@@ -1,0 +1,216 @@
+import Foundation
+import os
+
+/// Fetches an item's file into the audio cache, handing each piece on as it
+/// arrives, or reads back a file cached before. As ytm-native's `source.rs`,
+/// it asks in ranges, as googlevideo throttles large ones, retries what the
+/// network breaks, and on a refusal carries on from the same byte at a fresh
+/// URL for the same file.
+final class StreamLoader {
+    static let rangeLength: Int64 = 1 << 20
+    private static let maxRetries = 4
+    private static let retryDelay = Duration.milliseconds(500)
+    /// Fresh URLs asked for in a row without a whole range arriving from them.
+    private static let maxRefreshes = 2
+    private static let replayLength: Int64 = 256 << 10
+    /// What `warm` fetches, as ytm-native's warm-up.
+    static let warmLength: Int64 = 64 << 10
+
+    /// Reads the file for the decoder. Its descriptor follows the file as a
+    /// finished part becomes the cached file.
+    let reader: FileHandle
+    /// The file's length, or 0 until a download of unknown length ends.
+    private(set) var total: Int64
+    /// Bytes on disk from the start of the file.
+    private(set) var available: Int64
+    private(set) var isComplete: Bool
+    private let item: AudioItem
+    private let cache: AudioCache
+    private var url: URL
+    private var writer: FileHandle?
+    private var part: URL?
+
+    init(item: AudioItem, cache: AudioCache) throws(AudioFailure) {
+        self.item = item
+        self.cache = cache
+        url = item.url
+        do {
+            if let file = cache.completeFile(for: item.cacheKey, length: item.contentLength) {
+                reader = try FileHandle(forReadingFrom: file)
+                total = try Int64(reader.seekToEnd())
+                try reader.seek(toOffset: 0)
+                available = total
+                isComplete = true
+            } else {
+                let part = try cache.makePart(for: item.cacheKey)
+                self.part = part
+                writer = try FileHandle(forWritingTo: part)
+                reader = try FileHandle(forReadingFrom: part)
+                total = max(item.contentLength, 0)
+                available = 0
+                isComplete = false
+            }
+        } catch {
+            throw .storage
+        }
+    }
+
+    deinit {
+        if let part, !isComplete {
+            cache.discard(part)
+        }
+    }
+
+    /// Delivers the whole file to `onBytes` in order, from the network or
+    /// the cache. Returns why it failed, or nil once complete or cancelled.
+    func run(
+        isolation: isolated (any Actor)? = #isolation,
+        source: any ByteSource,
+        onBytes: (Data) -> Void
+    ) async -> AudioFailure? {
+        if isComplete {
+            return await replay(upTo: total, onBytes)
+        }
+        // The start `warm` fetched is on disk already.
+        if available > 0, let failure = await replay(upTo: available, onBytes) {
+            return failure
+        }
+        var retries = 0
+        var refreshes = 0
+        // The range after the one arriving, asked for already so it follows with no round trip.
+        var ahead: (start: Int64, bytes: AsyncThrowingStream<Data, any Error>)?
+        while total <= 0 || available < total {
+            guard !Task.isCancelled else { return nil }
+            let start = available
+            let end = total > 0 ? min(start + Self.rangeLength, total) : .max
+            let bytes = if let ahead, ahead.start == start {
+                ahead.bytes
+            } else {
+                source.bytes(of: url, headers: item.headers, range: start..<end)
+            }
+            ahead = end < total
+                ? (end, source.bytes(of: url, headers: item.headers, range: end..<min(end + Self.rangeLength, total)))
+                : nil
+            do {
+                for try await data in bytes {
+                    guard !Task.isCancelled else { return nil }
+                    try append(data)
+                    onBytes(data)
+                }
+                guard !Task.isCancelled else { return nil }
+                guard available > start else { throw ByteSourceError.empty }
+                if end == .max {
+                    total = available
+                }
+                retries = 0
+                refreshes = 0
+            } catch {
+                ahead = nil
+                guard !Task.isCancelled else { return nil }
+                if let failure = error as? AudioFailure {
+                    return failure
+                }
+                // A range that broke off after some bytes still got somewhere,
+                // so only failures in a row that bring nothing give up.
+                if available > start {
+                    retries = 0
+                }
+                if error as? ByteSourceError == .refused {
+                    guard refreshes < Self.maxRefreshes, let fresh = await refreshed() else { return .refused }
+                    refreshes += 1
+                    url = fresh
+                    continue
+                }
+                guard retries < Self.maxRetries else {
+                    Logger.audio.warning("A download failed after \(Self.maxRetries) retries")
+                    return .download
+                }
+                retries += 1
+                Logger.audio.debug("Download range failed, retry \(retries)")
+                try? await Task.sleep(for: Self.retryDelay * retries)
+            }
+        }
+        try? writer?.close()
+        writer = nil
+        if let part {
+            cache.commit(part, as: item.cacheKey)
+        }
+        isComplete = true
+        return nil
+    }
+
+    /// Fetches the file's first `warmLength` bytes ahead of `run`, which
+    /// carries on from what arrives. Only a head start, so it never retries.
+    func warm(isolation: isolated (any Actor)? = #isolation, source: any ByteSource) async {
+        guard available == 0, total > 0 else { return }
+        do {
+            for try await data in source.bytes(of: url, headers: item.headers, range: 0..<min(Self.warmLength, total)) {
+                guard !Task.isCancelled else { return }
+                try append(data)
+            }
+        } catch {
+            Logger.audio.debug("Could not warm a stream")
+        }
+    }
+
+    private func append(_ data: Data) throws(AudioFailure) {
+        guard let writer else { return }
+        do {
+            try writer.write(contentsOf: data)
+        } catch {
+            // Cut back to the bytes counted, so a later write follows them.
+            try? writer.truncate(atOffset: UInt64(available))
+            throw .storage
+        }
+        available += Int64(data.count)
+    }
+
+    /// Reads the file's first `end` bytes back from disk in pieces, letting
+    /// commands in between.
+    private func replay(isolation: isolated (any Actor)? = #isolation, upTo end: Int64, _ onBytes: (Data) -> Void) async -> AudioFailure? {
+        var offset: Int64 = 0
+        while offset < end {
+            guard !Task.isCancelled else { return nil }
+            guard let data = try? reader.read(upToCount: Int(min(Self.replayLength, end - offset))), !data.isEmpty else {
+                return .damaged
+            }
+            onBytes(data)
+            offset += Int64(data.count)
+            await Task.yield()
+        }
+        return nil
+    }
+
+    /// A fresh URL for the file being fetched, taken only if it serves the
+    /// same encode, as the bytes already held must line up with the rest.
+    private func refreshed(isolation: isolated (any Actor)? = #isolation) async -> URL? {
+        do {
+            let fresh = try await item.refresh()
+            guard Self.sameFile(url, fresh) else {
+                Logger.audio.warning("A refreshed stream URL serves a different file")
+                return nil
+            }
+            return fresh
+        } catch {
+            Logger.audio.warning("No fresh URL for a refused download")
+            return nil
+        }
+    }
+
+    /// Whether two googlevideo URLs serve the same file: the same format, of
+    /// the same length, from the same encode.
+    static func sameFile(_ a: URL, _ b: URL) -> Bool {
+        let first = parameters(a)
+        let second = parameters(b)
+        return first["itag"] != nil && ["itag", "clen", "lmt"].allSatisfy { first[$0] == second[$0] }
+    }
+
+    private static func parameters(_ url: URL) -> [String: String] {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return Dictionary(items.map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { first, _ in first })
+    }
+}
+
+extension Logger {
+    static let audio = Logger(subsystem: "YTMusic", category: "audio")
+}

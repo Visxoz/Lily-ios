@@ -1,0 +1,11 @@
+# Build output: the .ipa, screenshots, derived data and SwiftPM state.
+build/
+.build/
+DerivedData/
+*.ipa
+.swiftpm/
+Packages/YTMKit/.swiftpm/
+xcuserdata/
+*.xcuserstate
+
+.DS_Store

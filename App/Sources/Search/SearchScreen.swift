@@ -1,0 +1,151 @@
+import SwiftUI
+import YTMCore
+
+/// ytm-native's search box (`shell/top-bar.slint`) as the Search tab: the
+/// recent searches from focusing the field until the user types, YouTube's
+/// suggestions as they type, and the results as a page.
+struct SearchScreen: View {
+    /// What ytm-native waits after a keystroke before asking for suggestions.
+    private static let suggestDelay: Duration = .milliseconds(150)
+    /// Fewer characters than this get no suggestions.
+    private static let suggestFrom = 2
+    private static let suggestionLimit = 8
+
+    @Environment(AppModel.self) private var app
+    @State private var query = ""
+    @State private var searching = false
+    /// The user has typed since focusing the field, so suggestions replace
+    /// the recent searches.
+    @State private var typed = false
+    @State private var suggestions: [String] = []
+    /// The search whose results show.
+    @State private var shown: String?
+
+    var body: some View {
+        Group {
+            if searching {
+                SearchChoices(
+                    choices: showsRecent ? app.history.searches.queries : suggestions,
+                    recent: showsRecent,
+                    pick: search
+                )
+            } else if let shown {
+                PageScreen(route: .search(shown))
+                    .id(shown)
+            } else {
+                SearchPrompt()
+            }
+        }
+        // Always showing, so the query stays in view over its results, as
+        // ytm-native's search box.
+        .searchable(text: $query, isPresented: $searching, placement: .navigationBarDrawer(displayMode: .always), prompt: "What do you want to play?")
+        .onSubmit(of: .search) { search(query) }
+        .onChange(of: searching) { _, active in
+            // Each focus starts with the recent searches, even over the last query.
+            typed = false
+            if !active { suggestions = [] }
+        }
+        .onChange(of: query) {
+            if searching { typed = true }
+        }
+        .task(id: suggestKey) { await suggest(suggestKey) }
+    }
+
+    /// Recent searches show until the user types, and again once they clear
+    /// the field.
+    private var showsRecent: Bool {
+        query.isEmpty || !typed
+    }
+
+    /// The query to suggest for, or nil when none is wanted; each change
+    /// restarts the wait, dropping the request for the last keystroke.
+    private var suggestKey: String? {
+        guard searching, !showsRecent else { return nil }
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        return trimmed.count >= Self.suggestFrom ? trimmed : nil
+    }
+
+    private func suggest(_ query: String?) async {
+        guard let query else {
+            suggestions = []
+            return
+        }
+        do {
+            try await Task.sleep(for: Self.suggestDelay)
+        } catch {
+            return
+        }
+        let found = await app.api.suggestions(for: query)
+        guard !Task.isCancelled else { return }
+        suggestions = Array(found.prefix(Self.suggestionLimit))
+    }
+
+    /// Shows `text`'s results, keeping it among the recent searches.
+    private func search(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        searching = false
+        query = trimmed
+        app.history.recordSearch(trimmed)
+        app.navigation(for: .search).routes.removeAll()
+        shown = trimmed
+    }
+}
+
+/// The search field's dropdown, as a list: the recent searches with their
+/// remove buttons, or the suggestions.
+private struct SearchChoices: View {
+    let choices: [String]
+    let recent: Bool
+    let pick: (String) -> Void
+
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        List {
+            ForEach(choices, id: \.self) { choice in
+                HStack(spacing: 14) {
+                    Button { pick(choice) } label: {
+                        HStack(spacing: 14) {
+                            IconView(icon: recent ? .history : .search, size: 18, colour: theme.textSecondary)
+                            Text(choice)
+                                .font(.system(size: 15))
+                                .foregroundStyle(theme.text)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    if recent {
+                        IconButton(icon: .close, iconSize: 16) { app.history.removeSearch(choice) }
+                            .accessibilityLabel("Remove \u{201C}\(choice)\u{201D}")
+                    }
+                }
+                .listRowBackground(theme.panel)
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(theme.panel)
+        .scrollDismissesKeyboard(.immediately)
+    }
+}
+
+/// The Search tab before anything has been searched.
+private struct SearchPrompt: View {
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(spacing: 16) {
+            IconView(icon: .search, size: 48, colour: theme.textDim)
+            Text("What do you want to play?")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(theme.panel)
+    }
+}

@@ -1,0 +1,98 @@
+import Foundation
+import YTMCore
+
+/// A loaded page kept for returning to it, as ytm-native's `page_cache`.
+struct CachedPage {
+    var page: Page
+    let at: ContinuousClock.Instant
+}
+
+/// The page cache, as ytm-native's `navigation.rs`: pages are reused for five
+/// minutes, twelve at most, and what a past account asked for never lands.
+extension AppModel {
+    static let pageCacheSize = 12
+    static let pageCacheFor: Duration = .seconds(5 * 60)
+
+    /// `route`'s page as loaded within the last five minutes.
+    func cachedPage(_ route: Route) -> Page? {
+        guard let cached = pageCache[route], cached.at.duration(to: .now) < Self.pageCacheFor else { return nil }
+        return cached.page
+    }
+
+    /// `route`'s page fresh from YouTube, kept for going back. The history
+    /// isn't kept, so a song just played shows next time.
+    func fetchPage(_ route: Route) async throws -> Page {
+        let generation = accountGeneration
+        let page = try await api.page(route)
+        if generation == accountGeneration, route != .history {
+            cache(page, for: route)
+        }
+        return page
+    }
+
+    /// Signed in, Home's feed in one request, kept as `fetchPage` keeps it,
+    /// so a refusal shows the saved feed at once, as ytm-native's
+    /// `home_first_try`.
+    func fetchHomeFirstTry() async throws -> Page {
+        let generation = accountGeneration
+        let page = try await api.homeFirstTry()
+        if generation == accountGeneration {
+            cache(page, for: .home)
+        }
+        return page
+    }
+
+    /// Fetches the feed behind the saved one that Home shows, with its
+    /// retries, for the next visit, so the page never changes under the
+    /// reader, as ytm-native's `refresh_personal_home`. Not tied to the
+    /// screen, so leaving Home doesn't stop it.
+    func refreshHome() {
+        Task { [weak self] in
+            try? await Task.sleep(for: YTMusic.homeRetryAfter)
+            _ = try? await self?.fetchPage(.home)
+        }
+    }
+
+    /// The next step of what `page` has still to fetch, kept in the cache
+    /// with the time the page first loaded, as ytm-native's `complete_page`.
+    func fetchMore(of page: Page, for route: Route) async throws -> Page {
+        let generation = accountGeneration
+        let more = try await api.loadMore(page)
+        if generation == accountGeneration {
+            pageCache[route]?.page = more
+        }
+        return more
+    }
+
+    /// Drops `route`'s page, so it loads afresh.
+    func forget(_ route: Route) {
+        pageCache[route] = nil
+    }
+
+    /// After the player changed the account's library (a song rated, the
+    /// queue saved as a playlist): the pages that show it load afresh.
+    func libraryChanged() {
+        for route in [Route.likedSongs, .library, .libraryPlaylists] { forget(route) }
+    }
+
+    /// The signed-in Home as last saved, for when YouTube refuses the feed,
+    /// read off the main actor; nil signed out, as signing out deletes it.
+    func savedHome() async -> Page? {
+        guard isSignedIn else { return nil }
+        return await Self.readSavedHome(api)
+    }
+
+    @concurrent
+    private static func readSavedHome(_ api: YTMusic) async -> Page? {
+        api.cachedHome()
+    }
+
+    private func cache(_ page: Page, for route: Route) {
+        let now = ContinuousClock.now
+        pageCache = pageCache.filter { $0.value.at.duration(to: now) < Self.pageCacheFor }
+        if pageCache.count >= Self.pageCacheSize, let oldest = pageCache.min(by: { $0.value.at < $1.value.at })?.key {
+            pageCache[oldest] = nil
+        }
+        pageCache[route] = CachedPage(page: page, at: now)
+    }
+}

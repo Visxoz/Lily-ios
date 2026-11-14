@@ -1,0 +1,384 @@
+import AVFoundation
+
+/// The audio engine, as ytm-native's `engine.rs`: decodes the item heard into
+/// buffers a few seconds ahead of the player node, follows it with the next
+/// item without a gap or fading into it, and says when the sound crosses
+/// over. It runs on its own serial queue, never the main actor, and keeps
+/// only a few seconds of sound in memory, refilled as buffers play.
+actor PlaybackEngine {
+    /// An event, with the `play` or `stop` it follows, so the player can drop
+    /// those of an item it has already replaced.
+    struct Stamped: Sendable {
+        let session: UInt64
+        let event: AudioEvent
+    }
+
+    /// Where the sound goes: the device, or rendered on demand in tests.
+    enum Output: Sendable {
+        case device
+        case offline(sampleRate: Double)
+    }
+
+    nonisolated let clock = PlaybackClock()
+    nonisolated let queue = DispatchSerialQueue(label: "YTMusic.audio", qos: .userInitiated)
+    nonisolated var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
+
+    /// Seconds of sound in each buffer scheduled.
+    static let bufferSeconds = 0.5
+    /// Seconds of sound kept scheduled ahead of the player.
+    static let aheadSeconds = 3.5
+    /// Long enough for the mixer's volume ramp to reach silence.
+    static let pauseRamp = DispatchTimeInterval.milliseconds(60)
+    /// After this long paused or stopped, the output stops so the device can sleep.
+    static let idleAfter = DispatchTimeInterval.seconds(30)
+    /// The fade-in after a start, seek or stall: about one device callback,
+    /// as ytm-native ramps over.
+    static let fadeInSeconds = 0.01
+
+    /// Made on the engine's queue at first use, as both reach for the system.
+    lazy var graph = makeGraph()
+    lazy var cache = AudioCache(cacheLocation)
+    private let output: Output
+    private let cacheLocation: AudioCache.Location
+    let source: any ByteSource
+    let events: AsyncStream<Stamped>.Continuation
+    private var observer: (any NSObjectProtocol)?
+
+    var session: UInt64 = 0
+    /// The item whose sound is heard, or about to be.
+    var heard: Track?
+    /// The item whose buffers are being made: the one heard, or the next
+    /// once it follows on the same player.
+    var producing: Track?
+    /// The item queued by `setNext`, until it follows on.
+    var next: Track?
+    /// The start of the item likely to play next, fetched by `warm` until
+    /// the item opens.
+    var warmed: Warmed?
+    /// Whether each item's loudness is corrected.
+    var normalise = true
+    /// The crossfade into `next`, in seconds, or 0 to follow without a gap.
+    var nextFade = 0.0
+    var plan: FadePlan?
+    var fade: Fade?
+    /// The item heard has ended, and the next is still opening.
+    var awaitingNext = false
+
+    /// The buffers scheduled on the player, oldest first.
+    var scheduled: [Scheduled] = []
+    var aheadFrames = 0
+    /// Frames scheduled since the player last started, its timeline.
+    var playerFrames: Int64 = 0
+    /// Bumped as the player is stopped, so completions of its old buffers are ignored.
+    var generation = 0
+    var playerRunning = false
+    var fadeInNext = true
+    var paused = false
+    var buffering = false
+    /// Bumped by every pause and resume, so a stale delayed stop does nothing.
+    var pauseToken = 0
+
+    struct Scheduled {
+        let track: Track
+        /// The item frame of its first frame.
+        let first: Int64
+        let frames: Int
+        /// Its first frame on the player's timeline.
+        var start: Int64 = 0
+    }
+
+    init(output: Output, source: any ByteSource, cache: AudioCache.Location, events: AsyncStream<Stamped>.Continuation) {
+        self.output = output
+        self.source = source
+        cacheLocation = cache
+        self.events = events
+    }
+
+    private func makeGraph() -> AudioGraph {
+        guard case .offline(let rate) = output else { return AudioGraph() }
+        return AudioGraph(offlineFormat: AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2))
+    }
+
+    /// Runs `operation` on the engine's queue, in the order sent.
+    nonisolated func send(_ operation: @escaping @Sendable (isolated PlaybackEngine) -> Void) {
+        queue.async { self.assumeIsolated(operation) }
+    }
+
+    func emit(_ event: AudioEvent) {
+        events.yield(Stamped(session: session, event: event))
+    }
+
+    // MARK: Commands
+
+    func play(_ item: AudioItem, from seconds: Double, paused: Bool, session: UInt64) {
+        self.session = session
+        observeOutputChanges()
+        clear()
+        self.paused = paused
+        graph.setSilenced(paused)
+        guard let track = open(item, at: seconds, announcingStart: true) else { return }
+        heard = track
+        producing = track
+        clock.pin(seconds, since: nil)
+        describeHeard()
+        // Said again for the new item, as the player drops what came before it.
+        buffering = false
+        updateBuffering()
+    }
+
+    func setNext(_ item: AudioItem?, fade seconds: Double, session: UInt64) {
+        guard session == self.session, heard != nil else { return }
+        dropNext()
+        next = item.flatMap { open($0, at: 0, announcingStart: false) }
+        nextFade = seconds
+        // The item heard ended waiting for the next, which is gone.
+        if next == nil, awaitingNext {
+            awaitingNext = false
+            finish()
+        }
+    }
+
+    func seek(to seconds: Double, session: UInt64) {
+        guard session == self.session, let heard else { return }
+        // A seek lands in the item heard, so a next that already follows it
+        // is dropped, and the controller queues it again.
+        if let switched = producing, switched !== heard {
+            switched.cancel()
+            emit(.nextDropped)
+        }
+        producing = heard
+        fade = nil
+        plan = nil
+        awaitingNext = false
+        heard.seek(to: max(seconds, 0))
+        clock.pin(max(seconds, 0), since: nil)
+        restartPlayer()
+    }
+
+    func pause() {
+        paused = true
+        pauseToken += 1
+        let token = pauseToken
+        graph.setSilenced(true)
+        queue.asyncAfter(deadline: .now() + Self.pauseRamp) { [self] in
+            assumeIsolated { engine in
+                guard engine.paused, engine.pauseToken == token, engine.playerRunning else { return }
+                engine.graph.player.pause()
+                engine.playerRunning = false
+                engine.clock.hold()
+            }
+        }
+        stopOutputWhenIdle()
+        updateBuffering()
+    }
+
+    func resume() {
+        paused = false
+        pauseToken += 1
+        graph.setSilenced(false)
+        if heard != nil, !graph.engine.isRunning {
+            // The output stopped while paused, idle or interrupted, and took
+            // the player's schedule with it, so it is made again from where
+            // the sound stopped.
+            seek(to: clock.position(), session: session)
+        } else if !scheduled.isEmpty, !playerRunning {
+            startPlayer()
+        }
+        updateBuffering()
+    }
+
+    func stop(session: UInt64) {
+        self.session = session
+        clear()
+        clock.pin(0, since: nil)
+        describeHeard()
+        updateBuffering()
+        stopOutputWhenIdle()
+    }
+
+    func setLevel(_ level: Float) {
+        graph.setLevel(level)
+    }
+
+    func setEqualiser(enabled: Bool, gains: [Float]) {
+        graph.setEqualiser(enabled: enabled, gains: gains)
+    }
+
+    func cacheSize() -> Int64 {
+        cache.size()
+    }
+
+    func clearCache() {
+        cache.clear()
+    }
+
+    /// Makes the graph afresh, as after the system's media services reset,
+    /// when the old one no longer reaches the device. Drops anything playing;
+    /// the volume and equaliser carry over, and the next `play` follows the
+    /// new graph's output changes.
+    func rebuildGraph() {
+        clear()
+        if let observer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        observer = nil
+        let old = graph
+        old.engine.stop()
+        graph = makeGraph()
+        graph.adoptSettings(of: old)
+    }
+
+    func shutDown() {
+        clear()
+        warmed?.task.cancel()
+        warmed = nil
+        if let observer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        graph.engine.stop()
+        events.finish()
+    }
+
+    // MARK: Items
+
+    /// Opens an item and starts its download, carrying on from any start
+    /// `warm` fetched, or reports why it cannot.
+    func open(_ item: AudioItem, at seconds: Double, announcingStart: Bool) -> Track? {
+        let warmUp = takeWarmed(item)
+        guard let loader = warmUp?.loader ?? makeLoader(item) else { return nil }
+        let track = Track(item: item, loader: loader, startAt: seconds, announcesStart: announcingStart)
+        track.download = Task { [self] in
+            if let warming = warmUp?.task {
+                // The file's start is on its way, and the rest follows it.
+                await withTaskCancellationHandler { await warming.value } onCancel: { warming.cancel() }
+            }
+            let failure = await track.loader.run(source: source) { data in
+                guard !track.isCancelled else { return }
+                track.receive(data)
+                progressed(track)
+            }
+            guard !track.isCancelled else { return }
+            if let failure {
+                track.fail(failure)
+            }
+            progressed(track)
+        }
+        return track
+    }
+
+    /// A new download of the item, or nil once why it cannot start is reported.
+    private func makeLoader(_ item: AudioItem) -> StreamLoader? {
+        do {
+            return try StreamLoader(item: item, cache: cache)
+        } catch {
+            emit(.failed(id: item.id, message: error.message))
+            return nil
+        }
+    }
+
+    /// Acts on more of an item's file having arrived, or its download ending.
+    func progressed(_ track: Track) {
+        if track === next {
+            prepareNext()
+        } else if track === producing {
+            fill()
+        }
+        if track === heard {
+            describeHeard()
+        }
+    }
+
+    /// Tells the clock the length of the item heard and how much of it has downloaded.
+    func describeHeard() {
+        clock.describe(duration: heard?.duration, buffered: heard?.bufferedFraction ?? 0)
+    }
+
+    /// Readies the next item to follow on: open, its leading silence cut for
+    /// a crossfade. A next that fails is dropped and reported, and the item
+    /// heard then simply ends.
+    func prepareNext() {
+        guard let next else { return }
+        if let failure = next.failure {
+            emit(.failed(id: next.item.id, message: failure.message))
+            dropNext()
+            if awaitingNext {
+                awaitingNext = false
+                finish()
+            }
+            return
+        }
+        guard isReady(next) else { return }
+        if awaitingNext {
+            startAfresh(next)
+        } else {
+            fill()
+        }
+    }
+
+    func isReady(_ track: Track) -> Bool {
+        guard let rate = track.sampleRate else { return false }
+        return nextFade <= 0 || track.trimLeadingSilence(limit: Int64(AudioPlayer.silenceTrimSeconds * rate))
+    }
+
+    /// Drops the next item, taking back any of its buffers that follow the
+    /// item heard. Reports nothing: the controller asked for it.
+    func dropNext() {
+        if let switched = producing, let heard, switched !== heard {
+            switched.cancel()
+            producing = heard
+            fade = nil
+            heard.seek(to: clock.position())
+            restartPlayer()
+        }
+        next?.cancel()
+        next = nil
+        plan = nil
+    }
+
+    /// Ends everything, for a new item or a stop.
+    func clear() {
+        for track in [heard, producing, next, fade?.from].compactMap(\.self) {
+            track.cancel()
+        }
+        heard = nil
+        producing = nil
+        next = nil
+        plan = nil
+        fade = nil
+        awaitingNext = false
+        resetPlayer()
+    }
+
+    // MARK: Output
+
+    /// Follows the output device as it changes: the engine has stopped, so
+    /// it reconnects at the new format and carries on from where the sound got to.
+    private func observeOutputChanges() {
+        guard observer == nil else { return }
+        observer = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: graph.engine, queue: nil
+        ) { [weak self] _ in
+            self?.send { $0.outputChanged() }
+        }
+    }
+
+    private func outputChanged() {
+        graph.connectOutput()
+        guard heard != nil else { return }
+        seek(to: clock.position(), session: session)
+    }
+
+    /// Stops the output after a while with nothing to play, so the device
+    /// can sleep; the next sound starts it again.
+    func stopOutputWhenIdle() {
+        let token = pauseToken
+        let generation = generation
+        queue.asyncAfter(deadline: .now() + Self.idleAfter) { [self] in
+            assumeIsolated { engine in
+                let stopped = engine.heard == nil && engine.generation == generation
+                guard engine.pauseToken == token, engine.paused || stopped else { return }
+                engine.graph.engine.stop()
+            }
+        }
+    }
+}

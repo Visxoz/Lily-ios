@@ -1,0 +1,246 @@
+import Foundation
+import Testing
+@testable import YTMCore
+
+private func json(_ text: String) throws -> JSON {
+    try JSON(data: Data(text.utf8))
+}
+
+private func track(_ id: String, _ title: String, _ artists: [(id: String, name: String)]) -> Track {
+    Track(id: id, title: title, artists: artists.map { ArtistRef(id: $0.id.isEmpty ? nil : $0.id, name: $0.name) })
+}
+
+/// ytm-native's `api/mod.rs` tests.
+@Suite struct SongVersionTests {
+    @Test func matchesAMusicVideoToItsSong() {
+        let video = track("mqEZcXdtAUA", "Fever", [("UCbuck", "Buckshot"), ("UCfake", "fakemink")])
+        let song = track("FDzYuXpyUTI", "Fever", [("UCbuck", "Buckshot"), ("UCfake", "fakemink")])
+        #expect(YTMusic.isSongVersion(of: video, song))
+        let byName = track("x", "fever ", [("", "FAKEMINK")])
+        #expect(YTMusic.isSongVersion(of: video, byName))
+    }
+
+    @Test func keepsEditsAndNamesakes() {
+        let video = track("mqEZcXdtAUA", "Fever", [("UCbuck", "Buckshot")])
+        #expect(!YTMusic.isSongVersion(of: video, track("f61jlvSDYRc", "Fever (Solo)", [("UCbuck", "Buckshot")])))
+        #expect(!YTMusic.isSongVersion(of: video, track("x", "Fever", [("UCpeggy", "Peggy Lee")])))
+        let upload = track(
+            "STX02ldQjJ4", "Cult Member - U Weren't Here I Really Miss You (ORIGINAL SONG + BEST PART + SLOWED)",
+            [("UCupload", "some uploader")]
+        )
+        #expect(!YTMusic.isSongVersion(of: upload, track("x", "U Weren't Here I Really Miss You", [("UCcult", "Cult Member")])))
+    }
+}
+
+private let editablePlaylist = #"""
+{"contents":{"twoColumnBrowseResultsRenderer":{
+  "tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[
+    {"musicEditablePlaylistDetailHeaderRenderer":{"header":{"musicResponsiveHeaderRenderer":{
+      "title":{"runs":[{"text":"Road trip"}]},
+      "secondSubtitle":{"runs":[{"text":"1.2K views"},{"text":" • "},{"text":"1,204 songs"},{"text":" • "},{"text":"70+ hours"}]},
+      "description":{"musicDescriptionShelfRenderer":{"description":{"runs":[{"text":"For the car"}]}}},
+      "facepile":{"avatarStackViewModel":{"text":{"content":"Alex"},"rendererContext":{"commandContext":{"onTap":{"innertubeCommand":{
+        "browseEndpoint":{"browseId":"UCalex","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_USER_CHANNEL"}}}}}}}}},
+      "thumbnail":{"musicThumbnailRenderer":{"thumbnail":{"thumbnails":[{"url":"https://lh3.googleusercontent.com/p=w544-h544","width":544}]}}}}}}}
+  ]}}}}],
+  "secondaryContents":{"sectionListRenderer":{"contents":[
+    {"musicPlaylistShelfRenderer":{"contents":[
+      {"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"v1","playlistSetVideoId":"S1"},
+        "flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"One"}]}}},
+          {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Band","navigationEndpoint":{"browseEndpoint":{"browseId":"UCband"}}}]}}}],
+        "fixedColumns":[{"musicResponsiveListItemFixedColumnRenderer":{"text":{"runs":[{"text":"3:00"}]}}}]}},
+      {"continuationItemRenderer":{"continuationEndpoint":{"continuationCommand":{"token":"NEXT"}}}}
+    ]}}
+  ]}}}}}
+"""#
+
+@Suite struct PlaylistPageTests {
+    @Test func readsAnOwnedPlaylistsHeaderAndFirstBatch() throws {
+        let page = try Renderers.playlistPage(try json(editablePlaylist), id: "PLroad")
+        let header = try #require(page.header)
+        #expect(header.editable)
+        #expect(header.title == "Road trip" && header.label == "Playlist" && header.subtitle == "Alex")
+        #expect(header.meta == "1204 songs • 3 min", "the whole list's count, the loaded tracks' length")
+        #expect(header.description == "For the car")
+        #expect(header.radioId == "RDAMPLPLroad" && header.playlistId == "PLroad")
+        #expect(header.thumbnail == "https://lh3.googleusercontent.com/p=w544-h544-l90-rj")
+        #expect(page.more == .tracks(token: "NEXT", sectionIndex: 0))
+        let tracks = page.headerTracks
+        #expect(tracks.count == 1 && tracks[0].setVideoId == "S1" && tracks[0].artistNames == "Band")
+    }
+
+    @Test func countsTracksFromEitherSubtitleShape() throws {
+        let three = try json(#"{"secondSubtitle":{"runs":[{"text":"6.2M views"},{"text":" • "},{"text":"492 tracks"},{"text":" • "},{"text":"30 hours"}]}}"#)
+        let two = try json(#"{"secondSubtitle":{"runs":[{"text":"12 songs"},{"text":" • "},{"text":"53 minutes"}]}}"#)
+        #expect(Renderers.trackCount(three) == 492)
+        #expect(Renderers.trackCount(two) == 12)
+        #expect(Renderers.trackCount(.missing) == nil)
+    }
+}
+
+private let album = #"""
+{"microformat":{"microformatDataRenderer":{"urlCanonical":"https://music.youtube.com/playlist?list=OLAKok"}},
+ "contents":{"twoColumnBrowseResultsRenderer":{
+  "tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[
+    {"musicResponsiveHeaderRenderer":{"title":{"runs":[{"text":"OK Computer"}]},
+      "subtitle":{"runs":[{"text":"Album"},{"text":" • "},{"text":"1997"}]},
+      "straplineTextOne":{"runs":[{"text":"Radiohead","navigationEndpoint":{"browseEndpoint":{"browseId":"UCrh",
+        "browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ARTIST"}}}}}]},
+      "secondSubtitle":{"runs":[{"text":"3 songs"},{"text":" • "},{"text":"12 minutes"}]},
+      "thumbnail":{"musicThumbnailRenderer":{"thumbnail":{"thumbnails":[{"url":"https://lh3.googleusercontent.com/c=w60-h60","width":60}]}}}}}
+  ]}}}}],
+  "secondaryContents":{"sectionListRenderer":{"contents":[
+    {"musicShelfRenderer":{"contents":[
+      {"musicResponsiveListItemRenderer":{"index":{"runs":[{"text":"1"}]},"playlistItemData":{"videoId":"a1"},
+        "flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Airbag",
+            "navigationEndpoint":{"watchEndpoint":{"videoId":"a1","watchEndpointMusicSupportedConfigs":{"watchEndpointMusicConfig":{"musicVideoType":"MUSIC_VIDEO_TYPE_ATV"}}}}}]}}},
+          {"musicResponsiveListItemFlexColumnRenderer":{"text":{}}},
+          {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"19M plays"}]}}}],
+        "fixedColumns":[{"musicResponsiveListItemFixedColumnRenderer":{"text":{"runs":[{"text":"4:48"}]}}}]}},
+      {"musicResponsiveListItemRenderer":{"index":{"runs":[{"text":"0"}]},"playlistItemData":{"videoId":"v2"},
+        "flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Karma Police",
+            "navigationEndpoint":{"watchEndpoint":{"videoId":"v2","watchEndpointMusicSupportedConfigs":{"watchEndpointMusicConfig":{"musicVideoType":"MUSIC_VIDEO_TYPE_OMV"}}}}}]}}},
+          {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Guest","navigationEndpoint":{"browseEndpoint":{"browseId":"UCguest"}}}]}}}]}}
+    ]}},
+    {"musicCarouselShelfRenderer":{"header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Other versions"}]}}},
+      "contents":[{"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"OKNOTOK"}]},"subtitle":{"runs":[{"text":"Album"},{"text":" • "},{"text":"Radiohead"}]},
+        "navigationEndpoint":{"browseEndpoint":{"browseId":"MPREb_ok2","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}}}]}},
+    {"musicCarouselShelfRenderer":{"header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Releases for you"}]}}},
+      "contents":[{"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"Other"}]},
+        "navigationEndpoint":{"browseEndpoint":{"browseId":"MPREb_x","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}}}]}}
+  ]}}}}}
+"""#
+
+@Suite struct AlbumPageTests {
+    @Test func readsAnAlbum() throws {
+        let details = try Renderers.album(try json(album), id: "MPREb_ok")
+        #expect(details.type == .album && details.year == 1997 && details.trackCount == 3)
+        #expect(details.playlistId == "OLAKok")
+        #expect(details.tracks.map(\.trackNumber) == [1, 2], "a track numbered 0 follows on")
+        #expect(details.tracks[0].artistNames == "Radiohead", "an empty artists column means the album's, not the plays")
+        #expect(details.tracks[1].artistNames == "Guest")
+        #expect(details.needsPlaylist)
+
+        let page = details.page
+        let header = try #require(page.header)
+        #expect(header.label == "Album" && header.subtitle == "Radiohead")
+        #expect(header.meta == "1997 • 2 songs • 5 min")
+        #expect(header.radioId == "RDAMPLOLAKok" && header.playlistId == "OLAKok")
+        guard case .tracks(let list)? = page.sections.first, case .cards(let versions)? = page.sections.last else {
+            Issue.record("expected the tracks then other versions")
+            return
+        }
+        #expect(list.numbered && list.title.isEmpty)
+        #expect(list.tracks.allSatisfy { $0.thumbnail == "https://lh3.googleusercontent.com/c=w120-h120-l90-rj" && $0.album?.id == "MPREb_ok" })
+        #expect(page.sections.count == 2, "only other versions follow the tracks")
+        #expect(versions.title == "Other versions" && versions.cards.map(\.subtitle) == ["Album • Radiohead"])
+    }
+
+    @Test func adoptsSongsFromTheAlbumsPlaylist() throws {
+        var details = try Renderers.album(try json(album), id: "MPREb_ok")
+        details.adopt([
+            Track(id: "a1", title: "Airbag"),
+            Track(id: "song2", title: "Karma Police", duration: 261),
+            Track(id: "song3", title: "Lucky"),
+        ])
+        #expect(details.tracks.map(\.id) == ["a1", "song2", "song3"])
+        #expect(!details.tracks[1].isVideo && details.tracks[1].duration == 261)
+        #expect(details.tracks[2].trackNumber == 3 && details.tracks[2].album?.name == "OK Computer")
+    }
+}
+
+private let artist = #"""
+{"header":{"musicImmersiveHeaderRenderer":{"title":{"runs":[{"text":"Radiohead"}]},
+  "subscriptionButton":{"subscribeButtonRenderer":{"subscriberCountText":{"runs":[{"text":"5.47M"}]}}},
+  "startRadioButton":{"buttonRenderer":{"navigationEndpoint":{"watchEndpoint":{"playlistId":"RDEMradio"}}}},
+  "shareEndpoint":{"shareEntityEndpoint":{"serializedShareEntity":"GhhVQ3JfaXlVQU5jbjlPWF95eTlwaVlvTHc%3D"}},
+  "thumbnail":{"musicThumbnailRenderer":{"thumbnail":{"thumbnails":[
+    {"url":"https://lh3.googleusercontent.com/b=w540-h225","width":540},{"url":"https://lh3.googleusercontent.com/b=w1440-h600","width":1440}]}}}}},
+ "contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[
+  {"musicCarouselShelfRenderer":{"contents":[{"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"Radiohead"}]},
+    "navigationEndpoint":{"browseEndpoint":{"browseId":"UCchannel","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_USER_CHANNEL"}}}}}}]}},
+  {"musicShelfRenderer":{"title":{"runs":[{"text":"Top songs"}]},
+    "bottomEndpoint":{"browseEndpoint":{"browseId":"VLOLAKtop","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_PLAYLIST"}}}},
+    "contents":[{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"creep"},
+      "flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Creep"}]}}},
+        {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Radiohead","navigationEndpoint":{"browseEndpoint":{"browseId":"UCr_iyUANcn9OX_yy9piYoLw"}}}]}}}]}}]}},
+  {"musicCarouselShelfRenderer":{"header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Singles & EPs"}]},
+    "moreContentButton":{"buttonRenderer":{"navigationEndpoint":{"browseEndpoint":{"browseId":"MPADUCr","params":"SINGLES"}}}}}},
+    "contents":[
+      {"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"Ill Wind"}]},"subtitle":{"runs":[{"text":"2019"}]},
+        "navigationEndpoint":{"browseEndpoint":{"browseId":"MPREb_ill","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}}},
+      {"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"I Might Be Wrong"}]},"subtitle":{"runs":[{"text":"Album"},{"text":" • "},{"text":"2001"}]},
+        "navigationEndpoint":{"browseEndpoint":{"browseId":"MPREb_wrong","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}}}]}},
+  {"musicCarouselShelfRenderer":{"header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Videos"}]}}},
+    "contents":[{"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"Creep"}]},
+      "navigationEndpoint":{"watchEndpoint":{"videoId":"XFk","watchEndpointMusicSupportedConfigs":{"watchEndpointMusicConfig":{"musicVideoType":"MUSIC_VIDEO_TYPE_OMV"}}}}}}]}},
+  {"musicCarouselShelfRenderer":{"header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Fans might also like"}]}}},
+    "contents":[{"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"Nirvana"}]},"subtitle":{"runs":[{"text":"60M monthly audience"}]},
+      "navigationEndpoint":{"browseEndpoint":{"browseId":"UCnirvana","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ARTIST"}}}}}}]}}
+ ]}}}}]}}}
+"""#
+
+@Suite struct ArtistPageTests {
+    @Test func readsTheChannelIdOfAShareEntity() {
+        #expect(Renderers.sharedChannelId("GhhVQ3JfaXlVQU5jbjlPWF95eTlwaVlvTHc%3D") == "UCr_iyUANcn9OX_yy9piYoLw")
+        #expect(Renderers.sharedChannelId("not base64!") == nil)
+    }
+
+    @Test func readsAnArtist() throws {
+        let details = try Renderers.artist(try json(artist), id: "UCalias")
+        #expect(details.id == "UCr_iyUANcn9OX_yy9piYoLw", "an alias names the artist's own ID")
+        let page = details.page
+        let header = try #require(page.header)
+        #expect(header.label == "Artist" && header.banner)
+        #expect(header.subtitle == "5.5M subscribers")
+        #expect(header.radioId == "RDEMradio" && header.shufflePlaylistId == "OLAKtop")
+        #expect(header.thumbnail == "https://lh3.googleusercontent.com/b=w1440-h600", "the widest banner, as is")
+        #expect(page.sections.map(\.title) == ["Songs", "Albums", "Singles & EPs", "Fans might also like"])
+        guard case .tracks(let songs) = page.sections[0], case .cards(let albums) = page.sections[1],
+              case .cards(let singles) = page.sections[2]
+        else {
+            Issue.record("expected songs then releases")
+            return
+        }
+        #expect(songs.more == .playlist("OLAKtop") && songs.tracks.map(\.id) == ["creep", "XFk"], "the videos follow the top songs")
+        #expect(songs.tracks.map(\.isVideo) == [false, true])
+        #expect(albums.cards.map(\.title) == ["I Might Be Wrong"], "a tile's own label beats its shelf's")
+        #expect(singles.cards.map(\.subtitle) == ["Single • Radiohead • 2019"])
+        #expect(singles.more == .browse(id: "MPADUCr", params: "SINGLES"))
+    }
+}
+
+@Suite struct SearchAndBrowseTests {
+    @Test func readsSuggestedQueries() throws {
+        let response = try json(#"""
+        {"contents":[{"searchSuggestionsSectionRenderer":{"contents":[
+          {"searchSuggestionRenderer":{"suggestion":{"runs":[{"bold":true,"text":"radioh"},{"text":"ead"}]}}},
+          {"searchSuggestionRenderer":{"suggestion":{"runs":[{"text":"radiohead creep"}]}}}]}},
+         {"searchSuggestionsSectionRenderer":{"contents":[{"musicResponsiveListItemRenderer":{}}]}}]}
+        """#)
+        #expect(Renderers.suggestions(in: response) == ["radiohead", "radiohead creep"])
+    }
+
+    @Test func retitlesWithoutShowAll() {
+        let section = Section.tracks(TrackSection(title: "Songs on YouTube", tracks: [], mode: .radio, more: .search("x")))
+        guard case .tracks(let retitled) = section.retitled("Songs") else {
+            Issue.record("expected a track section")
+            return
+        }
+        #expect(retitled.title == "Songs" && retitled.more == nil)
+    }
+
+    @Test func appendsTheItemsOfLaterBatches() throws {
+        var section = Section.cards(CardSection(title: "", cards: [], layout: .grid))
+        section.append(try json(#"""
+        [{"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"Kid A"}]},"subtitle":{"runs":[{"text":"Album"},{"text":" • "},{"text":"2000"}]},
+          "navigationEndpoint":{"browseEndpoint":{"browseId":"MPREb_kida","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}}},
+         {"continuationItemRenderer":{}}]
+        """#).array, context: ItemContext(artists: [ArtistRef(id: "UCr", name: "Radiohead")]))
+        guard case .cards(let grid) = section else {
+            Issue.record("expected a card section")
+            return
+        }
+        #expect(grid.cards.map(\.subtitle) == ["Album • Radiohead • 2000"])
+    }
+}

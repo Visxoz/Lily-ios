@@ -1,0 +1,240 @@
+import Foundation
+
+/// The parsers every page shares: InnerTube's list and tile items into
+/// tracks and cards, its shelves into sections, and its endpoints into
+/// routes. Ports of ytm-native's `api/convert.rs` and `api/home_feed.rs`,
+/// reading the renderer JSON as rustypipe's `music_item.rs` does.
+///
+/// Every parser takes one item and returns nil for one it can't read, so an
+/// odd item is skipped and never fails the page.
+enum Renderers {
+    /// A parsed list or tile item.
+    enum Item {
+        case track(Track)
+        case card(Card)
+    }
+
+    /// The parsed item in a `{"<kind>Renderer": {...}}` wrapper, or nil for
+    /// kinds the app doesn't show (podcast episodes, messages, …).
+    static func item(_ wrapped: JSON, context: ItemContext = ItemContext()) -> Item? {
+        guard let (key, renderer) = wrapped.onlyValue else { return nil }
+        switch key {
+        case "musicResponsiveListItemRenderer":
+            if let track = track(renderer, context: context) { return .track(track) }
+            return listCard(renderer, context: context).map(Item.card)
+        case "musicTwoRowItemRenderer":
+            return twoRowCard(renderer, context: context).map(Item.card)
+        case "musicNavigationButtonRenderer":
+            return genreCard(renderer).map(Item.card)
+        default:
+            return nil
+        }
+    }
+
+    /// The tracks among list items, skipping the rest.
+    static func tracks(_ items: [JSON], context: ItemContext = ItemContext()) -> [Track] {
+        items.compactMap { wrapped in
+            guard case .track(let track)? = item(wrapped, context: context) else { return nil }
+            return track
+        }
+    }
+
+    /// The cards among list items, skipping the rest.
+    static func cards(_ items: [JSON], context: ItemContext = ItemContext()) -> [Card] {
+        items.compactMap { wrapped in
+            guard case .card(let card)? = item(wrapped, context: context) else { return nil }
+            return card
+        }
+    }
+}
+
+/// What the page around an item knows that the item itself leaves out.
+struct ItemContext: Sendable {
+    /// Album pages: the album every track is on.
+    var album: AlbumRef?
+    /// Album and artist pages: who the tracks and releases are by when they
+    /// don't say.
+    var artists: [ArtistRef] = []
+    /// The kind of release an unlabelled album tile is, as on an artist's
+    /// singles shelf, where tiles say only the year.
+    var albumType: AlbumType = .album
+    var subtitles: CardSubtitles = .composed
+}
+
+/// How a card's subtitle is worded.
+enum CardSubtitles: Sendable {
+    /// As ytm-native's `convert.rs` composes it: "Album • Artist • 2024",
+    /// "Playlist • Channel", "1.2M subscribers".
+    case composed
+    /// As YouTube words it, which ytm-native shows on Home.
+    case asShown
+}
+
+/// A release's kind, as its tile or header labels it.
+enum AlbumType: Sendable {
+    case album, ep, single, audiobook, show
+
+    /// From YouTube's English label; nil for any other text.
+    init?(label: String) {
+        switch label.trimmingCharacters(in: .whitespaces).lowercased() {
+        case "album", "albums": self = .album
+        case "ep": self = .ep
+        case "single", "singles": self = .single
+        case "audiobook": self = .audiobook
+        case "show": self = .show
+        default: return nil
+        }
+    }
+
+    /// As the app shows it.
+    var label: String {
+        switch self {
+        case .album: "Album"
+        case .ep: "EP"
+        case .single: "Single"
+        case .audiobook: "Audiobook"
+        case .show: "Podcast"
+        }
+    }
+}
+
+// MARK: - Endpoints
+
+extension Renderers {
+    /// What a browse endpoint opens, by its page type.
+    enum PageKind {
+        case album, artist, playlist
+
+        init?(pageType: String?) {
+            switch pageType {
+            case "MUSIC_PAGE_TYPE_ALBUM", "MUSIC_PAGE_TYPE_AUDIOBOOK": self = .album
+            case "MUSIC_PAGE_TYPE_ARTIST", "MUSIC_PAGE_TYPE_AUDIOBOOK_ARTIST", "MUSIC_PAGE_TYPE_USER_CHANNEL",
+                 "WEB_PAGE_TYPE_CHANNEL": self = .artist
+            case "MUSIC_PAGE_TYPE_PLAYLIST", "WEB_PAGE_TYPE_PLAYLIST": self = .playlist
+            default: return nil
+            }
+        }
+    }
+
+    /// A `browseEndpoint`'s page kind and the ID that page is asked for by:
+    /// playlists lose the `VL` their browse IDs carry.
+    static func page(_ endpoint: JSON) -> (kind: PageKind, id: String)? {
+        guard let id = endpoint["browseEndpoint", "browseId"].string, !id.isEmpty,
+              let kind = PageKind(pageType: pageType(endpoint))
+        else { return nil }
+        return (kind, kind == .playlist ? playlistId(id) : id)
+    }
+
+    /// A playlist's ID from its browse ID.
+    static func playlistId(_ browseId: String) -> String {
+        browseId.hasPrefix("VL") ? String(browseId.dropFirst(2)) : browseId
+    }
+
+    /// The page a navigation endpoint opens, or nil for one that plays.
+    static func route(_ endpoint: JSON) -> Route? {
+        if let query = endpoint["searchEndpoint", "query"].string { return .search(query) }
+        guard let id = endpoint["browseEndpoint", "browseId"].string, !id.isEmpty else { return nil }
+        let params = endpoint["browseEndpoint", "params"].string.flatMap { $0.isEmpty ? nil : $0 }
+        switch page(endpoint) {
+        case (.album, let id)?: return .album(id)
+        case (.artist, let id)?: return .artist(id)
+        case (.playlist, let id)?: return .playlist(id)
+        case nil: break
+        }
+        switch id {
+        case "FEmusic_home": return .home
+        case "FEmusic_explore": return .explore
+        case "FEmusic_library_landing": return .library
+        case "FEmusic_history": return .history
+        case "FEmusic_new_releases": return .newReleases
+        case "FEmusic_charts": return .charts
+        case "FEmusic_moods_and_genres": return .moodsAndGenres
+        case "FEmusic_moods_and_genres_category": return params.map(Route.genre)
+        case "FEmusic_liked_playlists": return .libraryPlaylists
+        case "FEmusic_liked_albums": return .libraryAlbums
+        case "FEmusic_library_corpus_track_artists", "FEmusic_library_corpus_artists": return .libraryArtists
+        case "FEmusic_liked_videos": return .librarySongs
+        default: break
+        }
+        if id.hasPrefix("VL") { return .playlist(playlistId(id)) }
+        if id.hasPrefix("MPRE") { return .album(id) }
+        if id.hasPrefix("UC") { return .artist(id) }
+        return .browse(id: id, params: params)
+    }
+
+    /// The watch endpoint's music video type says audio track (ATV) or
+    /// video (OMV, UGC, episodes…); nil when it doesn't say.
+    static func isVideo(_ watchEndpoint: JSON) -> Bool? {
+        watchEndpoint["watchEndpointMusicSupportedConfigs", "watchEndpointMusicConfig", "musicVideoType"].string
+            .map { $0 != "MUSIC_VIDEO_TYPE_ATV" }
+    }
+
+    /// A continuation endpoint's token: `continuationCommand`, or the first
+    /// one a `commandExecutorCommand` runs.
+    static func token(_ continuationEndpoint: JSON) -> String? {
+        let direct = continuationEndpoint["continuationCommand", "token"].string
+        let nested = continuationEndpoint["commandExecutorCommand", "commands"].array.lazy
+            .compactMap { $0["continuationCommand", "token"].string }.first
+        return (direct ?? nested).flatMap { $0.isEmpty ? nil : $0 }
+    }
+}
+
+// MARK: - Runs
+
+extension Renderers {
+    /// Text runs split at YouTube's " • " separators: "Song • A & B • 3:45"
+    /// gives three segments.
+    static func segments(_ runs: [JSON]) -> [[JSON]] {
+        var segments: [[JSON]] = [[]]
+        for run in runs {
+            if run["text"].string == " • " {
+                segments.append([])
+            } else {
+                segments[segments.count - 1].append(run)
+            }
+        }
+        return segments.filter { !$0.isEmpty }
+    }
+
+    static func text(_ runs: [JSON]) -> String {
+        runs.lazy.compactMap { $0["text"].string }.joined()
+    }
+
+    /// Runs linked to an artist or channel page.
+    static func linkedArtists(_ runs: [JSON]) -> [ArtistRef] {
+        runs.compactMap { run in
+            guard let name = run["text"].string, let id = run["navigationEndpoint", "browseEndpoint", "browseId"].string
+            else { return nil }
+            // Linked by page type, or, without one, by a channel's ID.
+            let kind = PageKind(pageType: pageType(run["navigationEndpoint"]))
+            return kind == .artist || (kind == nil && id.hasPrefix("UC")) ? ArtistRef(id: id, name: name) : nil
+        }
+    }
+
+    /// Artists named without links, as uploads' are: the first segment that
+    /// isn't a type label, its unlinked separators (", ", " & ") dropped, as
+    /// rustypipe's `map_artists`.
+    static func unlinkedArtists(_ segments: [[JSON]]) -> [ArtistRef] {
+        guard let segment = segments.first(where: { !typeLabels.contains(text($0)) }) else { return [] }
+        return segment.enumerated().compactMap { index, run in
+            guard let name = run["text"].string, index.isMultiple(of: 2), name != "Various Artists" else { return nil }
+            return ArtistRef(id: nil, name: name)
+        }
+    }
+
+    /// The labels YouTube puts before an item's details.
+    static let typeLabels: Set<String> = ["Song", "Video", "Episode", "Podcast", "Album", "Single", "EP", "Playlist", "Artist", "Profile"]
+
+    /// The first run linked to an album page.
+    static func album(_ runs: [JSON]) -> AlbumRef? {
+        runs.lazy.compactMap { run -> AlbumRef? in
+            guard let name = run["text"].string, case (.album, let id)? = page(run["navigationEndpoint"]) else { return nil }
+            return AlbumRef(id: id, name: name)
+        }.first
+    }
+
+    /// The page type of an endpoint that holds a `browseEndpoint`.
+    static func pageType(_ endpoint: JSON) -> String? {
+        endpoint["browseEndpoint", "browseEndpointContextSupportedConfigs", "browseEndpointContextMusicConfig", "pageType"].string
+    }
+}

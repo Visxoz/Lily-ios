@@ -1,0 +1,140 @@
+import Foundation
+import os
+
+/// YouTube's web player for one version, cut down to the code that
+/// unscrambles stream URLs, as ytm-native's `streams/premium/player.rs`.
+struct PlayerScript: Codable, Sendable {
+    /// The player version, eight hex digits.
+    let id: String
+    /// The signature timestamp, which player requests must quote.
+    let signatureTimestamp: Int
+    /// `PlayerTrimmer`'s script.
+    let code: String
+
+    /// Unscrambles an `n` value and a signature, in a throwaway context.
+    func solve(n: String?, signature: String?) async throws -> Solver.Solution {
+        try await Solver.solve(code, n: n, signature: signature)
+    }
+
+    private static let iframeAPI = "https://www.youtube.com/iframe_api"
+
+    /// Inputs the player must change, solved before a new version is
+    /// trusted, as it is cached until YouTube's next one, and Premium
+    /// formats always need the signature.
+    static let checkN = "abcdefghijklmnop"
+    static let checkSignature = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"
+
+    /// The current player: from the store unless YouTube has a newer one,
+    /// else fetched, trimmed, checked and saved.
+    @concurrent
+    static func load(store: FileStore) async throws -> PlayerScript {
+        let iframe = try await fetch(iframeAPI)
+        guard let id = playerId(inIframeAPI: String(decoding: iframe, as: UTF8.self)) else {
+            throw YTMError(.parse, "The version of YouTube's player wasn't found.")
+        }
+        if let cached = store.load(PlayerScript.self, from: .player), cached.id == id { return cached }
+
+        let clock = ContinuousClock()
+        let started = clock.now
+        let source = try await [UInt8](fetch("https://www.youtube.com/s/player/\(id)/player_ias.vflset/en_US/base.js"))
+        let fetched = clock.now
+        guard let timestamp = signatureTimestamp(in: source) else {
+            throw YTMError(.parse, "The signature timestamp wasn't found in YouTube's player.")
+        }
+        let player = PlayerScript(id: id, signatureTimestamp: timestamp, code: try PlayerTrimmer.trim(source))
+        let trimmed = clock.now
+        let check = try await player.solve(n: checkN, signature: checkSignature)
+        guard check.n != checkN, check.signature != checkSignature else {
+            throw YTMError(.unplayable, "YouTube's player didn't unscramble a test URL.")
+        }
+        Logger.premium.info("""
+            player \(id, privacy: .public): fetched in \(fetched - started, privacy: .public), \
+            trimmed from \(source.count >> 10) to \(player.code.utf8.count >> 10) KB in \(trimmed - fetched, privacy: .public)
+            """)
+        store.save(player, to: .player)
+        return player
+    }
+
+    /// The player version in `iframe_api`, which names it in its script URL.
+    static func playerId(inIframeAPI text: String) -> String? {
+        for marker in [#"player\/"#, "player/"] {
+            guard let start = text.range(of: marker)?.upperBound else { continue }
+            let id = text[start...].prefix(8)
+            if id.count == 8, id.allSatisfy(\.isHexDigit) { return String(id) }
+        }
+        return nil
+    }
+
+    static func signatureTimestamp(in source: [UInt8]) -> Int? {
+        for marker in ["signatureTimestamp:", "sts:"] {
+            guard let start = source.firstRange(of: Array(marker.utf8))?.upperBound else { continue }
+            let digits = source[start...].prefix { (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0) }
+            if let value = Int(String(decoding: digits, as: UTF8.self)) { return value }
+        }
+        return nil
+    }
+
+    private static func fetch(_ address: String) async throws -> Data {
+        guard let url = URL(string: address) else { throw YTMError(.parse, "The player's address couldn't be made.") }
+        var request = URLRequest(url: url)
+        request.setValue(ClientProfile.browserUserAgent, forHTTPHeaderField: "User-Agent")
+        return try await HTTP.data(for: request).0
+    }
+}
+
+/// The player the session solves with, as ytm-native's `premium_player`:
+/// loaded once and shared by every song, with a pause after a failure so a
+/// broken player isn't fetched again for each one. A phone app can run for
+/// days, so the version is checked again after a few hours.
+actor PlayerScripts {
+    static let shared = PlayerScripts()
+
+    private static let backoff: Duration = .seconds(10 * 60)
+    private static let recheck: Duration = .seconds(6 * 60 * 60)
+
+    private var current: (script: PlayerScript, checked: ContinuousClock.Instant)?
+    /// The load in flight, which every caller arriving meanwhile awaits.
+    private var loading: Task<PlayerScript, any Error>?
+    private var failed: ContinuousClock.Instant?
+
+    func player(store: FileStore) async throws -> PlayerScript {
+        let now = ContinuousClock.now
+        if let current, now - current.checked < Self.recheck { return current.script }
+        if let failed, now - failed < Self.backoff {
+            if let current { return current.script }
+            throw YTMError(.unplayable, "YouTube's player couldn't be prepared; trying again in a few minutes.")
+        }
+        if let loading {
+            do {
+                return try await loading.value
+            } catch {
+                return try working(after: error)
+            }
+        }
+        let task = Task { try await PlayerScript.load(store: store) }
+        loading = task
+        defer { loading = nil }
+        do {
+            let script = try await task.value
+            current = (script, .now)
+            failed = nil
+            return script
+        } catch {
+            failed = .now
+            Logger.premium.error("could not prepare the player: \(error.localizedDescription, privacy: .public)")
+            return try working(after: error)
+        }
+    }
+
+    /// The player that worked, which carries on until a newer one does, for
+    /// the caller that started a failed load and those that joined it alike.
+    private func working(after error: any Error) throws -> PlayerScript {
+        guard let current else { throw error }
+        return current.script
+    }
+}
+
+extension Logger {
+    /// What the Premium path did, for Console; never cookies or URLs.
+    static let premium = Logger(subsystem: "YTMusic", category: "Premium")
+}

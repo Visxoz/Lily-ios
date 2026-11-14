@@ -1,0 +1,91 @@
+import SwiftUI
+import YTMCore
+
+/// ytm-native's sign-in dialog with its Google window, as one sheet: Google's
+/// own page, and once that reaches YouTube Music signed in, its cookies sign
+/// the app in. The password goes to Google only.
+struct SignInScreen: View {
+    private enum Phase: Equatable {
+        case browsing
+        case signingIn
+        case failed(String)
+    }
+
+    private let onSignedIn: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+    /// Leaving `.browsing` drops the page with its private session, so
+    /// Try again starts signed out on a fresh one.
+    @State private var phase = Phase.browsing
+
+    init(onSignedIn: @escaping () -> Void) {
+        self.onSignedIn = onSignedIn
+    }
+
+    var body: some View {
+        NavigationStack {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(theme.panel)
+                .navigationTitle("Sign in")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", role: .cancel) { dismiss() }
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch phase {
+        case .browsing:
+            ZStack {
+                spinner
+                SignInWebView(onSession: signIn) { phase = .failed($0) }
+                    .ignoresSafeArea(edges: .bottom)
+            }
+        case .signingIn:
+            spinner
+        case .failed(let message):
+            VStack(spacing: 20) {
+                Text(message)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.signInError)
+                    .multilineTextAlignment(.center)
+                PillButton(title: "Try again", primary: true) { phase = .browsing }
+            }
+            .padding(24)
+        }
+    }
+
+    private var spinner: some View {
+        ProgressView()
+            .controlSize(.large)
+            .tint(theme.accent)
+    }
+
+    private func signIn(with cookies: [HTTPCookie]) {
+        // Later pages of the same session hand over again.
+        guard phase == .browsing else { return }
+        phase = .signingIn
+        Task {
+            do {
+                try await GoogleAuth.shared.signIn(cookies: cookies)
+                onSignedIn()
+                dismiss()
+            } catch {
+                phase = .failed(sentence(for: error))
+            }
+        }
+    }
+}
+
+private extension Theme {
+    /// The sign-in dialog's error text, which ytm-native colours apart from its theme.
+    var signInError: Color {
+        Color(rgb: RGB(hex: isLight ? 0xc4002b : 0xff6b81))
+    }
+}
