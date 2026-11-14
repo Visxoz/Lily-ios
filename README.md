@@ -1,47 +1,236 @@
-# YT Music for iOS
+<div align="center">
 
-A native SwiftUI port of [ytm-native](https://github.com/Visxoz/ytm-native), the Windows YouTube Music client, for
-iPhone. Same features, look and behaviour, built on Apple frameworks only, with no third-party code.
+<img src="docs/banner.svg" width="100%" alt="YT Music for iOS: YouTube Music, as a real iPhone app">
 
-- **Audio:** Opus and AAC decoded natively (AudioToolbox, AVAudioEngine).
-  - 256 kbps Premium streams, solved with JavaScriptCore.
-  - Gapless playback and a 6-second crossfade.
-  - A six-band equaliser, volume normalisation, and a disk cache.
-- **Music:**
-  - Home, Explore, moods and genres, charts, new releases.
-  - Search with suggestions and recent searches.
-  - Albums, artists with their full discography, playlists, Library and History.
-- **Playback:**
-  - Radio, autoplay, Smart Shuffle and repeat.
-  - A queue you drag into order and save as a playlist.
-  - Synced lyrics you tap to jump to.
-  - Lock-screen controls.
-  - Reopens on the song you left, at the second you left it.
-- **Account:** Google sign-in, likes, playlists, YouTube history and Last.fm scrobbling.
-- **Looks:** ytm-native's dark, light and pure black looks, its seven accents or one taken from the artwork, and its
-  own icons.
+<br>
 
-## Layout
+[![Release](https://img.shields.io/badge/release-1.0.0-ff0033?style=flat&labelColor=18181b)](https://github.com/Visxoz/YTMusic-Native-IOS/releases/latest)
+[![iOS 27.2](https://img.shields.io/badge/iOS-27.2-0a84ff?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#install)
+[![Swift 6.4](https://img.shields.io/badge/Swift-6.4-f05138?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
+[![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0a84ff?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
+[![Licence](https://img.shields.io/badge/licence-GPL--3.0-3f3f46?style=flat&labelColor=18181b)](LICENSE)
+
+<br>
+
+<a href="https://github.com/Visxoz/YTMusic-Native-IOS/releases/latest"><img src="docs/download.svg" width="300" alt="Download for iPhone"></a>
+
+<br>
+
+<img src="docs/hero.jpg" width="100%" alt="YT Music for iOS: an artist page with its banner, synced lyrics tinted from the artwork, and the queue">
+
+<sub>Artist pages with their banner · lyrics that follow the song, tinted from its artwork · a queue you drag into order</sub>
+
+</div>
+
+<br>
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### Sounds better
+256 kbps Opus with Premium, gapless playback, a 6-second crossfade, volume levelling and a six-band equaliser.
+
+</td>
+<td width="33%" valign="top">
+
+### Truly native
+Swift and SwiftUI from top to bottom, on Apple's own audio engine. No web views, no wrappers, nothing but the app.
+
+</td>
+<td width="33%" valign="top">
+
+### Looks the part
+Dark, light or pure black, in seven accents, or one that follows the song's artwork. Pages are tinted to match.
+
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top">
+
+### Plays like YouTube Music
+Radio, autoplay, Smart Shuffle, repeat, history and search with recent searches. Artist pages carry the whole discography.
+
+</td>
+<td width="33%" valign="top">
+
+### Lyrics and queue
+Synced lyrics you can tap to jump to. A queue you drag into order, edit several songs at a time, and save as a playlist.
+
+</td>
+<td width="33%" valign="top">
+
+### At home on iPhone
+The lock screen, Control Center and your AirPods, Last.fm, and the Liquid Glass tab bar. Reopens on the song you left, at the second you left it.
+
+</td>
+</tr>
+</table>
+
+## Make it yours
+
+<table>
+<tr>
+<td width="25%"><img src="docs/home.jpg" alt="Home in the dark look, tinted with the accent"></td>
+<td width="25%"><img src="docs/home-light.jpg" alt="Home in the light look"></td>
+<td width="25%"><img src="docs/album-black.jpg" alt="An album page in the pure black look"></td>
+<td width="25%"><img src="docs/album.jpg" alt="An album page tinted from its cover"></td>
+</tr>
+<tr>
+<td align="center"><b>Dark</b> · Home, tinted with your accent</td>
+<td align="center"><b>Light</b> · for daytime</td>
+<td align="center"><b>Black</b> · for OLED screens</td>
+<td align="center"><b>Albums</b> · tinted from the cover</td>
+</tr>
+<tr>
+<td width="25%"><img src="docs/explore.jpg" alt="Explore's moods and genres"></td>
+<td width="25%"><img src="docs/search.jpg" alt="Search results with the top result"></td>
+<td width="25%"><img src="docs/nowplaying.jpg" alt="Now Playing, tinted from the artwork"></td>
+<td width="25%"><img src="docs/library.jpg" alt="Library, asking to sign in"></td>
+</tr>
+<tr>
+<td align="center"><b>Explore</b> · moods, genres and new releases</td>
+<td align="center"><b>Search</b> · with a top result</td>
+<td align="center"><b>Now Playing</b> · the artwork's colour</td>
+<td align="center"><b>Library</b> · bring yours</td>
+</tr>
+</table>
+
+Pick a look and an accent in **Settings ▸ Appearance**: Red, Orange, Green, Teal, Blue, Purple, Pink, or **From the artwork**.
+
+## Sounds as good as YouTube gets
+
+<table>
+<tr>
+<td width="62%"><img src="docs/quality.svg" alt="Audio quality: Low about 50 kbps, Normal about 130 kbps, High up to 256 kbps with Premium"></td>
+<td width="38%"><img src="docs/equaliser.jpg" alt="The equaliser with the Bass boost preset"></td>
+</tr>
+</table>
+
+| Feature | What it does |
+| --- | --- |
+| **Premium streams** | Signed in with Premium on High, songs play in YouTube's 256 kbps formats, and Now Playing says so. Music videos swap to their song versions to get them. |
+| **Gapless** | The next song is lined up 15 seconds early and follows without a gap, and the screen changes the moment the sound does. |
+| **Crossfade** | Fades each song into the next over 6 seconds, cutting the silence at the joins. An album played in order still runs straight on, and skipping never fades. |
+| **Equaliser** | Six bands from 60 Hz to 15 kHz, ±12 dB each, with presets: Flat, Bass boost, Treble boost, Vocal, Rock, Electronic and Acoustic. Boosting turns the rest down to leave headroom. |
+| **Normalise volume** | Plays every track at a similar loudness, from YouTube's own measurement, as YouTube Music does. |
+| **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music carries on through the speaker. |
+
+## Install
+
+Grab `YTMusic.ipa` from the [latest release](https://github.com/Visxoz/YTMusic-Native-IOS/releases/latest), then:
+
+1. Open it with **SideStore** (or share it to SideStore), or tap **+** in SideStore's My Apps and pick the file.
+2. SideStore signs it with your own Apple ID and installs it.
+3. Open **YT Music**. It works signed out straight away.
+
+> [!NOTE]
+> Apps signed with a free Apple ID last seven days. SideStore refreshes them in the background; if it hasn't, open SideStore and tap **Refresh All**.
+
+## Getting around
+
+| Do | To |
+| --- | --- |
+| Tap the mini player | Open Now Playing |
+| Tap **Up next** or **Lyrics** | Show the queue or the lyrics beside the player |
+| Tap a lyric line | Jump to it |
+| Drag a song in the queue | Move it |
+| Swipe a song in the queue | Remove it |
+| **Select** in the queue | Pick several songs, then play them next or remove them |
+| Press and hold a song or card | Play it next, add it to the queue, start a radio, like it, save it to a playlist, or go to its artist or album |
+| Tap the shuffle button | Cycle Off, Shuffle and **Smart Shuffle**, which mixes in recommendations |
+
+## Your account
+
+Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations.
+
+The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in.
+
+<details>
+<summary><b>Connecting Last.fm</b></summary>
+<br>
+
+Create an API account at [last.fm/api](https://www.last.fm/api/account/create), then enter its key and secret once under **Settings ▸ Account ▸ Last.fm** and tap **Connect**. Approve the app on Last.fm's page, and plays scrobble from then on, including ones made while you were offline.
+
+</details>
+
+> [!WARNING]
+> YT Music for iOS is an unofficial client. It uses YouTube's undocumented API, which is against YouTube's terms of service. Google could ask you to confirm you're not a bot or sign the session out, and could in principle restrict the account. A separate account is the safest choice.
+
+## Under the hood
+
+Everything you see and hear is native code, written in Swift. A web view only appears while you sign in, to show Google's page.
+
+```mermaid
+flowchart LR
+    yt(["YouTube Music"]) -->|InnerTube| pages["Pages, search,<br/>radio, lyrics"]
+    yt -->|player endpoint| url["Stream URL<br/>visionOS, then Android VR, then iOS"]
+    premium["Premium<br/>web player's code, cut down natively,<br/>run in a throwaway JavaScriptCore"] -.-> url
+    url --> dl["Download<br/>1 MB ranges, to a disk cache"]
+    dl --> dec["Demux and decode<br/>WebM and MP4, Opus and AAC"]
+    dec --> fx["Levelling, EQ,<br/>gapless, crossfade"]
+    fx --> out(["AVAudioEngine"])
+    pages --> ui["SwiftUI"]
+```
+
+<details>
+<summary><b>What it's built with</b></summary>
+<br>
+
+| Part | Built with |
+| --- | --- |
+| YouTube Music data | YouTube's InnerTube API, called directly (`YTMCore`) |
+| Stream URLs | YouTube's player endpoint, called directly (`YTMCore/Streams`) |
+| Premium URLs | A Swift tokenizer that cuts the player down, and JavaScriptCore |
+| Demuxing | Its own WebM and MP4 readers (`YTMAudio`) |
+| Opus and AAC | AudioToolbox |
+| Audio output | AVAudioEngine, with AVAudioUnitEQ |
+| Interface | SwiftUI, with ytm-native's own icons drawn as shapes |
+| Networking | URLSession over HTTP/2 |
+| Artwork | ImageIO, decoded at the size it's shown |
+| Lock screen and AirPods | MediaPlayer |
+| Google sign-in | WebKit, only while signing in |
+
+Most YouTube clients get stream URLs that YouTube's player JavaScript has to unscramble. The visionOS client gets plain ones, so the app asks as that client and needs no JavaScript engine, falling back to Android VR and iOS if YouTube changes it. With Premium, the app unscrambles the web player's URLs itself, in a short-lived JavaScriptCore context with a cut-down copy of the player.
+
+Apple's AudioToolbox decodes Opus, but can't read the WebM files YouTube keeps it in, so the app reads them itself and hands AudioToolbox the packets as they download.
+
+The app talks only to YouTube's hosts, plus Last.fm if you connect it, each checked against an allowlist.
+
+</details>
+
+<details>
+<summary><b>Building from source</b></summary>
+<br>
+
+You need Xcode 27.2. There are no dependencies to fetch.
+
+```sh
+cd Packages/YTMKit
+swift test               # the unit tests
+swift run ytmcheck all   # checks every page, stream and decode path against live YouTube
+cd ../..
+scripts/build-ipa.sh     # build/YTMusic.ipa, unsigned, for SideStore
+```
+
+Or open `YTMusic.xcodeproj` and run it on the iPhone simulator.
 
 | Path | What it holds |
 | --- | --- |
-| `App/` | The SwiftUI app. The Xcode project syncs this folder. |
+| `App/` | The SwiftUI app |
 | `Packages/YTMKit/Sources/YTMCore` | Models, the InnerTube API, page parsing, streams and Premium, persistence, Last.fm, artwork |
-| `Packages/YTMKit/Sources/YTMAudio` | Streaming download, WebM/MP4 demuxers, the decoder and the AVAudioEngine graph |
-| `Packages/YTMKit/Sources/YTMPlayback` | The queue, the player controller, Now Playing, the audio session, Smart Shuffle, scrobbling |
-| `Packages/YTMKit/Sources/ytmcheck` | A macOS tool that checks every page, stream and decode path against live YouTube |
+| `Packages/YTMKit/Sources/YTMAudio` | Streaming download, the WebM and MP4 readers, decoding and the audio engine |
+| `Packages/YTMKit/Sources/YTMPlayback` | The queue, the player, Now Playing, Smart Shuffle, scrobbling |
+| `Packages/YTMKit/Sources/ytmcheck` | A macOS tool that checks the app's YouTube paths are still working |
 
-## Building
-
-Requires Xcode 27.2 and iOS 27.2.
-
-```sh
-cd Packages/YTMKit && swift test && swift run ytmcheck all      # unit tests, then live checks
-scripts/build-ipa.sh                                            # unsigned build/YTMusic.ipa
-```
-
-Install `build/YTMusic.ipa` with SideStore, which signs it with your own Apple ID.
+</details>
 
 ## Licence
 
-GPL-3.0, as ytm-native.
+YT Music for iOS is a port of [ytm-native](https://github.com/Visxoz/ytm-native) and, like it, free software under the [GNU General Public License, version 3](LICENSE).
+
+<br>
+
+<div align="center">
+<sub>Not affiliated with, endorsed by or connected to YouTube or Google. YouTube Music is a trademark of Google LLC.</sub>
+</div>
