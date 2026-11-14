@@ -110,6 +110,10 @@ struct PillLabel: View {
         Text(title)
             .font(.system(size: small ? 13 : 14, weight: .bold))
             .foregroundStyle(primary ? theme.textInverse : theme.text)
+            // A pill is one line, as ytm-native's: a row squeezes its
+            // description instead.
+            .lineLimit(1)
+            .fixedSize()
             .padding(.horizontal, small ? 16 : 24)
             .frame(height: small ? 32 : 40)
             .background {
