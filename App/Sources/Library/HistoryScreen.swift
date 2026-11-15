@@ -8,7 +8,7 @@ struct HistoryScreen: View {
 
     var body: some View {
         if app.isSignedIn && app.settings.value.youtubeHistory {
-            PageScreen(route: .history)
+            PageScreen(route: .history, app: app)
         } else {
             LocalHistoryScreen()
         }

@@ -79,5 +79,8 @@ extension PlayerController {
         nowPlaying?.show(track, duration: duration)
         publishPlayback()
         loadRating(of: track.id)
+        // So the launch's first play starts without waiting on YouTube. Not
+        // warmed: the play fetches the start itself.
+        resolveAhead(track, warming: false)
     }
 }

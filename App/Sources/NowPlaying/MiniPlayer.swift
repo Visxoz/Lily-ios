@@ -61,15 +61,21 @@ struct MiniPlayer: View {
 }
 
 /// How far the song has got, pulled twice a second while it plays and left
-/// alone while paused. A 2-point line moves too little to need more.
+/// alone while paused, apart from showing a seek made then. A 2-point line
+/// moves too little to need more.
 private struct MiniProgress: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    /// The place last sought, shown while paused until the song plays or
+    /// changes, as the engine's clock may not have reached it and a paused
+    /// line is never pulled again.
+    @State private var sought: Double?
 
     var body: some View {
         let player = app.player
         TimelineView(.animation(minimumInterval: 0.5, paused: !player.isPlaying)) { _ in
-            let fraction = player.duration > 0 ? min(max(player.currentTime / player.duration, 0), 1) : 0
+            let time = (player.isPlaying ? nil : sought) ?? player.currentTime
+            let fraction = player.duration > 0 ? min(max(time / player.duration, 0), 1) : 0
             Capsule()
                 .fill(theme.ink.opacity(0.19))
                 .overlay {
@@ -78,6 +84,9 @@ private struct MiniProgress: View {
                         .scaleEffect(x: fraction, anchor: .leading)
                 }
         }
+        .onChange(of: player.lastSeek) { _, seek in sought = seek.to }
+        .onChange(of: player.isPlaying) { sought = nil }
+        .onChange(of: player.current?.id) { sought = nil }
         .frame(height: 2)
         .accessibilityHidden(true)
     }

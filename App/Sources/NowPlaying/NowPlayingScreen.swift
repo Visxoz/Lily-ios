@@ -14,6 +14,7 @@ struct NowPlayingScreen: View {
     @Namespace private var artwork
 
     var body: some View {
+        @Bindable var app = app
         VStack(spacing: 0) {
             if let track = app.player.current {
                 NowPlayingTopBar(track: track)
@@ -51,6 +52,7 @@ struct NowPlayingScreen: View {
         .padding(.bottom, 8)
         .background { NowPlayingBackground() }
         .animation(Theme.normal, value: panel)
+        .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0) }
     }
 }
 
@@ -96,15 +98,7 @@ private struct LargeArtwork: View {
     var body: some View {
         GeometryReader { space in
             let edge = min(space.size.width, space.size.height)
-            ArtworkView(url: url, size: edge, radius: 8, pixelEdge: ImagePipeline.playerEdge)
-                // Cast by a shape behind the opaque artwork rather than by the
-                // image, so the blur comes from a path once instead of being
-                // rendered off screen each frame Now Playing grows or shrinks.
-                .background {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(theme.highlight)
-                        .shadow(color: theme.shadowSoft, radius: 16, y: 8)
-                }
+            ArtworkView(url: url, size: edge, radius: 8, pixelEdge: ImagePipeline.playerEdge, shadow: (theme.shadowSoft, 16, 8))
                 .frame(width: space.size.width, height: space.size.height)
         }
     }

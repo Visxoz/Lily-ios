@@ -182,6 +182,17 @@ private let homePage = #"""
         #expect(Renderers.twoRowCard(podcast) == nil)
     }
 
+    @Test func tellsVideosByTheirType() throws {
+        func isVideo(_ type: String) throws -> Bool? {
+            Renderers.isVideo(try json(#"{"watchEndpointMusicSupportedConfigs":{"watchEndpointMusicConfig":{"musicVideoType":"\#(type)"}}}"#))
+        }
+        #expect(try isVideo("MUSIC_VIDEO_TYPE_UGC") == true)
+        #expect(try isVideo("MUSIC_VIDEO_TYPE_OMV") == true)
+        #expect(try isVideo("MUSIC_VIDEO_TYPE_ATV") == false)
+        #expect(try isVideo("MUSIC_VIDEO_TYPE_PODCAST_EPISODE") == false, "an episode has no song version")
+        #expect(Renderers.isVideo(try json("{}")) == nil)
+    }
+
     @Test func mapsEndpointsToRoutes() throws {
         func route(_ text: String) throws -> Route? { Renderers.route(try json(text)) }
         #expect(try route(#"{"browseEndpoint":{"browseId":"MPREb_x","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}"#) == .album("MPREb_x"))

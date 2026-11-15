@@ -24,27 +24,6 @@ extension LastFM {
         var duration: Int?
         /// When the play started, in Unix seconds.
         var timestamp: Int64
-
-        /// `track` started at `start`, or nil when it lacks the artist or
-        /// title Last.fm refuses a play without.
-        init?(_ track: Track, at start: Date) {
-            // The first artist, as Last.fm's catalogue lists features in the
-            // title rather than as artists.
-            artist = track.artists.first?.name ?? ""
-            self.track = track.title
-            album = track.album?.name
-            duration = track.duration
-            timestamp = Int64(start.timeIntervalSince1970)
-            if artist.isEmpty || self.track.isEmpty { return nil }
-        }
-
-        init(artist: String, track: String, album: String? = nil, duration: Int? = nil, timestamp: Int64) {
-            self.artist = artist
-            self.track = track
-            self.album = album
-            self.duration = duration
-            self.timestamp = timestamp
-        }
     }
 
     enum Failure: Error, Equatable {
@@ -60,6 +39,21 @@ extension LastFM {
         case invalidKeys
         /// Last.fm could not be reached or could not answer; try again later.
         case failed(String)
+    }
+}
+
+extension LastFM.Play {
+    /// `track` started at `start`, or nil when it lacks the artist or
+    /// title Last.fm refuses a play without.
+    init?(_ track: Track, at start: Date) {
+        // The first artist, as Last.fm's catalogue lists features in the
+        // title rather than as artists.
+        artist = track.artists.first?.name ?? ""
+        self.track = track.title
+        album = track.album?.name
+        duration = track.duration
+        timestamp = Int64(start.timeIntervalSince1970)
+        if artist.isEmpty || self.track.isEmpty { return nil }
     }
 }
 

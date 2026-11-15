@@ -28,9 +28,10 @@ struct GenreTile: View {
 
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        Button { app.activate(card) } label: {
+        Button { app.activate(card, displayScale: displayScale) } label: {
             ZStack(alignment: .topLeading) {
                 background
                 RoundedRectangle(cornerRadius: 8)

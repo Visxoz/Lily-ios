@@ -117,6 +117,9 @@ actor PlaybackEngine {
         self.paused = paused
         graph.setSilenced(paused)
         guard let track = open(item, at: seconds, announcingStart: true) else { return }
+        // Sent after the download's first job, so the output wakes while the
+        // first range is in flight rather than after it.
+        if !paused { send { _ = $0.graph.start() } }
         heard = track
         producing = track
         clock.pin(seconds, since: nil)
@@ -143,7 +146,7 @@ actor PlaybackEngine {
         // A seek lands in the item heard, so a next that already follows it
         // is dropped, and the controller queues it again.
         if let switched = producing, switched !== heard {
-            switched.cancel()
+            keepWarm(switched)
             emit(.nextDropped)
         }
         producing = heard
@@ -324,25 +327,29 @@ actor PlaybackEngine {
     }
 
     /// Drops the next item, taking back any of its buffers that follow the
-    /// item heard. Reports nothing: the controller asked for it.
+    /// item heard, and keeping what it downloaded. Reports nothing: the
+    /// controller asked for it.
     func dropNext() {
         if let switched = producing, let heard, switched !== heard {
-            switched.cancel()
+            keepWarm(switched)
             producing = heard
             fade = nil
             heard.seek(to: clock.position())
             restartPlayer()
         }
-        next?.cancel()
+        if let next { keepWarm(next) }
         next = nil
         plan = nil
     }
 
-    /// Ends everything, for a new item or a stop.
+    /// Ends everything, for a new item or a stop. A next item keeps what it
+    /// downloaded, as the song skipped to is often that one.
     func clear() {
-        for track in [heard, producing, next, fade?.from].compactMap(\.self) {
+        for track in [heard, fade?.from].compactMap(\.self) {
             track.cancel()
         }
+        if let producing, producing !== heard { keepWarm(producing) }
+        if let next { keepWarm(next) }
         heard = nil
         producing = nil
         next = nil

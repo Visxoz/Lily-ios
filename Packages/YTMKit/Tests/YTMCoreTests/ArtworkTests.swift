@@ -23,6 +23,15 @@ private func image(_ width: Int = 8, _ height: Int = 8, _ colour: (Int, Int) -> 
     ))
 }
 
+/// What the downloads under test did, in order.
+private actor DownloadLog {
+    private(set) var events: [String] = []
+
+    func add(_ event: String) {
+        events.append(event)
+    }
+}
+
 @Suite struct ArtworkPaletteTests {
     @Test func roundTripsHSL() {
         for colour in [RGB(r: 1, g: 0, b: 0), RGB(r: 0.2, g: 0.6, b: 0.4), RGB(r: 0.5, g: 0.5, b: 0.5), RGB(r: 0.1, g: 0.2, b: 0.9)] {
@@ -92,6 +101,29 @@ private func image(_ width: Int = 8, _ height: Int = 8, _ colour: (Int, Int) -> 
         #expect(ImagePipeline.key(row, 168) != ImagePipeline.key(row, 1080))
         let banner = "https://lh3.googleusercontent.com/abc=w1440-h600-p-l90-rj"
         #expect(ImagePipeline.key(banner, 360) != ImagePipeline.key(row, 360), "a banner keeps its own rendition")
+    }
+
+    @Test func aRequestDuringAPrefetchWaitsForItsDownload() async {
+        let downloads = Downloads()
+        let log = DownloadLog()
+        let (started, didStart) = AsyncStream.makeStream(of: Void.self)
+        let prefetch = Task {
+            await downloads.prefetch("art") {
+                didStart.yield()
+                try? await Task.sleep(for: .milliseconds(50))
+                await log.add("prefetched")
+            }
+        }
+        for await _ in started { break }
+        let image = await downloads.image(for: "art") {
+            await log.add("loaded")
+            return nil
+        }
+        await prefetch.value
+        #expect(image == nil)
+        #expect(await log.events == ["prefetched", "loaded"], "the request reads what the prefetch downloaded")
+        await downloads.prefetch("art") { await log.add("prefetched again") }
+        #expect(await log.events.count == 3, "a finished prefetch no longer blocks another")
     }
 
     @Test func decodesWithTheShorterSideAtTheEdge() throws {

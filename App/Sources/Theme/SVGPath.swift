@@ -1,15 +1,15 @@
 import SwiftUI
 
 /// SVG path data, as Material Symbols write it, turned into a SwiftUI `Path`.
-/// Covers the commands those paths use: moves, lines, cubic and quadratic
-/// curves (with their smooth forms) and closing, absolute and relative.
+/// Covers the commands those paths use: moves, lines, cubic curves (with the
+/// smooth form) and closing, absolute and relative.
 nonisolated enum SVGPath {
     static func parse(_ data: String) -> Path {
         var scanner = Scanner(bytes: Array(data.utf8))
         var path = Path()
         var current = CGPoint.zero
         var start = CGPoint.zero
-        // The last curve's second control point, for the smooth forms.
+        // The last curve's second control point, for the smooth form.
         var lastControl: CGPoint?
         var command: UInt8 = 0
 
@@ -51,17 +51,6 @@ nonisolated enum SVGPath {
                 guard let c2 = point(), let p = point() else { return path }
                 path.addCurve(to: p, control1: reflected(lastControl, about: current), control2: c2)
                 control = c2
-                current = p
-            case UInt8(ascii: "q"):
-                guard let c = point(), let p = point() else { return path }
-                path.addQuadCurve(to: p, control: c)
-                control = c
-                current = p
-            case UInt8(ascii: "t"):
-                let c = reflected(lastControl, about: current)
-                guard let p = point() else { return path }
-                path.addQuadCurve(to: p, control: c)
-                control = c
                 current = p
             case UInt8(ascii: "z"):
                 path.closeSubpath()

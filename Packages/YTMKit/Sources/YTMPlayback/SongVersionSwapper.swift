@@ -70,24 +70,10 @@ extension PlayerController {
             putSongVersion(song, for: videoId)
             return
         }
-        let task = prefetcher.begin(song.id, resolver(for: song.id))
-        Task { [weak self] in
-            let result = await task.result
-            guard let self, prefetcher.finish(song.id, task) else { return }
-            switch result {
-            // Kept only once the song is in the queue, which the video may
-            // have left, or started playing, meanwhile.
-            case .success(let stream):
-                if putSongVersion(song, for: videoId) {
-                    prefetcher.store(song.id, .init(stream: stream, resolvedAt: .now))
-                    warm(song, stream)
-                }
-            // Tried again at the next song start, not from here; until then
-            // the video resolves as it is queued or starts.
-            case .failure(let error):
-                Logger.playback.debug("\(song.id, privacy: .public): the song version did not resolve: \(sentence(for: error), privacy: .public)")
-            }
-        }
+        // Kept only once the song is in the queue, which the video may have
+        // left, or started playing, meanwhile. A failure is tried again at the
+        // next song start; until then the video resolves as it is queued or starts.
+        resolveAhead(song) { $0.putSongVersion(song, for: videoId) }
     }
 
     /// Puts `song` in place of the video `videoId` in the queue, unless the

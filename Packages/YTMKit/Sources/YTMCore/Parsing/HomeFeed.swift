@@ -48,7 +48,7 @@ enum HomeFeed {
     /// lists songs, a track list of at most `listLimit`. Other shelves (the
     /// taste picker, banners) are skipped.
     private static func shelves(_ list: JSON) -> [Section] {
-        let context = ItemContext(subtitles: .asShown)
+        let context = ItemContext(subtitles: .asShown, musicVideosOnly: true)
         return list["contents"].array.compactMap { wrapped -> Section? in
             guard let kind = wrapped.onlyValue?.key, shelfKinds.contains(kind) else { return nil }
             switch Renderers.section(wrapped, context: context) {

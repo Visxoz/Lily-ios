@@ -15,8 +15,9 @@ public struct AudioItem: Sendable {
     /// The correction for the file's loudness in dB, applied while the
     /// player normalises.
     public let loudnessDB: Float
-    /// A fresh URL for the same file, asked for when the old one is refused.
-    public let refresh: @Sendable () async throws -> URL
+    /// A fresh URL for the same file, with the headers its client's requests
+    /// must carry, asked for when the old one is refused.
+    public let refresh: @Sendable () async throws -> (url: URL, headers: [String: String])
 
     public init(
         id: String,
@@ -25,7 +26,7 @@ public struct AudioItem: Sendable {
         contentLength: Int64,
         cacheKey: String,
         loudnessDB: Float,
-        refresh: @escaping @Sendable () async throws -> URL
+        refresh: @escaping @Sendable () async throws -> (url: URL, headers: [String: String])
     ) {
         self.id = id
         self.url = url

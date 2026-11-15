@@ -42,6 +42,8 @@ extension PlayerController {
         settings.value.premiumAccount = false
         settings.value.noPremium = false
         signedIn = await music.isSignedIn
+        // Streams kept are the old account's, Premium ones too.
+        prefetcher.clear()
         preparePremium()
         if let id = current?.id { loadRating(of: id) }
     }

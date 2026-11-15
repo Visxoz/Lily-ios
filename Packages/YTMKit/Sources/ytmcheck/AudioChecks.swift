@@ -45,7 +45,7 @@ enum AudioChecks {
         ) {
             let fresh = try await Live.api.stream(videoId: song.id, quality: .high)
             guard fresh.itag == itag, HTTP.isAllowed(fresh.url) else { throw YTMError(.unplayable, "The refreshed stream isn't the same file.") }
-            return fresh.url
+            return (url: fresh.url, headers: fresh.headers)
         }
         return Entry(song: song, stream: stream, item: item)
     }

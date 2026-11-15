@@ -10,6 +10,9 @@ struct PageScreen: View {
     @State private var model: PageModel
     @Environment(AppModel.self) private var app
     @Environment(\.scenePhase) private var scenePhase
+    /// The app went to the background with the page on screen, so the next
+    /// visit is a return to the app rather than to the page.
+    @State private var backgrounded = false
 
     /// What the page loads afresh for: a new account, or the app coming back
     /// from the background, as Home may have aged meanwhile. Control Centre
@@ -19,9 +22,9 @@ struct PageScreen: View {
         let foreground: Bool
     }
 
-    init(route: Route) {
+    init(route: Route, app: AppModel) {
         self.route = route
-        _model = State(initialValue: PageModel(route: route))
+        _model = State(initialValue: PageModel(route: route, app: app))
     }
 
     var body: some View {
@@ -30,7 +33,7 @@ struct PageScreen: View {
             case .loading:
                 PageStatus(phase: .loading, tint: Theme.routeTint(route))
             case .failed(let message):
-                PageStatus(phase: .failed(message: message, action: "Try again") {
+                PageStatus(phase: .failed(message: message) {
                     Task { await model.retry(in: app) }
                 }, tint: Theme.routeTint(route))
             case .loaded(let page):
@@ -42,8 +45,13 @@ struct PageScreen: View {
         .animation(.easeOut(duration: 0.3), value: model.page != nil)
         // A new account loads the page afresh, and so may a return to the app.
         .task(id: Visit(account: app.accountGeneration, foreground: scenePhase != .background)) {
-            guard scenePhase != .background else { return }
-            await model.appear(in: app)
+            guard scenePhase != .background else {
+                backgrounded = true
+                return
+            }
+            let returning = backgrounded
+            backgrounded = false
+            await model.appear(in: app, returning: returning)
         }
         // Completes the page while it is on screen, as ytm-native's
         // `complete_page`, so Home is saved whole.

@@ -3,7 +3,8 @@ import os
 import YTMCore
 
 /// Streams resolved ahead of time, so the next song starts without waiting
-/// on YouTube, as ytm-native's `Playback::prefetched`. Each is kept with when
+/// on YouTube, as ytm-native's `Playback::prefetched`, and those of songs
+/// played, for previous, a jump back or repeat one. Each is kept with when
 /// it was resolved: stream URLs last about six hours, and one older than an
 /// hour is asked for again.
 struct StreamPrefetcher {
@@ -22,7 +23,12 @@ struct StreamPrefetcher {
 
     /// Whether a fresh stream for `id` is waiting.
     func has(_ id: String, at now: ContinuousClock.Instant = .now) -> Bool {
-        streams[id].map { now - $0.resolvedAt < Self.freshFor } == true
+        kept(id, at: now) != nil
+    }
+
+    /// The fresh stream waiting for `id`, left in place.
+    func kept(_ id: String, at now: ContinuousClock.Instant = .now) -> Prefetched? {
+        streams[id].flatMap { now - $0.resolvedAt < Self.freshFor ? $0 : nil }
     }
 
     /// Takes the stream resolved ahead for `id`, if still fresh.
@@ -59,6 +65,12 @@ struct StreamPrefetcher {
         pending.removeValue(forKey: id)
     }
 
+    /// A resolve still running for `id`, left in place, so its own completion
+    /// still keeps the stream for whatever starts the song.
+    func pendingTask(_ id: String) -> Task<ResolvedStream, any Error>? {
+        pending[id]
+    }
+
     /// Ends `task`, resolving `id`. Returns false, changing nothing, when it
     /// was taken meanwhile, or dropped by `clear` as its stream is for the
     /// old quality or account.
@@ -80,12 +92,13 @@ struct StreamPrefetcher {
 extension PlayerController {
     /// Gets the next song ready ahead of time, as each song starts and as
     /// the queue changes: Smart Shuffle's recommendations first, as the next
-    /// song may be one of them, then a music video's song version, the next
-    /// artwork, and its stream. Never waits.
+    /// song may be one of them, then a music video's song version, its lyrics
+    /// while they are shown, the next artwork, and its stream. Never waits.
     func prefetchNext() {
         topUpSmartShuffle()
         guard let next = queue.peekNext(repeat: repeatMode) else { return }
         if next.isVideo { swapInSongVersion(next) }
+        prefetchLyrics(of: songVersions.knownSong(for: next.id)?.id ?? next.id)
         // Both sizes the playing song shows, so its artwork and colours are
         // there on the first frame.
         if let art = next.thumbnail {
@@ -96,16 +109,36 @@ extension PlayerController {
         // place, unless it is playing, as on repeat, and stays. One still
         // being looked up resolves too, for a quick skip.
         let replaced = songVersions.knownSong(for: next.id) != nil && current?.id != next.id
-        guard !replaced, !prefetcher.has(next.id), !prefetcher.isPending(next.id) else { return }
-        let task = prefetcher.begin(next.id, resolver(for: next.id))
+        guard !replaced else { return }
+        resolveAhead(next)
+    }
+
+    /// Resolves `track`'s stream ahead and keeps it, unless one is waiting,
+    /// which is warmed instead, or on its way, or `keep` says otherwise once
+    /// it lands. `warming` has
+    /// the engine fetch its start too while it is still next.
+    func resolveAhead(
+        _ track: Track, warming: Bool = true, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }
+    ) {
+        if let kept = prefetcher.kept(track.id) {
+            // A stream kept from an earlier play may have lost its part file
+            // since, so its start is fetched again; the engine skips a file
+            // cached or open, and the song playing has its own open.
+            if warming, current?.id != track.id { warm(track, kept.stream) }
+            return
+        }
+        guard !prefetcher.isPending(track.id) else { return }
+        let task = prefetcher.begin(track.id, resolver(for: track.id))
         Task { [weak self] in
             let result = await task.result
-            guard let self, prefetcher.finish(next.id, task) else { return }
+            guard let self, prefetcher.finish(track.id, task) else { return }
             switch result {
             case .success(let stream):
-                prefetcher.store(next.id, .init(stream: stream, resolvedAt: .now))
-                warm(next, stream)
-            case .failure(let error): Logger.playback.debug("prefetch failed: \(sentence(for: error), privacy: .public)")
+                guard keep(self) else { return }
+                prefetcher.store(track.id, .init(stream: stream, resolvedAt: .now))
+                if warming { warm(track, stream) }
+            case .failure(let error):
+                Logger.playback.debug("\(track.id, privacy: .public): could not resolve ahead: \(sentence(for: error), privacy: .public)")
             }
         }
     }
@@ -113,9 +146,14 @@ extension PlayerController {
     /// Where `id`'s stream comes from as it starts or is queued: one
     /// resolved ahead, keeping when it was resolved; a resolve ahead still
     /// running, waited on rather than asked again, as a quick skip does; or
-    /// a fresh resolve.
-    func streamSource(for id: String) -> @Sendable () async throws -> StreamPrefetcher.Prefetched {
+    /// a fresh resolve. Unless `owning`, a resolve ahead is waited on but
+    /// left in place, so cancelling the wait, as a skip does to the gapless
+    /// queueing, leaves it running for the song to start from.
+    func streamSource(for id: String, owning: Bool = true) -> @Sendable () async throws -> StreamPrefetcher.Prefetched {
         if let prefetched = prefetcher.take(id) { return { prefetched } }
+        if !owning, let pending = prefetcher.pendingTask(id) {
+            return { .init(stream: try await pending.value, resolvedAt: .now) }
+        }
         if let pending = prefetcher.takePending(id) {
             return {
                 let stream = try await withTaskCancellationHandler { try await pending.value } onCancel: { pending.cancel() }

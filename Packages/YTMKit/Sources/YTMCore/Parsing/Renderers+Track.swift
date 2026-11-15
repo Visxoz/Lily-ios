@@ -32,7 +32,7 @@ extension Renderers {
         // Without a video type, videos show by their wide thumbnails, as
         // rustypipe tells them; album tracks are songs.
         let first = thumbnails[0]
-        let isVideo = isVideo(watch) ?? (context.album == nil && first.exists && first["width"].int != first["height"].int)
+        let isVideo = isVideo(watch, context: context) ?? (context.album == nil && first.exists && first["width"].int != first["height"].int)
 
         return Track(
             id: id,

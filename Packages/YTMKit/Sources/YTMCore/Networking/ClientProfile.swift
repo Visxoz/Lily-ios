@@ -30,13 +30,13 @@ struct ClientProfile: Sendable, Hashable {
     /// the consent cookie a browser that dismissed YouTube's banner sends.
     let isWeb: Bool
 
-    /// `https://<host>/youtubei/v1/<endpoint>?prettyPrint=false&…`.
-    func url(_ endpoint: String, query: [URLQueryItem] = []) -> URL? {
+    /// `https://<host>/youtubei/v1/<endpoint>?prettyPrint=false`.
+    func url(_ endpoint: String) -> URL? {
         var parts = URLComponents()
         parts.scheme = "https"
         parts.host = host
         parts.path = "/youtubei/v1/" + endpoint
-        parts.queryItems = [URLQueryItem(name: "prettyPrint", value: "false")] + query
+        parts.queryItems = [URLQueryItem(name: "prettyPrint", value: "false")]
         return parts.url
     }
 

@@ -21,6 +21,12 @@ struct PageContent: View {
     /// The header artwork's colour, once sampled.
     @State private var artworkTint: RGB?
 
+    /// Header colours already sampled, so a page opened again starts in its
+    /// colour, as ytm-native's accent cache has it. Keyed by URL alone, as
+    /// the size isn't known until the header is measured and doesn't change
+    /// the colour.
+    @MainActor private static var tints: [String: RGB] = [:]
+
     /// The scroll view's width and the bar's height over it.
     private nonisolated struct Frame: Equatable {
         var width: CGFloat = 0
@@ -60,7 +66,7 @@ struct PageContent: View {
             }
             .padding(.bottom, Metrics.pageBottom)
             .background(alignment: .top) {
-                PageTint(colour: artworkTint ?? Theme.routeTint(route), top: frame.top)
+                PageTint(colour: artworkTint ?? tintSource.flatMap { Self.tints[$0.url] } ?? Theme.routeTint(route), top: frame.top)
             }
         }
         .scrollPosition($position)
@@ -91,14 +97,59 @@ struct PageContent: View {
         .modifier(Refresh(model: model))
         .task(id: tintSource) {
             guard let tintSource else { return }
+            // Held in the view too, as another page may empty the cache while this one stays in a stack.
+            if let cached = Self.tints[tintSource.url] {
+                artworkTint = cached
+                return
+            }
             if let colours = await ArtworkColours.of(url: tintSource.url, pixelEdge: tintSource.pixels) {
                 artworkTint = colours.background
+                // shortcut: drops everything once full; upgrade to LRU only if revisits show the fade again.
+                if Self.tints.count >= 64 { Self.tints.removeAll() }
+                Self.tints[tintSource.url] = colours.background
             }
         }
+        // As ytm-native's `load_art`: the page's art is fetched as the page is
+        // built, rather than as each row scrolls in, and stops once it is left.
+        .task(id: [itemCount, model?.replacements ?? 0]) { await prefetchArt() }
     }
 
     private var canPlay: Bool {
         !page.headerTracks.isEmpty
+    }
+
+    /// Tracks and cards on the page, so a further step, which may only grow
+    /// one section's tracks, fetches its art too.
+    private var itemCount: Int {
+        page.sections.reduce(0) { count, section in
+            switch section {
+            case .tracks(let s): count + s.tracks.count
+            case .cards(let s): count + s.cards.count
+            }
+        }
+    }
+
+    /// Downloads the art of every track row, then every card, at the pixels
+    /// each will be drawn at. Albums' numbered rows and the chips and top
+    /// result draw none of it, or their own, so they are left out.
+    private func prefetchArt() async {
+        // The first screen's own loads go first, so none is asked for twice.
+        try? await Task.sleep(for: .milliseconds(250))
+        guard !Task.isCancelled else { return }
+        var tracks: [String] = []
+        var cards: [String] = []
+        for section in page.sections {
+            switch section {
+            case .tracks(let s) where !s.numbered:
+                tracks += s.tracks.compactMap(\.thumbnail)
+            case .cards(let s) where s.layout == .carousel || s.layout == .grid:
+                cards += s.cards.compactMap(\.thumbnail)
+            case .tracks, .cards:
+                break
+            }
+        }
+        await ImagePipeline.shared.prefetch(tracks, pixelEdge: ArtworkImage.pixels(edge: Metrics.rowArt, scale: displayScale))
+        await ImagePipeline.shared.prefetch(cards, pixelEdge: CardView.artPixels(scale: displayScale))
     }
 
     private var tintSource: TintSource? {

@@ -25,7 +25,7 @@ extension YTMusic {
         do {
             return try await personalHome()
         } catch {
-            guard !Task.isCancelled, cachedHome() == nil, let page = try? await publicHome() else { throw error }
+            guard !Task.isCancelled, await cachedHome() == nil, let page = try? await publicHome() else { throw error }
             return page
         }
     }
@@ -46,8 +46,9 @@ extension YTMusic {
     }
 
     /// The signed-in Home as last saved, to show in place of the feed when
-    /// YouTube refuses it. Reads the disk, so call it off the main actor.
-    public func cachedHome() -> Page? {
+    /// YouTube refuses it. Reads the disk, so it runs off the caller's actor.
+    @concurrent
+    public func cachedHome() async -> Page? {
         store.load(Page.self, from: .home).flatMap { $0.sections.isEmpty ? nil : $0 }
     }
 

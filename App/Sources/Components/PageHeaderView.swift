@@ -48,8 +48,10 @@ struct PageHeaderView: View {
             } else {
                 VStack(alignment: .leading, spacing: 24) {
                     if header.thumbnail != nil || canPlay {
-                        ArtworkView(url: header.thumbnail, size: Self.artEdge(header, topInset: topInset), radius: Metrics.cardArtRadius)
-                            .shadow(color: theme.shadowDeep, radius: 20, y: 8)
+                        ArtworkView(
+                            url: header.thumbnail, size: Self.artEdge(header, topInset: topInset), radius: Metrics.cardArtRadius,
+                            shadow: (theme.shadowDeep, 20, 8)
+                        )
                             .frame(maxWidth: .infinity)
                     }
                     HeaderText(header: header, foreground: theme.text, secondary: theme.textSecondary)

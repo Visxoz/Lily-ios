@@ -15,7 +15,15 @@ extension YTMusic {
     /// `maxKbps` caps that best, for the last resort at Low and Normal quality; a cap rules out Premium formats.
     @concurrent
     public func premiumStream(videoId: String, anyFormat: Bool, maxKbps: Int? = nil) async throws -> PremiumOutcome {
-        let player = try await PlayerScripts.shared.player(store: store)
+        let player: PlayerScript
+        do {
+            player = try await PlayerScripts.shared.player(store: store)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // `PlayerScripts` has logged the real reason already.
+            throw YTMError.playerUnprepared
+        }
         return try await PremiumResolver(innerTube: innerTube, player: player).resolve(
             videoId: videoId, signedIn: auth.isSignedIn, anyFormat: anyFormat, maxKbps: maxKbps
         )
@@ -28,4 +36,11 @@ extension YTMusic {
     public func preparePremium() async {
         _ = try? await PlayerScripts.shared.player(store: store)
     }
+}
+
+extension YTMError {
+    /// The Premium path's player script couldn't be had, which says nothing
+    /// about the account, so the player doesn't count it as a Premium
+    /// failure, as ytm-native's `premium_player`.
+    public static let playerUnprepared = YTMError(.unplayable, "YouTube's player couldn't be prepared; trying again in a few minutes.")
 }

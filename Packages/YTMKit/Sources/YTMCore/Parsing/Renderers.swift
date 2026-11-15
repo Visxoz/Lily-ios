@@ -59,6 +59,9 @@ struct ItemContext: Sendable {
     /// singles shelf, where tiles say only the year.
     var albumType: AlbumType = .album
     var subtitles: CardSubtitles = .composed
+    /// Home: only official music videos count as videos, as ytm-native's
+    /// `home_feed.rs` tells them; uploads have no song version to look up.
+    var musicVideosOnly = false
 }
 
 /// How a card's subtitle is worded.
@@ -162,11 +165,14 @@ extension Renderers {
         return .browse(id: id, params: params)
     }
 
-    /// The watch endpoint's music video type says audio track (ATV) or
-    /// video (OMV, UGC, episodes…); nil when it doesn't say.
-    static func isVideo(_ watchEndpoint: JSON) -> Bool? {
-        watchEndpoint["watchEndpointMusicSupportedConfigs", "watchEndpointMusicConfig", "musicVideoType"].string
-            .map { $0 != "MUSIC_VIDEO_TYPE_ATV" }
+    /// The watch endpoint's music video type says song (ATV), video (OMV,
+    /// UGC…) or neither (a podcast episode), as rustypipe's `TrackType`; nil
+    /// when it doesn't say. Home counts only OMV, and a missing type as no
+    /// video.
+    static func isVideo(_ watchEndpoint: JSON, context: ItemContext = ItemContext()) -> Bool? {
+        let type = watchEndpoint["watchEndpointMusicSupportedConfigs", "watchEndpointMusicConfig", "musicVideoType"].string
+        if context.musicVideosOnly { return type == "MUSIC_VIDEO_TYPE_OMV" }
+        return type.map { $0 != "MUSIC_VIDEO_TYPE_ATV" && $0 != "MUSIC_VIDEO_TYPE_PODCAST_EPISODE" }
     }
 
     /// A continuation endpoint's token: `continuationCommand`, or the first

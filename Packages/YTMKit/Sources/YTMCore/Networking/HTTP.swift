@@ -47,17 +47,21 @@ enum HTTP {
     }()
 
     /// Artwork: a disk cache that outlives launches, so rows scroll in from
-    /// disk rather than the network, kept small as a screen's images are a
-    /// few kilobytes each, and more connections per host, as a screen of
-    /// cards asks for many images at once.
+    /// disk rather than the network, and more connections per host, as a
+    /// screen of cards asks for many images at once. A disk copy is used
+    /// whatever its age. Pages prefetch all their art, so a long playlist's
+    /// thumbnails (about 10 KB each) must not push Home's out.
     static let media: URLSession = {
         let config = URLSessionConfiguration.default
         config.urlCache = URLCache(
             memoryCapacity: 8 << 20,
-            diskCapacity: 20 << 20,
+            diskCapacity: 100 << 20,
             directory: URL.cachesDirectory.appending(path: "artwork", directoryHint: .isDirectory)
         )
-        config.requestCachePolicy = .useProtocolCachePolicy
+        // Artwork URLs name their image and size, so a stored copy is always
+        // right, offline too; asking the server again once its short max-age
+        // lapses would only hold a placeholder on screen.
+        config.requestCachePolicy = .returnCacheDataElseLoad
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false
         config.httpCookieAcceptPolicy = .never

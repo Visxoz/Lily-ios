@@ -104,6 +104,10 @@ import YTMCore
     @ObservationIgnored let sessionSaving = Debounce()
     /// The song whose lyrics are shown or loading.
     @ObservationIgnored var lyricsFor: String?
+    /// Lyrics found, nil for songs without, so a song played again shows
+    /// them at once. Failures are never kept.
+    @ObservationIgnored var lyricsCache: [String: Lyrics?] = [:]
+    static let lyricsCacheLimit = 32
     /// Bumped as the playing song changes or is rated, so a rating fetched
     /// before then is not shown.
     @ObservationIgnored var ratingGeneration: UInt64 = 0
@@ -125,6 +129,9 @@ import YTMCore
     @ObservationIgnored var autoplay: Task<Void, Never>?
     /// What a page or card asked to play, while its tracks load.
     @ObservationIgnored var pendingPlay: Task<Void, Never>?
+    /// The rest of a long playlist being added, batch by batch, after its
+    /// first batch started playing.
+    @ObservationIgnored var continuing: Task<Void, Never>?
     @ObservationIgnored var lyricsLoad: Task<Void, Never>?
     @ObservationIgnored var ratingLoad: Task<Void, Never>?
 
@@ -170,7 +177,7 @@ import YTMCore
     }
 
     isolated deinit {
-        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, lyricsLoad, ratingLoad] {
+        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, continuing, lyricsLoad, ratingLoad] {
             task?.cancel()
         }
         toastSink.finish()
@@ -218,6 +225,8 @@ import YTMCore
             // `finished`, and the next then loads afresh.
             if id == gapless.queued?.itemID {
                 gapless.queuedFailed = true
+                // Its stream may be kept too; the song then resolves afresh.
+                if let trackID = gapless.queued?.trackID { prefetcher.remove(trackID) }
             } else if id == playback.itemID {
                 playbackFailed(current?.title ?? "", message)
             }
@@ -335,7 +344,8 @@ import YTMCore
     /// queued after itself, as on repeat, is told apart. Should googlevideo
     /// refuse its URL partway, the download asks the path that gave it for a
     /// fresh one, taken only for the same file (its format and length), so
-    /// the download carries on from the same byte. The engine can't import
+    /// the download carries on from the same byte, with the headers of the
+    /// client that gave it, as googlevideo checks them. The engine can't import
     /// YTMCore, so every URL, refreshed ones too, is checked against the host
     /// allowlist here.
     func audioItem(for track: Track, stream: ResolvedStream) throws(YTMError) -> AudioItem {
@@ -352,7 +362,7 @@ import YTMCore
             let fresh = try await chooser.refresh(videoId: videoId, wasPremium: stream.isPremium, signedIn: signedIn, quality: quality)
             guard fresh.itag == stream.itag, fresh.contentLength == stream.contentLength else { throw Self.otherFile }
             guard HostAllowlist.allows(fresh.url) else { throw Self.blocked }
-            return fresh.url
+            return (url: fresh.url, headers: fresh.headers)
         }
     }
 
@@ -360,11 +370,12 @@ import YTMCore
     private nonisolated static let otherFile = YTMError(.unplayable, "YouTube offered a different file partway through the song.")
 
     /// Replaces the queue, dropping what was on its way for the old one:
-    /// Smart Shuffle's batch, a radio carrying it on, a card's tracks.
+    /// Smart Shuffle's batch, a radio carrying it on, a card's tracks, a
+    /// playlist's later batches.
     func replaceQueue(with tracks: [Track], start: Int, shuffle: Bool) {
         queue.set(items: tracks, start: start, shuffle: shuffle)
         smart.reset()
-        for task in [extending, autoplay, pendingPlay] { task?.cancel() }
+        for task in [extending, autoplay, pendingPlay, continuing] { task?.cancel() }
         playback.extending = false
     }
 }

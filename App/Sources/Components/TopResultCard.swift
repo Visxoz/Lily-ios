@@ -8,12 +8,15 @@ struct TopResultCard: View {
 
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        Button { app.activate(card) } label: {
+        Button { app.activate(card, displayScale: displayScale) } label: {
             VStack(alignment: .leading, spacing: 0) {
-                ArtworkView(url: card.thumbnail, size: Metrics.topResultArt, round: card.kind == .artist, radius: Metrics.cardArtRadius)
-                    .shadow(color: theme.shadow, radius: 8)
+                ArtworkView(
+                    url: card.thumbnail, size: Metrics.topResultArt, round: card.kind == .artist, radius: Metrics.cardArtRadius,
+                    shadow: (theme.shadow, 8, 0)
+                )
                 Spacer(minLength: 16)
                 Text(card.title)
                     .font(.system(size: 30, weight: .bold))

@@ -7,8 +7,6 @@ import YTMCore
 extension Logger {
     /// What the player did, for Console; never cookies or stream URLs.
     static let playback = Logger(subsystem: "YTMusic", category: "Playback")
-    /// The Premium path's decisions, beside YTMCore's own.
-    static let premium = Logger(subsystem: "YTMusic", category: "Premium")
 }
 
 extension Result where Failure == any Error {

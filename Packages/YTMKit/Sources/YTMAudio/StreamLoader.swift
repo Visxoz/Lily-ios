@@ -27,6 +27,8 @@ final class StreamLoader {
     private let item: AudioItem
     private let cache: AudioCache
     private var url: URL
+    /// The headers of the client that gave `url`, as googlevideo checks them.
+    private var headers: [String: String]
     private var writer: FileHandle?
     private var part: URL?
 
@@ -34,6 +36,7 @@ final class StreamLoader {
         self.item = item
         self.cache = cache
         url = item.url
+        headers = item.headers
         do {
             if let file = cache.completeFile(for: item.cacheKey, length: item.contentLength) {
                 reader = try FileHandle(forReadingFrom: file)
@@ -86,10 +89,10 @@ final class StreamLoader {
             let bytes = if let ahead, ahead.start == start {
                 ahead.bytes
             } else {
-                source.bytes(of: url, headers: item.headers, range: start..<end)
+                source.bytes(of: url, headers: headers, range: start..<end)
             }
             ahead = end < total
-                ? (end, source.bytes(of: url, headers: item.headers, range: end..<min(end + Self.rangeLength, total)))
+                ? (end, source.bytes(of: url, headers: headers, range: end..<min(end + Self.rangeLength, total)))
                 : nil
             do {
                 for try await data in bytes {
@@ -118,15 +121,16 @@ final class StreamLoader {
                 if error as? ByteSourceError == .refused {
                     guard refreshes < Self.maxRefreshes, let fresh = await refreshed() else { return .refused }
                     refreshes += 1
-                    url = fresh
+                    url = fresh.url
+                    headers = fresh.headers
                     continue
                 }
                 guard retries < Self.maxRetries else {
-                    Logger.audio.warning("A download failed after \(Self.maxRetries) retries")
+                    Logger.audio.warning("A download failed after \(Self.maxRetries) retries: \(Self.reason(error), privacy: .public)")
                     return .download
                 }
                 retries += 1
-                Logger.audio.debug("Download range failed, retry \(retries)")
+                Logger.audio.debug("Download range failed, retry \(retries): \(Self.reason(error), privacy: .public)")
                 try? await Task.sleep(for: Self.retryDelay * retries)
             }
         }
@@ -144,7 +148,7 @@ final class StreamLoader {
     func warm(isolation: isolated (any Actor)? = #isolation, source: any ByteSource) async {
         guard available == 0, total > 0 else { return }
         do {
-            for try await data in source.bytes(of: url, headers: item.headers, range: 0..<min(Self.warmLength, total)) {
+            for try await data in source.bytes(of: url, headers: headers, range: 0..<min(Self.warmLength, total)) {
                 guard !Task.isCancelled else { return }
                 try append(data)
             }
@@ -168,6 +172,9 @@ final class StreamLoader {
     /// Reads the file's first `end` bytes back from disk in pieces, letting
     /// commands in between.
     private func replay(isolation: isolated (any Actor)? = #isolation, upTo end: Int64, _ onBytes: (Data) -> Void) async -> AudioFailure? {
+        // A loader kept from a download cut short left its reader where that
+        // replay stopped: the decoder reads with pread, which never moves it.
+        guard (try? reader.seek(toOffset: 0)) != nil else { return .damaged }
         var offset: Int64 = 0
         while offset < end {
             guard !Task.isCancelled else { return nil }
@@ -183,10 +190,10 @@ final class StreamLoader {
 
     /// A fresh URL for the file being fetched, taken only if it serves the
     /// same encode, as the bytes already held must line up with the rest.
-    private func refreshed(isolation: isolated (any Actor)? = #isolation) async -> URL? {
+    private func refreshed(isolation: isolated (any Actor)? = #isolation) async -> (url: URL, headers: [String: String])? {
         do {
             let fresh = try await item.refresh()
-            guard Self.sameFile(url, fresh) else {
+            guard Self.sameFile(url, fresh.url) else {
                 Logger.audio.warning("A refreshed stream URL serves a different file")
                 return nil
             }
@@ -203,6 +210,16 @@ final class StreamLoader {
         let first = parameters(a)
         let second = parameters(b)
         return first["itag"] != nil && ["itag", "clen", "lmt"].allSatisfy { first[$0] == second[$0] }
+    }
+
+    /// Why a range failed, without the error itself: a URLError's
+    /// description carries the stream URL.
+    private static func reason(_ error: any Error) -> String {
+        switch error {
+        case let error as ByteSourceError: String(describing: error)
+        case let error as URLError: "URLError \(error.code.rawValue)"
+        default: "other"
+        }
     }
 
     private static func parameters(_ url: URL) -> [String: String] {

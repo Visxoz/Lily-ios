@@ -173,10 +173,13 @@ struct PlayerControllerTests {
         #expect(second.player.currentTime == 42)
         #expect(!second.player.isPlaying)
         #expect(second.audio.played.isEmpty, "nothing loads until played")
+        await second.settle()
+        #expect(second.music.calls.contains("stream b"), "resolved ahead at launch")
         second.player.togglePlayPause()
         await second.settle()
         let resumed = try #require(second.audio.played.last)
         #expect(resumed.item.id.hasPrefix("b#") && resumed.from == 42)
+        #expect(second.music.calls.filter { $0 == "stream b" }.count == 1, "the play takes it rather than asking again")
     }
 
     @Test func seeksBeforeLoadingStartThere() async throws {
@@ -247,7 +250,8 @@ struct PlayerControllerTests {
         rig.player.rate(.dislike)
         await rig.settle()
         #expect(rig.player.current?.id == "b")
-        #expect(rig.music.calls.filter { $0.hasPrefix("rate") } == ["rate a LIKE", "rate a INDIFFERENT", "rate a DISLIKE"])
+        // Each rating is sent on its own task, as ytm-native's spawn, so taps this close may arrive in any order.
+        #expect(rig.music.calls.filter { $0.hasPrefix("rate") }.sorted() == ["rate a DISLIKE", "rate a INDIFFERENT", "rate a LIKE"])
     }
 
     @Test func aQualityChangeDropsStreamsResolvedAhead() async {
@@ -344,7 +348,7 @@ struct PlayerControllerTests {
         rig.audio.currentTime = 42
         rig.player.mediaServicesReset()
         await rig.settle()
-        #expect(rig.audio.log.suffix(3).map { $0.prefix(4) } == ["stop", "rebu", "play"], "loaded once the graph is new")
+        #expect(rig.audio.log.suffix(3).map { $0.prefix(4) } == ["rebu", "stop", "play"], "loaded once the graph is new")
         let played = try #require(rig.audio.played.last)
         #expect(played.item.id.hasPrefix("a#") && played.from == 42)
         await rig.soundStarts()
@@ -433,4 +437,20 @@ struct StreamChooserTests {
         let stream = try await chooser.resolve(videoId: "a", wantPremium: true, signedIn: true, quality: .high)
         #expect(!stream.isPremium && music.calls == ["premium a", "stream a"])
     }
+
+    @Test func aPlayerThatCantBePreparedIsNotCountedAsAPremiumError() async throws {
+        let music = FakeMusic()
+        music.set { $0.playerUnprepared = true }
+        let chooser = StreamChooser(music: music)
+        for id in ["a", "b", "c", "d"] {
+            music.set { $0.calls = [] }
+            let stream = try await chooser.resolve(videoId: id, wantPremium: true, signedIn: true, quality: .high)
+            #expect(!stream.isPremium && music.calls == ["premium \(id)", "stream \(id)"], "no cool-off after three")
+        }
+    }
+}
+
+/// YTMCore can't see YTMAudio, so its band count is checked against the engine's here.
+@Test func settingsKeepAGainForEveryEqualiserBand() {
+    #expect(Settings.equaliserBands == EqualiserBands.frequencies.count)
 }

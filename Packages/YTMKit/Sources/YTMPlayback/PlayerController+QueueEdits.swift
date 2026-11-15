@@ -23,8 +23,10 @@ extension PlayerController {
         if queue.playNextMany(offsets) { queueEdited() }
     }
 
-    /// Drops everything after the song playing.
+    /// Drops everything after the song playing, and the rest of a playlist
+    /// still on its way.
     public func clearUpcoming() {
+        continuing?.cancel()
         let before = queue.revision
         queue.clearUpcoming()
         if queue.revision != before { queueEdited() }

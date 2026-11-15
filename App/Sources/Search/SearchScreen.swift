@@ -22,18 +22,23 @@ struct SearchScreen: View {
 
     var body: some View {
         @Bindable var app = app
-        Group {
+        // The results stay in the tree under the dropdown, as in ytm-native, so
+        // cancelling a search shows them again in place, scrolled where they were.
+        ZStack {
+            if let shown {
+                PageScreen(route: .search(shown), app: app)
+                    .id(shown)
+                    // Covered by the choices while searching, so VoiceOver skips it.
+                    .accessibilityHidden(app.isSearching)
+            } else {
+                SearchPrompt()
+            }
             if app.isSearching {
                 SearchChoices(
                     choices: showsRecent ? app.history.searches.queries : suggestions,
                     recent: showsRecent,
                     pick: search
                 )
-            } else if let shown {
-                PageScreen(route: .search(shown))
-                    .id(shown)
-            } else {
-                SearchPrompt()
             }
         }
         // Always showing, so the query stays in view over its results, as

@@ -73,6 +73,8 @@ struct PremiumResolver: Sendable {
     /// The signed-in player request YouTube's web player makes, quoting the
     /// player's signature timestamp so the URLs match its scrambling.
     func request(videoId: String, as client: ClientProfile) async throws -> JSON {
+        // Not retried, as ytm-native's player_request: the next client is the
+        // retry, so a broken one costs a request rather than the song.
         try await innerTube.post("player", body: [
             "playbackContext": [
                 "contentPlaybackContext": [
@@ -83,7 +85,7 @@ struct PremiumResolver: Sendable {
             "videoId": videoId,
             "contentCheckOk": true,
             "racyCheckOk": true,
-        ], client: client)
+        ], client: client, retries: 0)
     }
 
     /// Premium formats come first, so a song with AAC 141 but no Opus 774

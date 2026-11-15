@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import YTMAudio
 
@@ -33,9 +34,25 @@ struct StreamLoaderTests {
         #expect(try Data(contentsOf: cached) == file)
     }
 
+    @Test func asksAFreshURLWithItsOwnClientsHeaders() async throws {
+        let query = "itag=251&clen=\(file.count)&lmt=1&file=song"
+        let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?\(query)"))
+        let fresh = try #require(URL(string: "https://rr2.googlevideo.com/videoplayback?\(query)&n=fresh"))
+        let item = AudioItem(id: "x", url: stale, headers: ["User-Agent": "old"], contentLength: Int64(file.count),
+                             cacheKey: "x-\(UUID())", loudnessDB: 0) {
+            (url: fresh, headers: ["User-Agent": "new"])
+        }
+        let source = AgentRecording(RefusingPartWay(files: ["song": file], after: 3_000))
+        let (_, received, failure) = try await load(item, from: source)
+        #expect(failure == nil && received == file)
+        #expect(source.agents == ["old", "new"], "the rest is asked for as the fresh URL's client")
+    }
+
     @Test func givesUpWhenEveryURLIsRefused() async throws {
         let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=10000&lmt=1"))
-        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) { stale }
+        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) {
+            (url: stale, headers: [:])
+        }
         let (loader, received, failure) = try await load(item, from: MemoryByteSource(files: [:], refuseFrom: 0))
         #expect(failure == .refused && received.isEmpty && !loader.isComplete)
     }
@@ -43,7 +60,9 @@ struct StreamLoaderTests {
     @Test func refusesAFreshURLForAnotherFile() async throws {
         let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=10000&lmt=1"))
         let other = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=10000&lmt=2&n=fresh"))
-        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) { other }
+        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) {
+            (url: other, headers: [:])
+        }
         let (_, _, failure) = try await load(item, from: MemoryByteSource(files: [:], refuseFrom: 0))
         #expect(failure == .refused)
     }
@@ -55,6 +74,23 @@ struct StreamLoaderTests {
                               cacheKey: item.cacheKey, loudnessDB: 0, refresh: item.refresh)
         let (loader, received, failure) = try await load(again, from: MemoryByteSource(files: [:], refuseFrom: 0))
         #expect(failure == nil && received == file && loader.isComplete && loader.available == Int64(file.count))
+    }
+}
+
+/// Notes the User-Agent of each request it passes on.
+private final class AgentRecording: ByteSource {
+    private let served: any ByteSource
+    private let asked = Mutex<[String]>([])
+
+    init(_ served: any ByteSource) {
+        self.served = served
+    }
+
+    var agents: [String] { asked.withLock { $0 } }
+
+    func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
+        asked.withLock { $0.append(headers["User-Agent"] ?? "") }
+        return served.bytes(of: url, headers: headers, range: range)
     }
 }
 

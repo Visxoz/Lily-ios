@@ -17,9 +17,10 @@ final class PageModel {
     /// Counts the pages shown, so the screen asks for the next step of
     /// `Page.more` once the last has arrived.
     private(set) var step = 0
-    /// Counts the pages that replaced one shown when the screen came back
-    /// (Home's fresh feed over a saved or aged one), which start from the
-    /// top: the reader's place belonged to the feed replaced.
+    /// Counts the pages that changed what was shown when the screen came back
+    /// (Home's fresh feed over a saved or aged one, History on a visit),
+    /// which start from the top: the reader's place belonged to the page
+    /// replaced.
     private(set) var replacements = 0
 
     @ObservationIgnored private var generation = 0
@@ -33,8 +34,11 @@ final class PageModel {
     @ObservationIgnored private var shownAt: ContinuousClock.Instant?
     @ObservationIgnored private var loadingMore = false
 
-    init(route: Route) {
+    /// Shows a page the cache still holds at once, as ytm-native's `navigate`
+    /// does, so a page returned to within five minutes has no spinner or rise.
+    init(route: Route, app: AppModel) {
         self.route = route
+        if app.accountGeneration > 0, let page = app.cachedPage(route) { show(page, for: app) }
     }
 
     var page: Page? {
@@ -46,10 +50,15 @@ final class PageModel {
     /// ytm-native does, keeping the songs shown meanwhile, and so is Home
     /// while its saved feed stands in, or once its feed has aged past the
     /// page cache's five minutes: the app stays alive for days, so a feed
-    /// loaded once would otherwise never change.
-    func appear(in app: AppModel) async {
+    /// loaded once would otherwise never change. Any other page loads afresh
+    /// once it has left the page cache (aged past five minutes, pushed out,
+    /// or forgotten after a library change), as ytm-native's `navigate`
+    /// checks the cache on every visit. `returning` is a return to the app
+    /// with the page on screen, which ytm-native never refetches it for, so
+    /// only Home's age counts then.
+    func appear(in app: AppModel, returning: Bool) async {
         guard app.accountGeneration > 0 else { return }
-        if shownFor == app.accountGeneration, route != .history, !showsSaved, !isStale { return }
+        if shownFor == app.accountGeneration, route != .history, !showsSaved, !isStale(in: app, returning: returning) { return }
         if shownFor != app.accountGeneration { phase = .loading }
         await load(in: app, cached: true)
     }
@@ -82,9 +91,15 @@ final class PageModel {
         let generation = generation
         let account = app.accountGeneration
         loadingMore = false
-        // On a visit, a page over one already shown starts from the top.
+        // Home's fresh feed and History's latest plays start from the top when
+        // they differ from what was shown; the same page again, or any other
+        // page loaded afresh on a visit, keeps the reader's place, as
+        // ytm-native's `restore_scroll`.
         func present(_ page: Page, saved: Bool = false) {
-            if cached, self.page != nil { replacements += 1 }
+            if cached, let shown = self.page, route == .home || route == .history,
+               shown.sections != page.sections || shown.header != page.header {
+                replacements += 1
+            }
             show(page, for: app, saved: saved)
         }
         if cached, let page = app.cachedPage(route) {
@@ -125,7 +140,9 @@ final class PageModel {
             guard isCurrent(generation, account, in: app) else { return }
             present(page)
         } catch {
-            guard generation == self.generation, !Task.isCancelled else { return }
+            // A change of account cancels the last account's requests, whose
+            // failure is no news: the page loads afresh for the new one.
+            guard isCurrent(generation, account, in: app), !Task.isCancelled else { return }
             if self.page == nil {
                 phase = .failed(sentence(for: error))
             } else {
@@ -141,9 +158,13 @@ final class PageModel {
         generation == self.generation && account == app.accountGeneration
     }
 
-    /// Home's feed is older than the page cache keeps pages.
-    private var isStale: Bool {
-        guard route == .home, let shownAt else { return false }
+    /// Home's feed is older than the page cache keeps pages (one shown from the
+    /// cache may be older still); any other page is no longer in the cache, as
+    /// ytm-native's `navigate` refetches a page aged out or forgotten, though
+    /// not on a return to the app.
+    private func isStale(in app: AppModel, returning: Bool) -> Bool {
+        guard route == .home else { return !returning && app.cachedPage(route) == nil }
+        guard let shownAt else { return false }
         return shownAt.duration(to: .now) >= AppModel.pageCacheFor
     }
 

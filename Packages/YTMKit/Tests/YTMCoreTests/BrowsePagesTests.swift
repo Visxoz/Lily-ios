@@ -57,6 +57,31 @@ private func carousel(_ title: String, _ items: [String]) -> String {
         #expect(tiles.layout == .grid)
     }
 
+    @Test func countsOnlyOfficialMusicVideosAsVideos() throws {
+        func tile(_ id: String, _ type: String) -> String {
+            #"{"musicTwoRowItemRenderer":{"title":{"runs":[{"text":"\#(id)"}]},"navigationEndpoint":{"watchEndpoint":{"videoId":"\#(id)","watchEndpointMusicSupportedConfigs":{"watchEndpointMusicConfig":{"musicVideoType":"\#(type)"}}}}}}"#
+        }
+        let wideRow = #"""
+        {"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"w"},
+          "thumbnail":{"musicThumbnailRenderer":{"thumbnail":{"thumbnails":[{"url":"https://i.ytimg.com/vi/w/a.jpg","width":400,"height":225}]}}},
+          "flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Wide"}]}}}]}}
+        """#
+        let page = try json(#"""
+        {"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{
+          "contents":[\#(carousel("Listen again", [tile("omv", "MUSIC_VIDEO_TYPE_OMV"), tile("ugc", "MUSIC_VIDEO_TYPE_UGC")])),
+            \#(carousel("Quick picks", [wideRow]))]}}}}]}}}
+        """#)
+        let sections = try HomeFeed.firstPage(page).sections
+        guard sections.count == 2, case .cards(let tiles) = sections[0], case .tracks(let rows) = sections[1] else {
+            Issue.record("expected a card row then a track list")
+            return
+        }
+        #expect(tiles.cards.map { $0.track?.isVideo } == [true, false], "uploads play as they are")
+        #expect(rows.tracks.map(\.isVideo) == [false], "no type on Home is no video, whatever the thumbnail")
+        let elsewhere = try #require(Renderers.track(try json(wideRow)["musicResponsiveListItemRenderer"]))
+        #expect(elsewhere.isVideo, "off Home, a wide thumbnail still marks a video")
+    }
+
     @Test func readsContinuationPages() throws {
         let page = try json(#"""
         {"continuationContents":{"sectionListContinuation":{"contents":[\#(carousel("Mixed for you", [mixTile]))],

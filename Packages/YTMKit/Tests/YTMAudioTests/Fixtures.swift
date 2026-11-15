@@ -230,7 +230,7 @@ extension AudioItem {
             contentLength: Int64(length),
             cacheKey: "\(name)-\(UUID().uuidString)",
             loudnessDB: loudnessDB,
-            refresh: { fresh }
+            refresh: { (url: fresh, headers: [:]) }
         )
     }
 }

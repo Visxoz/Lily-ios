@@ -54,12 +54,15 @@ struct StreamResolver: Sendable {
     /// The `player` response for `videoId`, asked signed out as `client`,
     /// with `visitorData` or else the saved visitor ID.
     func player(videoId: String, as client: ClientProfile, visitorData: String? = nil) async throws -> JSON {
+        // Not retried, as ytm-native's resolve_with: the next client is the
+        // retry, so a broken one costs a request rather than the song.
         try await innerTube.post(
             "player",
             body: ["videoId": videoId, "contentCheckOk": true, "racyCheckOk": true],
             client: client,
             authenticated: false,
-            visitorData: visitorData
+            visitorData: visitorData,
+            retries: 0
         )
     }
 

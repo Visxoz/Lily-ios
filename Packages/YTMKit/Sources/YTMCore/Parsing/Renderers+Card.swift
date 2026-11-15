@@ -17,7 +17,7 @@ extension Renderers {
             let track = Track(
                 id: videoId, title: title, artists: artists,
                 thumbnail: Thumbnail.pick(thumbnails, edge: Thumbnail.row),
-                isVideo: isVideo(watch) ?? false
+                isVideo: isVideo(watch, context: context) ?? false
             )
             return Card(
                 kind: .song, id: videoId, title: title, subtitle: text(subtitle),

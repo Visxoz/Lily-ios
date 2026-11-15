@@ -21,7 +21,7 @@ extension YTMusic {
     }
 
     /// The radio's playlist ID for a playlist or album's own.
-    static func radioId(forPlaylist id: String) -> String { "RDAMPL" + id }
+    public static func radioId(forPlaylist id: String) -> String { "RDAMPL" + id }
 
     /// The params YouTube Music's player starts a radio with, as rustypipe's
     /// `music_radio` sends them.

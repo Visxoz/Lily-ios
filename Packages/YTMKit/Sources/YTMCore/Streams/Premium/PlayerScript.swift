@@ -85,7 +85,8 @@ struct PlayerScript: Codable, Sendable {
 /// The player the session solves with, as ytm-native's `premium_player`:
 /// loaded once and shared by every song, with a pause after a failure so a
 /// broken player isn't fetched again for each one. A phone app can run for
-/// days, so the version is checked again after a few hours.
+/// days, so the version is checked again after a few hours, in the
+/// background, while the known player keeps solving.
 actor PlayerScripts {
     static let shared = PlayerScripts()
 
@@ -93,48 +94,49 @@ actor PlayerScripts {
     private static let recheck: Duration = .seconds(6 * 60 * 60)
 
     private var current: (script: PlayerScript, checked: ContinuousClock.Instant)?
-    /// The load in flight, which every caller arriving meanwhile awaits.
+    /// The load in flight, which callers await only while no player is known.
     private var loading: Task<PlayerScript, any Error>?
     private var failed: ContinuousClock.Instant?
 
     func player(store: FileStore) async throws -> PlayerScript {
         let now = ContinuousClock.now
-        if let current, now - current.checked < Self.recheck { return current.script }
-        if let failed, now - failed < Self.backoff {
-            if let current { return current.script }
-            throw YTMError(.unplayable, "YouTube's player couldn't be prepared; trying again in a few minutes.")
+        let backingOff = failed.map { now - $0 < Self.backoff } ?? false
+        if let current {
+            // A known script keeps solving while a newer one is fetched behind
+            // it, as ytm-native keeps its player for the whole run, so no song
+            // waits for the recheck.
+            if now - current.checked >= Self.recheck, loading == nil, !backingOff { refresh(store: store) }
+            return current.script
         }
-        if let loading {
-            do {
-                return try await loading.value
-            } catch {
-                return try working(after: error)
-            }
+        if backingOff {
+            throw YTMError.playerUnprepared
         }
-        let task = Task { try await PlayerScript.load(store: store) }
-        loading = task
-        defer { loading = nil }
-        do {
-            let script = try await task.value
-            current = (script, .now)
-            failed = nil
-            return script
-        } catch {
-            failed = .now
-            Logger.premium.error("could not prepare the player: \(error.localizedDescription, privacy: .public)")
-            return try working(after: error)
-        }
+        if loading == nil { refresh(store: store) }
+        guard let loading else { throw YTMError(.unplayable, "YouTube's player couldn't be prepared.") }
+        return try await loading.value
     }
 
-    /// The player that worked, which carries on until a newer one does, for
-    /// the caller that started a failed load and those that joined it alike.
-    private func working(after error: any Error) throws -> PlayerScript {
-        guard let current else { throw error }
-        return current.script
+    /// Starts the load on the actor, which records its outcome for every
+    /// caller. The task can't run before `loading` is set, as the actor is
+    /// busy until this returns.
+    private func refresh(store: FileStore) {
+        loading = Task {
+            defer { loading = nil }
+            do {
+                let script = try await PlayerScript.load(store: store)
+                current = (script, .now)
+                failed = nil
+                return script
+            } catch {
+                failed = .now
+                Logger.premium.error("could not prepare the player: \(error.localizedDescription, privacy: .public)")
+                throw error
+            }
+        }
     }
 }
 
 extension Logger {
     /// What the Premium path did, for Console; never cookies or URLs.
-    static let premium = Logger(subsystem: "YTMusic", category: "Premium")
+    package static let premium = Logger(subsystem: "YTMusic", category: "Premium")
 }

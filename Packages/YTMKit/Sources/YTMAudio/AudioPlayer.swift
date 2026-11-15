@@ -14,7 +14,7 @@ import Foundation
     public let events: AsyncStream<AudioEvent>
     public private(set) var isPlaying = false
 
-    public var equaliser: (enabled: Bool, gains: [Float]) = (false, Array(repeating: 0, count: 6)) {
+    public var equaliser: (enabled: Bool, gains: [Float]) = (false, Array(repeating: 0, count: EqualiserBands.frequencies.count)) {
         didSet {
             let (enabled, gains) = equaliser
             engine.send { $0.setEqualiser(enabled: enabled, gains: gains) }
@@ -90,7 +90,8 @@ import Foundation
 
     /// Fetches the start of an item likely to play next, so a skip to it
     /// starts sooner; its download, by `play` or `setNext`, carries on from
-    /// there. One item is warmed at a time, the last asked for.
+    /// there. One item is warmed at a time, the last asked for, or a next
+    /// item let go, which keeps what it had downloaded.
     public func warm(_ item: AudioItem) {
         engine.send { $0.warm(item) }
     }

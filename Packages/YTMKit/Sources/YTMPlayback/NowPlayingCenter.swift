@@ -58,6 +58,11 @@ import AppKit
             metadata[MPMediaItemPropertyArtwork] = Self.artwork(image)
             return
         }
+        // The row's small copy, scaled up by the system, so the lock screen
+        // has artwork while the large one loads.
+        if let small = ImagePipeline.shared.cachedImage(for: url, pixelEdge: ImagePipeline.smallEdge) {
+            metadata[MPMediaItemPropertyArtwork] = Self.artwork(small)
+        }
         let id = track.id
         artwork = Task { [weak self] in
             guard let image = await ImagePipeline.shared.image(for: url, pixelEdge: ImagePipeline.playerEdge),

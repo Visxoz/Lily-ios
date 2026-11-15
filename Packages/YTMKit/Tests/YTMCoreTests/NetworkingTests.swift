@@ -63,8 +63,8 @@ import Testing
     }
 
     @Test func buildsEndpointURLs() {
-        let url = ClientProfile.webRemix.url("browse", query: [URLQueryItem(name: "ctoken", value: "a")])
-        #expect(url?.absoluteString == "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false&ctoken=a")
+        let url = ClientProfile.webRemix.url("browse")
+        #expect(url?.absoluteString == "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false")
         #expect(ClientProfile.plainStreamClients.map(\.name) == ["VISIONOS", "ANDROID_VR", "IOS"])
     }
 }
@@ -155,6 +155,27 @@ private final class FlakyServer: URLProtocol {
         await visitor.adopt("v3", replacing: "v1")
         #expect(try await visitor.value() == "v2", "a late adoption changes nothing")
         #expect(await issuer.fetches == 2)
+    }
+
+    /// VisitorData's saved file, in the same shape.
+    private struct Saved: Codable, Sendable {
+        let value: String
+        let fetched: Date
+    }
+
+    @Test(.timeLimit(.minutes(1))) func sendsADayOldIDWhileANewOneIsFetched() async throws {
+        let issuer = Issuer()
+        let store = FileStore(directory: .temporaryDirectory.appending(path: "ytm-visitor-\(UUID().uuidString)"))
+        store.save(Saved(value: "old", fetched: .now.addingTimeInterval(-2 * 86_400)), to: .visitor)
+        let visitor = VisitorData(store: store) { await issuer.issue() }
+        var value = try await visitor.value()
+        #expect(value == "old", "no request waits on the refresh")
+        while value == "old" {
+            await Task.yield()
+            value = try await visitor.value()
+        }
+        #expect(value == "v1")
+        #expect(await issuer.fetches == 1)
     }
 
     @Test func asksAsRustypipesDefaults() {

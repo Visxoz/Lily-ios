@@ -85,21 +85,48 @@ extension PlayerController {
         }
         guard lyricsFor != id else { return }
         lyricsFor = id
-        lyrics = .loading
         lyricsLoad?.cancel()
+        if let cached = lyricsCache[id] {
+            lyrics = cached.map(LyricsState.loaded) ?? .unavailable
+            return
+        }
+        lyrics = .loading
         let music = music
         lyricsLoad = Task { [weak self] in
             let result = await Result { try await music.lyrics(videoId: id) }
-            guard let self, !Task.isCancelled, lyricsFor == id else { return }
+            guard let self else { return }
+            // Kept even when the song has changed meanwhile, for when it plays again.
+            if case .success(let found) = result { remember(found, for: id) }
+            guard !Task.isCancelled, lyricsFor == id else { return }
             switch result {
-            case .success(let found?): lyrics = .loaded(found)
-            case .success(nil): lyrics = .unavailable
+            case .success(let found): lyrics = found.map(LyricsState.loaded) ?? .unavailable
             case .failure(let error):
                 // Asked again when next shown.
                 lyricsFor = nil
                 lyrics = .failed("Couldn't load lyrics: \(sentence(for: error))")
             }
         }
+    }
+
+    /// Fetches the lyrics of the song coming next ahead, only while lyrics
+    /// are on screen, so the panel fills as the song changes.
+    func prefetchLyrics(of id: String) {
+        guard showsLyrics, id != current?.id, lyricsCache[id] == nil else { return }
+        // shortcut: asks again for a song whose fetch is still running, as on a quick skip or a
+        // queue edit; keep the task by ID if the duplicates show up.
+        let music = music
+        Task { [weak self] in
+            // Not `try?`, which would fold a song without lyrics into a failure.
+            let result = await Result { try await music.lyrics(videoId: id) }
+            if case .success(let found) = result { self?.remember(found, for: id) }
+        }
+    }
+
+    /// Keeps `found` for `id`, starting over once the cache is full.
+    func remember(_ found: Lyrics?, for id: String) {
+        if lyricsCache.count >= Self.lyricsCacheLimit { lyricsCache.removeAll() }
+        // `.some`, as nil assigned through the subscript would remove the entry.
+        lyricsCache[id] = .some(found)
     }
 
     /// Shows how the account rated `id`, the playing song, once YouTube says.

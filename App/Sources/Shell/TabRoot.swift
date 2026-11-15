@@ -30,7 +30,7 @@ struct TabRoot<Content: View>: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) { AccountButton() }
                 }
-                .navigationDestination(for: Route.self) { PageScreen(route: $0) }
+                .navigationDestination(for: Route.self) { PageScreen(route: $0, app: app) }
         }
         .overlay(alignment: .bottom) { ToastView() }
         // Empty without a song, which leaves the pages their full height.

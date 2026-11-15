@@ -22,8 +22,14 @@ public final class ImagePipeline: Sendable {
     /// copy, the mini player's and the one fetched ahead are the same decode.
     public static let smallEdge = 168
 
-    /// Decoded artwork kept for reuse, in bytes, as ytm-native's budget.
-    private static let memoryLimit = 32 << 20
+    /// Decoded artwork kept for reuse, in bytes: ytm-native's 32 MB scaled
+    /// for decodes at 3x rather than a desktop's 1x, so a Home feed's cards
+    /// and the playing song's 1080-pixel copy, fetched ahead, outlast a
+    /// scroll. NSCache still sheds it under memory pressure.
+    private static let memoryLimit = 96 << 20
+    /// Prefetches at once: few, so the artwork a view asks for itself never
+    /// queues behind a page's worth for the media host's connections.
+    private static let prefetchWidth = 4
     private static let log = Logger(subsystem: "YTMusic", category: "ImagePipeline")
 
     private let memory = MemoryCache(limit: memoryLimit)
@@ -46,6 +52,31 @@ public final class ImagePipeline: Sendable {
     /// Artwork already decoded at `pixelEdge`, without fetching.
     public func cachedImage(for url: String, pixelEdge: Int) -> CGImage? {
         memory[Self.key(url, pixelEdge)]
+    }
+
+    /// Downloads artwork into the disk URL cache without decoding it, so a
+    /// page's art is on the device before it scrolls in, as ytm-native's
+    /// `load_art`; memory stays bounded as nothing is decoded. Artwork
+    /// already decoded, on its way or downloaded is skipped, and nothing more
+    /// starts once the caller is cancelled.
+    public func prefetch(_ urls: [String], pixelEdge: Int) async {
+        await withTaskGroup(of: Void.self) { group in
+            var seen = Set<String>()
+            var running = 0
+            for url in urls {
+                if running == Self.prefetchWidth {
+                    _ = await group.next()
+                    running -= 1
+                }
+                guard !Task.isCancelled else { return }
+                let key = Self.key(url, pixelEdge)
+                guard seen.insert(key).inserted, memory[key] == nil else { continue }
+                group.addTask { [downloads] in
+                    await downloads.prefetch(key) { await Self.download(url, edge: pixelEdge) }
+                }
+                running += 1
+            }
+        }
     }
 
     /// Keyed by what is requested, so artwork stored at different sizes, as
@@ -72,6 +103,16 @@ public final class ImagePipeline: Sendable {
         } catch {
             return nil
         }
+    }
+
+    /// Fetches `url` at `edge` for the URL cache to keep, unless it already
+    /// holds it. The bytes are dropped: `fetch` reads them back from the cache.
+    @concurrent
+    private static func download(_ url: String, edge: Int) async {
+        guard let request = requestURL(url, edge: edge).map({ URLRequest(url: $0) }),
+              HTTP.media.configuration.urlCache?.cachedResponse(for: request) == nil
+        else { return }
+        _ = try? await HTTP.data(for: request, session: HTTP.media)
     }
 
     /// The URL to fetch: googleusercontent renders any size, so it is asked
@@ -138,7 +179,7 @@ private final class MemoryCache: @unchecked Sendable {
 }
 
 /// Downloads under way, each shared by everyone waiting for its image.
-private actor Downloads {
+actor Downloads {
     private struct Download {
         /// Its starter's ID, so a cancelled download that ends late never
         /// answers a newer one's waiters.
@@ -149,6 +190,10 @@ private actor Downloads {
     }
 
     private var downloads: [String: Download] = [:]
+    /// Prefetches under way: a request for the same image meanwhile waits
+    /// for its download, then reads it from the URL cache, rather than
+    /// fetching it a second time.
+    private var prefetches: [String: Task<Void, Never>] = [:]
     private var nextID: UInt64 = 0
 
     /// Waits for `key`'s image, starting `load` unless it is already on its
@@ -166,7 +211,9 @@ private actor Downloads {
                 } else if downloads[key] != nil {
                     downloads[key]?.waiters[id] = continuation
                 } else {
+                    let prefetch = prefetches[key]
                     let task = Task { [weak self] in
+                        await prefetch?.value
                         let image = await load()
                         await self?.finish(key, id: id, with: image)
                     }
@@ -176,6 +223,20 @@ private actor Downloads {
         } onCancel: {
             Task { await self.leave(key, id: id) }
         }
+    }
+
+    /// Runs `download`, a prefetch of `key`'s image, unless the image is on
+    /// its way already, so it is never fetched twice. It stops with its caller.
+    func prefetch(_ key: String, download: @escaping @Sendable () async -> Void) async {
+        guard downloads[key] == nil, prefetches[key] == nil else { return }
+        let task = Task { await download() }
+        prefetches[key] = task
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        prefetches[key] = nil
     }
 
     private func finish(_ key: String, id: UInt64, with image: CGImage?) {

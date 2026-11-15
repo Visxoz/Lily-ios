@@ -160,6 +160,9 @@ final class StreamChooser: Sendable {
             }
         } catch is CancellationError {
             throw CancellationError()
+        } catch let error as YTMError where error == .playerUnprepared {
+            // Not the account's fault, so not counted, as ytm-native's `resolve`.
+            Logger.playback.info("\(videoId, privacy: .public): could not prepare the player; using the free stream")
         } catch {
             Logger.playback.info("\(videoId, privacy: .public): Premium path failed, using the free stream: \(sentence(for: error), privacy: .public)")
             if counters.withLock({ $0.recordError(at: .now) }) {

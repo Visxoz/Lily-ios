@@ -29,10 +29,15 @@ final class FakeMusic: MusicService {
         /// Premium answers by video ID; songs missing have no Premium formats.
         var premium: [String: Bool] = [:]
         var premiumFails = false
+        /// The Premium path's player script can't be had.
+        var playerUnprepared = false
         var lyrics: [String: Lyrics] = [:]
+        var lyricsFail = false
+        /// Playlists as `page` and `loadMore` serve them, a batch at a time.
+        var playlistBatches: [String: [[Track]]] = [:]
         var ratings: [String: Rating] = [:]
-        /// Streams held back until `release`, as a slow resolve, and the
-        /// resolves waiting on them.
+        /// Streams, and cards' tracks, held back until `release`, as a slow
+        /// network, and the calls waiting on them.
         var held: Set<String> = []
         var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
         var calls: [String] = []
@@ -46,7 +51,8 @@ final class FakeMusic: MusicService {
 
     var calls: [String] { state.withLock(\.calls) }
 
-    /// Lets `videoId`'s held streams resolve, now and from then on.
+    /// Lets what is held for `videoId`, or a card's ID, through, now and
+    /// from then on.
     func release(_ videoId: String) {
         let waiting = state.withLock { state in
             state.held.remove(videoId)
@@ -71,25 +77,30 @@ final class FakeMusic: MusicService {
         )
     }
 
+    /// Waits while `id` is held.
+    private func waitWhileHeld(_ id: String) async {
+        guard state.withLock({ $0.held.contains(id) }) else { return }
+        await withCheckedContinuation { continuation in
+            let wait = state.withLock { state in
+                guard state.held.contains(id) else { return false }
+                state.waiting[id, default: []].append(continuation)
+                return true
+            }
+            if !wait { continuation.resume() }
+        }
+    }
+
     func stream(videoId: String, quality: AudioQuality) async throws -> ResolvedStream {
         log("stream \(videoId)")
-        if state.withLock({ $0.held.contains(videoId) }) {
-            await withCheckedContinuation { continuation in
-                let wait = state.withLock { state in
-                    guard state.held.contains(videoId) else { return false }
-                    state.waiting[videoId, default: []].append(continuation)
-                    return true
-                }
-                if !wait { continuation.resume() }
-            }
-        }
+        await waitWhileHeld(videoId)
         if state.withLock({ $0.failing.contains(videoId) }) { throw YTMError(.unplayable, "No audio.") }
         return Self.stream(videoId)
     }
 
     func premiumStream(videoId: String, anyFormat: Bool, maxKbps: Int?) async throws -> PremiumOutcome {
         log("premium \(videoId)")
-        let (fails, has) = state.withLock { ($0.premiumFails, $0.premium[videoId]) }
+        let (fails, unprepared, has) = state.withLock { ($0.premiumFails, $0.playerUnprepared, $0.premium[videoId]) }
+        if unprepared { throw YTMError.playerUnprepared }
         if fails { throw YTMError(.network, "Premium failed.") }
         switch has {
         case true?: return .stream(Self.stream(videoId, premium: true))
@@ -113,12 +124,39 @@ final class FakeMusic: MusicService {
 
     func tracks(of card: Card) async throws -> [Track] {
         log("tracks \(card.id)")
+        await waitWhileHeld(card.id)
         return state.withLock { $0.radios[card.id] } ?? []
     }
 
     func playlistTracks(_ playlistId: String) async throws -> [Track] {
         log("playlist \(playlistId)")
         return state.withLock { $0.radios[playlistId] } ?? []
+    }
+
+    /// A playlist's page with its first batch, and `more` while others remain.
+    func page(_ route: Route) async throws -> Page {
+        guard case .playlist(let id) = route else { throw YTMError(.notFound, "No such page.") }
+        log("page \(id)")
+        let batches = state.withLock { $0.playlistBatches[id] } ?? []
+        return Page(
+            header: PageHeader(title: id, playlistId: id),
+            sections: [.tracks(TrackSection(title: "", tracks: batches.first ?? [], mode: .section))],
+            more: batches.count > 1 ? .tracks(token: "\(id)#1", sectionIndex: 0) : nil
+        )
+    }
+
+    /// The page with its next batch, the token naming the playlist and batch.
+    func loadMore(_ page: Page) async throws -> Page {
+        guard case .tracks(let token, let index)? = page.more, let id = page.header?.playlistId,
+              let step = token.split(separator: "#").last.flatMap({ Int($0) }), page.sections.indices.contains(index),
+              case .tracks(var section) = page.sections[index] else { return page }
+        log("more \(token)")
+        let batches = state.withLock { $0.playlistBatches[id] } ?? []
+        var page = page
+        section.tracks += batches.indices.contains(step) ? batches[step] : []
+        page.sections[index] = .tracks(section)
+        page.more = step + 1 < batches.count ? .tracks(token: "\(id)#\(step + 1)", sectionIndex: index) : nil
+        return page
     }
 
     func songVersion(of video: Track) async throws -> Track? {
@@ -128,6 +166,7 @@ final class FakeMusic: MusicService {
 
     func lyrics(videoId: String) async throws -> Lyrics? {
         log("lyrics \(videoId)")
+        if state.withLock(\.lyricsFail) { throw YTMError(.network, "No connection.") }
         return state.withLock { $0.lyrics[videoId] }
     }
 
@@ -264,6 +303,7 @@ final class ObservedChange: Sendable {
             await player.extending?.value
             await player.autoplay?.value
             await player.pendingPlay?.value
+            await player.continuing?.value
         }
     }
 

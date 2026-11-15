@@ -96,8 +96,9 @@ extension PlayerController {
         guard let (nextID, fade) = plan.due, let next else { return }
         gapless.markTried(nextID)
         // Kept with the time it was resolved, so one handed back stays only
-        // as fresh as it was.
-        let source = streamSource(for: nextID)
+        // as fresh as it was. A resolve ahead is only waited on, so a skip
+        // that cancels this still starts the song from it.
+        let source = streamSource(for: nextID, owning: false)
         let generation = playback.generation
         queueing = Task { [weak self] in
             let result = await Result(source)
@@ -142,6 +143,9 @@ extension PlayerController {
         present(track, at: 0)
         recordPlay()
         show(queued.prefetched.stream)
+        // Kept, as a song started by `play` is, for previous, a jump back or
+        // repeat one.
+        prefetcher.store(track.id, queued.prefetched)
         updateBuffering()
         publishPlayback()
         extendWithRadioIfEnding()

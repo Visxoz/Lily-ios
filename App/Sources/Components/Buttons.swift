@@ -25,7 +25,6 @@ struct IconButton: View {
     var active = false
     /// The icon's colour; the theme's secondary text when nil.
     var colour: Color?
-    var background = Color.clear
     let action: () -> Void
 
     @Environment(\.theme) private var theme
@@ -34,7 +33,6 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                Circle().fill(background)
                 IconView(icon: icon, size: iconSize, colour: iconColour)
                 if active {
                     Circle()
@@ -47,6 +45,7 @@ struct IconButton: View {
             .contentShape(Circle())
         }
         .buttonStyle(PressScale(scale: 0.88, animation: .easeOut(duration: 0.09)))
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     private var iconColour: Color {
@@ -147,6 +146,7 @@ struct Pill: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(PressScale(scale: 0.96))
+        .accessibilityAddTraits(active ? .isSelected : [])
         .animation(Theme.fast, value: active)
     }
 }

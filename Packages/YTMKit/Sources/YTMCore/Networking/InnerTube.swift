@@ -33,13 +33,15 @@ final class InnerTube: Sendable {
     /// gives there itself. `authenticated` sends the account's cookies when
     /// signed in, for web clients; signed out, or with it false, the request
     /// is anonymous. `visitorData` stands in for the saved visitor ID, to
-    /// try one before keeping it. Runs, and parses, off the caller's actor.
+    /// try one before keeping it. `retries` is how many times a 5xx, a 429
+    /// or a timeout is asked again; requests with a fallback of their own
+    /// pass 0. Runs, and parses, off the caller's actor.
     @concurrent
     func post(
         _ endpoint: String, body: [String: Any] = [:], client: ClientProfile = .webRemix,
-        authenticated: Bool = true, query: [URLQueryItem] = [], visitorData: String? = nil
+        authenticated: Bool = true, visitorData: String? = nil, retries: Int = InnerTube.retries
     ) async throws -> JSON {
-        guard let url = client.url(endpoint, query: query) else {
+        guard let url = client.url(endpoint) else {
             throw YTMError(.parse, "The request couldn't be made.")
         }
         let visitorData = if let visitorData { visitorData } else { try await visitor.value() }
@@ -64,7 +66,7 @@ final class InnerTube: Sendable {
             }
         }
         request.allHTTPHeaderFields = headers
-        let (data, _) = try await HTTP.data(for: request, retries: Self.retries)
+        let (data, _) = try await HTTP.data(for: request, retries: retries)
         return try JSON(data: data)
     }
 
@@ -75,9 +77,9 @@ final class InnerTube: Sendable {
         return try await post("browse", body: body, authenticated: authenticated)
     }
 
-    /// The page after `token` of a list `endpoint` returned.
-    func continuation(_ token: String, endpoint: String = "browse", authenticated: Bool = true) async throws -> JSON {
-        try await post(endpoint, body: ["continuation": token], authenticated: authenticated)
+    /// The page after `token` of a browse list.
+    func continuation(_ token: String, authenticated: Bool = true) async throws -> JSON {
+        try await post("browse", body: ["continuation": token], authenticated: authenticated)
     }
 
     /// The visitor ID requests are sent with; streams' players want it too.
@@ -102,7 +104,8 @@ final class InnerTube: Sendable {
 /// The visitor ID YouTube identifies a signed-out browser by, which
 /// InnerTube wants with every request. Fetched from YouTube Music's
 /// `visitor_id` endpoint as the patched rustypipe's `util/visitor_data.rs`
-/// does, kept a day, and saved, so a launch needs no fetch.
+/// does, and saved, so a launch needs no fetch; once a day old it is
+/// replaced in the background.
 ///
 /// A fresh ID only replaces the saved one once it has worked where the
 /// saved one failed, as ytm-native's `forget_visitor`: both failing points
@@ -125,13 +128,29 @@ actor VisitorData {
         self.request = request
     }
 
-    /// The saved ID, or a new one, kept, once it is a day old.
+    /// The saved ID, or, with none saved, a new one, kept. A saved ID a day
+    /// old is still sent while a new one is fetched behind it, as rustypipe
+    /// refreshes its pool, so no request waits on the refresh.
     func value() async throws -> String {
-        if let saved, Self.isFresh(saved) { return saved.value }
+        guard let saved else {
+            let value = try await fetch()
+            // Callers that shared the fetch keep it once.
+            if self.saved.map(Self.isFresh) != true { keep(value) }
+            return value
+        }
+        if !Self.isFresh(saved), fetching == nil {
+            Task { try? await refresh() }
+        }
+        return saved.value
+    }
+
+    /// Replaces a day-old ID; a failed fetch leaves it in use.
+    private func refresh() async throws {
+        // Requests arriving before the first refresh starts each queue one;
+        // those behind a finished refresh have nothing to do.
+        guard saved.map(Self.isFresh) != true else { return }
         let value = try await fetch()
-        // Callers that shared the fetch keep it once.
         if saved.map(Self.isFresh) != true { keep(value) }
-        return value
     }
 
     /// An ID to try in place of `refused`: the saved one if another caller

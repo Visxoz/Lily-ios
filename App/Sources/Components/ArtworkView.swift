@@ -11,14 +11,24 @@ struct ArtworkView: View {
     /// The decode's edge in pixels, for artwork sharing a decode made for
     /// elsewhere rather than one at the size drawn.
     var pixelEdge: Int?
+    /// A drop shadow, cast by a shape behind the opaque artwork rather than
+    /// by the image, so the blur comes from a path once instead of being
+    /// rendered off screen each frame the image fades in or the artwork resizes.
+    var shadow: (colour: Color, radius: CGFloat, y: CGFloat)?
 
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: round ? size / 2 : radius)
         ArtworkImage(url: url, edge: size, pixelEdge: pixelEdge)
             .frame(width: size, height: size)
             .background(theme.highlight)
-            .clipShape(RoundedRectangle(cornerRadius: round ? size / 2 : radius))
+            .clipShape(shape)
+            .background {
+                if let shadow {
+                    shape.fill(theme.highlight).shadow(color: shadow.colour, radius: shadow.radius, y: shadow.y)
+                }
+            }
     }
 }
 
@@ -26,8 +36,9 @@ struct ArtworkView: View {
 /// except that small artwork shares one size, `ImagePipeline.smallEdge`, so a
 /// song's rows, mini player and queue entry reuse one decode. An image already
 /// in memory shows on the first frame, so scrolling back never flickers, as
-/// does the song's copy at a shared size while its own loads; one fetched
-/// fades in, and the fetch is cancelled when the view goes.
+/// does the song's copy at a shared size while its own loads. Only artwork
+/// slow enough to have come from the network fades in; a disk-cache hit
+/// appears at once. The fetch is cancelled when the view goes.
 struct ArtworkImage: View {
     let url: String?
     /// The shorter side drawn, in points: what the decode is sized to.
@@ -69,16 +80,33 @@ struct ArtworkImage: View {
 
     /// The decode's edge: as asked, else what is drawn, or the shared small size.
     private var pixels: Int {
-        pixelEdge ?? max(Int((edge * displayScale).rounded(.up)), ImagePipeline.smallEdge)
+        pixelEdge ?? Self.pixels(edge: edge, scale: displayScale)
     }
 
-    /// The loaded image, or until the load has run, one already in memory:
-    /// at this size, else at the shared sizes the mini player and the lock
-    /// screen decode, scaled until this size comes.
+    /// The pixels artwork drawn `edge` points wide is decoded at, so a
+    /// prefetch asks for the very URL the view will.
+    static func pixels(edge: CGFloat, scale: CGFloat) -> Int {
+        max(Int((edge * scale).rounded(.up)), ImagePipeline.smallEdge)
+    }
+
+    /// The loaded image, or until the load has run, one already in memory at
+    /// any size, scaled until this size comes.
     private func image(for key: Key) -> CGImage? {
         if let loaded, loaded.key == key { return loaded.image }
-        return [key.pixels, ImagePipeline.playerEdge, ImagePipeline.smallEdge].lazy
-            .compactMap { ImagePipeline.shared.cachedImage(for: key.url, pixelEdge: $0) }
+        return Self.cachedAnySize(key.url, preferring: key.pixels, scale: displayScale)
+    }
+
+    /// A copy of `url`'s artwork already in memory at any size the app draws,
+    /// `pixels` first: then the largest, the page header's and the cards',
+    /// and the shared small one, so opening a card's page or playing it never
+    /// waits on a download for art already decoded at another size.
+    static func cachedAnySize(_ url: String, preferring pixels: Int? = nil, scale: CGFloat) -> CGImage? {
+        let edges = [
+            pixels, ImagePipeline.playerEdge, Self.pixels(edge: Metrics.headerArt, scale: scale),
+            CardView.artPixels(scale: scale), ImagePipeline.smallEdge,
+        ]
+        return edges.lazy.compactMap { $0 }
+            .compactMap { ImagePipeline.shared.cachedImage(for: url, pixelEdge: $0) }
             .first
     }
 
@@ -88,9 +116,16 @@ struct ArtworkImage: View {
             loaded = Loaded(key: key, image: image)
             return
         }
+        let start = ContinuousClock.now
         guard let image = await ImagePipeline.shared.image(for: key.url, pixelEdge: key.pixels), !Task.isCancelled else {
             return
         }
-        withAnimation(.easeOut(duration: 0.3)) { loaded = Loaded(key: key, image: image) }
+        let next = Loaded(key: key, image: image)
+        // A disk-cache hit lands within a frame or two; fading it in reads as a reload, so only a slow fetch fades.
+        if ContinuousClock.now - start < .milliseconds(120) {
+            loaded = next
+        } else {
+            withAnimation(.easeOut(duration: 0.3)) { loaded = next }
+        }
     }
 }

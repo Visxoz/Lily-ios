@@ -50,6 +50,9 @@ public enum Accent: String, Codable, CaseIterable, Sendable {
 
 /// The user's preferences, saved as settings.json.
 public struct Settings: Codable, Equatable, Sendable {
+    /// YTMCore cannot see YTMAudio's EqualiserBands, so its band count is repeated here and checked by a test.
+    static let equaliserBands = 6
+
     public var muted = false
     public var quality: AudioQuality = .high
     public var normalise = true
@@ -60,7 +63,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var repeatMode: RepeatMode = .off
     public var equaliserEnabled = false
     /// Each band's gain in dB, kept while the equaliser is off.
-    public var equaliserGains: [Float] = Array(repeating: 0, count: 6)
+    public var equaliserGains: [Float] = Array(repeating: 0, count: Settings.equaliserBands)
     /// Report songs played to the signed-in account's YouTube history.
     public var youtubeHistory = true
     /// Show like and dislike buttons beside the song playing.
@@ -88,7 +91,7 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&shuffle, .shuffle)
         file.read(&repeatMode, .repeatMode)
         file.read(&equaliserEnabled, .equaliserEnabled)
-        file.read(&equaliserGains, .equaliserGains) { $0.count == 6 }
+        file.read(&equaliserGains, .equaliserGains) { $0.count == Self.equaliserBands }
         file.read(&youtubeHistory, .youtubeHistory)
         file.read(&ratingButtons, .ratingButtons)
         file.read(&look, .look)

@@ -254,9 +254,39 @@ struct PlaybackEngineTests {
         #expect(await playback.state({ $0.clock.buffered }) == 0, "nothing heard")
     }
 
+    @Test func carriesOnFromTheBytesANextItemLetGoHadFetched() async throws {
+        // Both long enough that neither ends, nor follows on, while the test looks.
+        let long = Fixtures.signal(frames: 480_000)
+        let files = ["one": try Fixtures.opusWebM(long), "two": try Fixtures.opusWebM(long.map { -$0 })]
+        let two = files["two", default: Data()]
+        let half = two.count / 2
+        let source = StallingByteSource(files: files, stalling: "two", after: half)
+        let playback = OfflinePlayback(source: source)
+        let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
+        let next = try AudioItem.fixture("two", length: two.count)
+        playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
+        playback.engine.send { $0.setNext(next, fade: 0, session: 1) }
+        for _ in 0..<1_000 where await playback.state({ $0.next?.loader.available ?? 0 }) < Int64(half) {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        // A skip to the queued item: the engine stops, then plays it.
+        playback.engine.send { $0.stop(session: 2, keepingOutput: true) }
+        playback.engine.send { $0.play(next, from: 0, paused: false, session: 3) }
+        let output = await playback.render(seconds: 0.5)
+        while await playback.state({ $0.clock.buffered }) < 1 {
+            _ = await playback.render(seconds: 0.1)
+        }
+        let length = Int64(two.count)
+        #expect(source.ranges == [0..<length, Int64(half)..<length], "the bytes it had are not asked for again")
+        let decoded = try DecodableFile(two).decode(limit: 24_000)
+        expectSame(output[480..<24_000], decoded[480...], "the item from its first byte")
+    }
+
     @Test func reportsAStreamThatWillNotDownload() async throws {
         let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=100&lmt=1&file=gone"))
-        let item = AudioItem(id: "gone", url: stale, headers: [:], contentLength: 100, cacheKey: "gone-\(UUID())", loudnessDB: 0) { stale }
+        let item = AudioItem(id: "gone", url: stale, headers: [:], contentLength: 100, cacheKey: "gone-\(UUID())", loudnessDB: 0) {
+            (url: stale, headers: [:])
+        }
         let (stream, sink) = AsyncStream.makeStream(of: PlaybackEngine.Stamped.self)
         let cache = AudioCache.Location(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), limit: 1 << 20)
         let engine = PlaybackEngine(output: .offline(sampleRate: 48_000), source: MemoryByteSource(files: [:], refuseFrom: 0), cache: cache, events: sink)
@@ -285,6 +315,38 @@ private final class RecordingByteSource: ByteSource {
     func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
         asked.withLock { $0.append(range) }
         return served.bytes(of: url, headers: headers, range: range)
+    }
+}
+
+/// Serves files as `MemoryByteSource` does, but holds the first request for
+/// `stalling` open after `after` bytes, as a slow network does, noting each
+/// range asked of that file.
+private final class StallingByteSource: ByteSource {
+    private let served: MemoryByteSource
+    private let stalling: String
+    private let after: Int
+    /// The held request is kept open here rather than left to end.
+    private let state = Mutex<(ranges: [Range<Int64>], held: [AsyncThrowingStream<Data, any Error>.Continuation])>(([], []))
+
+    init(files: [String: Data], stalling: String, after: Int) {
+        served = MemoryByteSource(files: files)
+        self.stalling = stalling
+        self.after = after
+    }
+
+    var ranges: [Range<Int64>] { state.withLock { $0.ranges } }
+
+    func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
+        guard url.absoluteString.contains(stalling) else { return served.bytes(of: url, headers: headers, range: range) }
+        let first = state.withLock { state -> Bool in
+            state.ranges.append(range)
+            return state.ranges.count == 1
+        }
+        guard first, let file = served.files[stalling] else { return served.bytes(of: url, headers: headers, range: range) }
+        let (stream, continuation) = AsyncThrowingStream.makeStream(of: Data.self)
+        continuation.yield(file.subdata(in: Int(range.lowerBound)..<after))
+        state.withLock { $0.held.append(continuation) }
+        return stream
     }
 }
 

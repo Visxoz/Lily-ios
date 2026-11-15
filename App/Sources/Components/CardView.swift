@@ -10,12 +10,22 @@ struct CardView: View {
 
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    @Environment(\.displayScale) private var displayScale
+
+    /// Every card's decode, whatever its layout: carousel and grid cards share
+    /// one, so a grid of art already seen in a carousel draws on its first
+    /// frame, as ytm-native decodes every card at one size.
+    static func artPixels(scale: CGFloat) -> Int {
+        ArtworkImage.pixels(edge: Metrics.cardWidth, scale: scale)
+    }
 
     var body: some View {
-        Button { app.activate(card) } label: {
+        Button { app.activate(card, displayScale: displayScale) } label: {
             VStack(alignment: .leading, spacing: 4) {
-                ArtworkView(url: card.thumbnail, size: width, round: card.kind == .artist, radius: Metrics.cardArtRadius)
-                    .shadow(color: theme.shadowSoft, radius: 8, y: 6)
+                ArtworkView(
+                    url: card.thumbnail, size: width, round: card.kind == .artist, radius: Metrics.cardArtRadius,
+                    pixelEdge: Self.artPixels(scale: displayScale), shadow: (theme.shadowSoft, 8, 6)
+                )
                     .padding(.bottom, 4)
                 Text(card.title)
                     .font(.system(size: 15, weight: .semibold))

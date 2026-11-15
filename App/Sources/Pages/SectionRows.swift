@@ -13,7 +13,7 @@ struct SectionRows: View {
 
     var body: some View {
         if !section.title.isEmpty {
-            SectionHeader(title: section.title, more: more)
+            SectionHeader(title: section.title, more: section.more)
         }
         switch section {
         case .tracks(let tracks):
@@ -41,13 +41,6 @@ struct SectionRows: View {
                 // Until the page's width is measured, so no card is sized to nothing.
                 EmptyView()
             }
-        }
-    }
-
-    private var more: Route? {
-        switch section {
-        case .tracks(let s): s.more
-        case .cards(let s): s.more
         }
     }
 }

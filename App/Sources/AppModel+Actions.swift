@@ -10,12 +10,20 @@ enum HeaderAction {
 /// `actions.rs` and `library.rs`.
 extension AppModel {
     /// A card opens its page; a song card plays, with a radio after it.
-    func activate(_ card: Card) {
-        if let route = card.route {
-            open(route)
-        } else {
-            play(card)
+    func activate(_ card: Card, displayScale: CGFloat) {
+        guard let route = card.route else { return play(card) }
+        switch route {
+        case .album, .playlist:
+            // The header's cover is the card's, so its fetch overlaps the page's rather than following it.
+            // An artist's header is a wide banner, never the card's square, so it isn't fetched ahead.
+            if let url = card.thumbnail {
+                let pixels = ArtworkImage.pixels(edge: Metrics.headerArt, scale: displayScale)
+                Task { _ = await ImagePipeline.shared.image(for: url, pixelEdge: pixels) }
+            }
+        default:
+            break
         }
+        open(route)
     }
 
     func play(_ card: Card) {
@@ -57,7 +65,8 @@ extension AppModel {
     }
 
     func addToPlaylist(_ track: Track) {
-        sheet = .addToPlaylist(track)
+        // From Now Playing the picker stacks on it, as ytm-native's dialog sits over its player bar and panel.
+        if sheet == .nowPlaying { nowPlayingPicker = track } else { sheet = .addToPlaylist(track) }
     }
 
     func openArtist(of track: Track) {

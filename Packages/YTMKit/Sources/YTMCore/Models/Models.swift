@@ -170,12 +170,20 @@ public enum Section: Codable, Hashable, Sendable {
         }
     }
 
+    /// Where the section's "More" leads.
+    public var more: Route? {
+        switch self {
+        case .tracks(let s): s.more
+        case .cards(let s): s.more
+        }
+    }
+
     /// Empty sections are not worth a row.
-    public static func tracks(_ title: String, _ tracks: [Track], mode: QueueMode, numbered: Bool = false, more: Route? = nil) -> Section? {
+    static func tracks(_ title: String, _ tracks: [Track], mode: QueueMode, numbered: Bool = false, more: Route? = nil) -> Section? {
         tracks.isEmpty ? nil : .tracks(TrackSection(title: title, tracks: tracks, mode: mode, numbered: numbered, more: more))
     }
 
-    public static func cards(_ title: String, _ cards: [Card], layout: CardLayout, more: Route? = nil) -> Section? {
+    static func cards(_ title: String, _ cards: [Card], layout: CardLayout, more: Route? = nil) -> Section? {
         cards.isEmpty ? nil : .cards(CardSection(title: title, cards: cards, layout: layout, more: more))
     }
 }

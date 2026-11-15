@@ -47,7 +47,14 @@ final class AppModel {
     let history: LocalHistory
 
     var tab: AppTab = .home
-    var sheet: AppSheet?
+    var sheet: AppSheet? {
+        // Closing Now Playing under its picker doesn't write the picker's
+        // binding back, so it would reopen with the next Now Playing.
+        didSet { if sheet != .nowPlaying, nowPlayingPicker != nil { nowPlayingPicker = nil } }
+    }
+    /// The playlist picker opened from Now Playing, shown over it rather than
+    /// in its place, so Now Playing and its open panel stay.
+    var nowPlayingPicker: Track?
     /// The search field is active, with the keyboard up, so the mini player
     /// steps aside rather than ride up above the keyboard.
     var isSearching = false
@@ -72,6 +79,11 @@ final class AppModel {
     @ObservationIgnored private let played = TabNavigation()
     @ObservationIgnored private let search = TabNavigation()
     @ObservationIgnored var pageCache: [Route: CachedPage] = [:]
+    /// The page requests in flight, shared by every screen asking for the
+    /// same route, and Home's first try apart, as `refreshHome` wants the
+    /// retries that joining it would lose.
+    @ObservationIgnored var pageLoads: [Route: Task<Page, any Error>] = [:]
+    @ObservationIgnored var homeFirstTryLoad: Task<Page, any Error>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// The wait for Last.fm access, which outlives Settings, as ytm-native's.
     private var lastFMWait: Task<Void, Never>?
@@ -112,16 +124,23 @@ final class AppModel {
     }
 
     /// Takes the colours of the playing song's artwork, for an accent that
-    /// follows it and for Now Playing. They are sampled from the small copy
-    /// the mini player shows, as the palette reads only 16 pixels square,
-    /// so they come with it rather than waiting for the large one.
+    /// follows it and for Now Playing. They are sampled from any copy already
+    /// in memory, else the small one the mini player shows, as the palette
+    /// reads only 16 pixels square, so they never wait for the large one.
     func followArtwork(of url: String?) async {
         // Without artwork, the last song's colour would linger.
         guard let url else {
             artwork = nil
             return
         }
-        guard let colours = await ArtworkColours.of(url: url, pixelEdge: ImagePipeline.smallEdge), !Task.isCancelled else { return }
+        let colours: ArtworkColours?
+        // At 3x, the scale the shared pixel sizes are set for, so the card a song started from is found.
+        if let image = ArtworkImage.cachedAnySize(url, scale: 3) {
+            colours = await ArtworkColours.of(image)
+        } else {
+            colours = await ArtworkColours.of(url: url, pixelEdge: ImagePipeline.smallEdge)
+        }
+        guard let colours, !Task.isCancelled else { return }
         artwork = colours
     }
 
@@ -156,12 +175,17 @@ final class AppModel {
     /// in) or Home fresh, closing Settings; unless `quietly`, as for a
     /// sign-in YouTube rejected, which drops back to signed out unannounced.
     func accountChanged(quietly: Bool = false) async {
-        await Self.forgetSavedHome(api)
+        api.clearCachedHome()
         isSignedIn = await api.auth.isSignedIn
         account = nil
         // Together with the bump, so no page asked for by the last account
         // lands in the cache once it is cleared.
         pageCache.removeAll()
+        // A request the last account made must not be shared with the next.
+        pageLoads.values.forEach { $0.cancel() }
+        pageLoads.removeAll()
+        homeFirstTryLoad?.cancel()
+        homeFirstTryLoad = nil
         accountGeneration += 1
         if !quietly {
             sheet = nil
@@ -176,11 +200,6 @@ final class AppModel {
     func signOut(quietly: Bool = false) async {
         await api.auth.signOut()
         await accountChanged(quietly: quietly)
-    }
-
-    @concurrent
-    private static func forgetSavedHome(_ api: YTMusic) async {
-        api.clearCachedHome()
     }
 
     var isConnectingLastFM: Bool { lastFMWait != nil }
@@ -233,6 +252,9 @@ final class AppModel {
     /// Pushes `route` on the tab in view, closing whatever is presented.
     func open(_ route: Route) {
         sheet = nil
-        navigation(for: tab).routes.append(route)
+        let stack = navigation(for: tab)
+        // Already on top: pushing again would only stack a copy, as ytm-native's navigate.
+        guard stack.routes.last != route else { return }
+        stack.routes.append(route)
     }
 }

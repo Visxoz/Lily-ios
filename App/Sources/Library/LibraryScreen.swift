@@ -8,7 +8,7 @@ struct LibraryScreen: View {
 
     var body: some View {
         if app.isSignedIn {
-            PageScreen(route: .library)
+            PageScreen(route: .library, app: app)
         } else {
             BringYourLibrary()
         }

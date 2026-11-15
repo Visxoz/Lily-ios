@@ -11,7 +11,10 @@ struct BarSlider: View {
     /// How much is ready, from 0 to 1, drawn lighter behind `value`, as the
     /// seek bar's buffered fill. Zero for none.
     var buffered = 0.0
-    var changed: ((Double) -> Void)?
+    /// What VoiceOver reads as the value in place of the percentage, as the
+    /// seek bar's time.
+    var valueText: String?
+    let changed: (Double) -> Void
     let committed: (Double) -> Void
 
     @Environment(\.theme) private var theme
@@ -54,7 +57,7 @@ struct BarSlider: View {
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
         .gesture(drag, isEnabled: isEnabled)
         .accessibilityElement()
-        .accessibilityValue(Text(shown, format: .percent.precision(.fractionLength(0))))
+        .accessibilityValue(valueText.map { Text($0) } ?? Text(shown, format: .percent.precision(.fractionLength(0))))
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: committed(min(shown + Self.step, 1))
@@ -68,7 +71,7 @@ struct BarSlider: View {
         DragGesture(minimumDistance: 0)
             .onChanged { gesture in
                 dragging = true
-                changed?(fraction(at: gesture.location.x))
+                changed(fraction(at: gesture.location.x))
             }
             .onEnded { gesture in
                 dragging = false

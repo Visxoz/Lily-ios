@@ -148,14 +148,6 @@ struct Charts: Sendable {
 }
 
 private extension Section {
-    /// Where the section's "More" leads.
-    var more: Route? {
-        switch self {
-        case .tracks(let s): s.more
-        case .cards(let s): s.more
-        }
-    }
-
     /// The section's tracks; none for a card row.
     var tracks: [Track] {
         if case .tracks(let s) = self { s.tracks } else { [] }

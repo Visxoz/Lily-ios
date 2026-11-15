@@ -20,26 +20,40 @@ extension AppModel {
     }
 
     /// `route`'s page fresh from YouTube, kept for going back. The history
-    /// isn't kept, so a song just played shows next time.
+    /// isn't kept, so a song just played shows next time. The request is not
+    /// the screen's, so leaving it doesn't cancel it: the page still lands in
+    /// the cache, as ytm-native's, and a second visit meanwhile shares it.
     func fetchPage(_ route: Route) async throws -> Page {
+        if let load = pageLoads[route] { return try await load.value }
         let generation = accountGeneration
-        let page = try await api.page(route)
-        if generation == accountGeneration, route != .history {
-            cache(page, for: route)
+        let load = Task<Page, any Error> { [api] in
+            defer { if generation == self.accountGeneration { self.pageLoads[route] = nil } }
+            let page = try await api.page(route)
+            if generation == self.accountGeneration, route != .history {
+                self.cache(page, for: route)
+            }
+            return page
         }
-        return page
+        pageLoads[route] = load
+        return try await load.value
     }
 
     /// Signed in, Home's feed in one request, kept as `fetchPage` keeps it,
     /// so a refusal shows the saved feed at once, as ytm-native's
-    /// `home_first_try`.
+    /// `home_first_try`. Shared and not cancelled by leaving, as `fetchPage`.
     func fetchHomeFirstTry() async throws -> Page {
+        if let load = homeFirstTryLoad { return try await load.value }
         let generation = accountGeneration
-        let page = try await api.homeFirstTry()
-        if generation == accountGeneration {
-            cache(page, for: .home)
+        let load = Task<Page, any Error> { [api] in
+            defer { if generation == self.accountGeneration { self.homeFirstTryLoad = nil } }
+            let page = try await api.homeFirstTry()
+            if generation == self.accountGeneration {
+                self.cache(page, for: .home)
+            }
+            return page
         }
-        return page
+        homeFirstTryLoad = load
+        return try await load.value
     }
 
     /// Fetches the feed behind the saved one that Home shows, with its
@@ -55,10 +69,13 @@ extension AppModel {
 
     /// The next step of what `page` has still to fetch, kept in the cache
     /// with the time the page first loaded, as ytm-native's `complete_page`.
+    /// Leaving the screen doesn't cancel it, so Home is still saved whole; a
+    /// step of a page refreshed meanwhile never overwrites the fresh one.
     func fetchMore(of page: Page, for route: Route) async throws -> Page {
         let generation = accountGeneration
-        let more = try await api.loadMore(page)
-        if generation == accountGeneration {
+        let since = pageCache[route]?.at
+        let more = try await Task { [api] in try await api.loadMore(page) }.value
+        if generation == accountGeneration, pageCache[route]?.at == since {
             pageCache[route]?.page = more
         }
         return more
@@ -79,12 +96,7 @@ extension AppModel {
     /// read off the main actor; nil signed out, as signing out deletes it.
     func savedHome() async -> Page? {
         guard isSignedIn else { return nil }
-        return await Self.readSavedHome(api)
-    }
-
-    @concurrent
-    private static func readSavedHome(_ api: YTMusic) async -> Page? {
-        api.cachedHome()
+        return await api.cachedHome()
     }
 
     private func cache(_ page: Page, for route: Route) {

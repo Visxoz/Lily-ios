@@ -39,11 +39,20 @@ extension PlayerController {
 
     /// A card played: an album's, playlist's or artist's songs from the
     /// start, or a song card's song with a radio after it. Returns once the
-    /// songs have loaded and started, or failed to.
+    /// songs have loaded and started, or failed to; a long playlist's later
+    /// batches are added as they arrive. With shuffle on, the whole playlist
+    /// loads first, as ytm-native's `card_tracks`, so the first song can be
+    /// any of it.
     public func play(_ card: Card) async {
         switch card.kind {
         case .song:
             if let track = card.track { startRadio(from: track) }
+        case .playlist where settings.value.shuffle == .off:
+            let music = music
+            await load({ try await music.page(.playlist(card.id)) }, failure: "Couldn't load") { player, page in
+                player.play(page.headerTracks)
+                player.continuePlaylist(page)
+            }
         case .album, .playlist, .artist:
             let music = music
             await load({ try await music.tracks(of: card) }, failure: "Couldn't load") { $0.play($1) }
@@ -57,7 +66,7 @@ extension PlayerController {
     public func startRadio(from card: Card) async {
         switch card.kind {
         case .playlist:
-            await startRadio(playlistId: "RDAMPL" + card.id)
+            await startRadio(playlistId: YTMusic.radioId(forPlaylist: card.id))
         case .song:
             if let track = card.track { startRadio(from: track) }
         case .album, .artist:
@@ -75,12 +84,21 @@ extension PlayerController {
     }
 
     /// A page header's Play or Shuffle: the page's track list, or the whole
-    /// playlist behind a page that shows only part of it, for Shuffle on an
-    /// artist's songs and for a long playlist whose further tracks have yet
-    /// to load.
+    /// playlist behind a page that shows only part of it. Shuffle on an
+    /// artist's songs, or on a long playlist whose further tracks have yet to
+    /// load, waits for the whole list, as does Play with shuffle on; Play
+    /// otherwise starts the page's tracks at once and adds the rest of the
+    /// playlist as it arrives.
     public func play(_ page: Page, shuffle: Bool = false) async {
         let tracks = page.headerTracks
         let unfinished: String? = if case .tracks? = page.more { page.header?.playlistId } else { nil }
+        if !shuffle, settings.value.shuffle == .off, unfinished != nil {
+            // The rest follows from where the page has got to, without asking
+            // again for the batches it shows.
+            play(tracks)
+            continuePlaylist(page)
+            return
+        }
         guard let playlist = (shuffle ? page.header?.shufflePlaylistId : nil) ?? unfinished else {
             play(tracks, shuffle: shuffle)
             return
@@ -93,7 +111,7 @@ extension PlayerController {
     }
 
     /// Plays a radio by its playlist ID: an artist page's radio, or a
-    /// playlist's (`"RDAMPL"` and its ID).
+    /// playlist's (`YTMusic.radioId(forPlaylist:)`).
     public func startRadio(playlistId: String) async {
         let music = music
         await load({ try await music.radio(playlistId: playlistId) }, failure: "Couldn't start the radio") { $0.play($1) }
@@ -179,9 +197,15 @@ extension PlayerController {
     /// repeat others.
     func appendUnique(_ tracks: [Track]) {
         var known = Set(queue.items.map(\.id))
-        queue.append(contentsOf: tracks.filter { known.insert($0.id).inserted })
-        // Keeps the new tracks in the shuffle. Recommendations are taken out
-        // first, as they are placed again where they are due.
+        appendKeepingShuffle(tracks.filter { known.insert($0.id).inserted })
+    }
+
+    /// Adds `tracks` to the end of the queue as they are, keeping them in
+    /// the shuffle, and gets the next song ready.
+    private func appendKeepingShuffle(_ tracks: [Track]) {
+        queue.append(contentsOf: tracks)
+        // Recommendations are taken out first, as they are placed again
+        // where they are due.
         if settings.value.shuffle != .off {
             queue.removeRecommended()
             queue.setShuffle(false)
@@ -190,11 +214,42 @@ extension PlayerController {
         prefetchNext()
     }
 
+    /// Adds the rest of a long playlist, after the first batch `page` shows
+    /// and plays, as each further batch arrives, so the first song starts at
+    /// once. Every track is kept, as a playlist may hold a song twice.
+    func continuePlaylist(_ page: Page) {
+        guard case .tracks? = page.more, !page.headerTracks.isEmpty else { return }
+        let music = music
+        // Its own task, so another queue, or clearing what is up next, drops
+        // the batches still to come, and nothing else.
+        continuing = Task { [weak self] in
+            var page = page
+            var shown = page.headerTracks.count
+            while case .tracks? = page.more {
+                guard let next = try? await music.loadMore(page), !Task.isCancelled, let self else { return }
+                page = next
+                let all = page.headerTracks
+                guard all.count > shown else { continue }
+                // Unshuffled before the batch goes on, so it follows the
+                // playlist's own last song rather than the shuffle's.
+                let shuffled = settings.value.shuffle != .off
+                if shuffled {
+                    queue.removeRecommended()
+                    queue.setShuffle(false)
+                }
+                queue.append(contentsOf: all[shown...])
+                if shuffled { queue.setShuffle(true) }
+                prefetchNext()
+                shown = all.count
+            }
+        }
+    }
+
     /// Loads what to play off the main actor, then plays it, unless something
     /// else was asked for meanwhile; says `failure` and why when it can't.
-    private func load(
-        _ work: @escaping @Sendable () async throws -> [Track], failure: String,
-        then play: @escaping @MainActor (PlayerController, [Track]) -> Void
+    private func load<T: Sendable>(
+        _ work: @escaping @Sendable () async throws -> T, failure: String,
+        then play: @escaping @MainActor (PlayerController, T) -> Void
     ) async {
         pendingPlay?.cancel()
         let task = Task { [weak self] in
@@ -202,7 +257,7 @@ extension PlayerController {
             guard let self, !Task.isCancelled else { return }
             pendingPlay = nil
             switch result {
-            case .success(let tracks): play(self, tracks)
+            case .success(let value): play(self, value)
             case .failure(let error): say("\(failure): \(sentence(for: error))")
             }
         }

@@ -9,7 +9,10 @@ extension YTMusic {
         let next = try await innerTube.next(["videoId": videoId], authenticated: false)
         guard let browseId = Lyrics.browseId(in: next) else { return nil }
         do {
-            let android = try await innerTube.post("browse", body: ["browseId": browseId], client: .androidMusic, authenticated: false)
+            // Not retried, as ytm-native's lyrics::timed: the web lyrics are the fallback.
+            let android = try await innerTube.post(
+                "browse", body: ["browseId": browseId], client: .androidMusic, authenticated: false, retries: 0
+            )
             if let timed = Lyrics(timed: android) { return timed }
         } catch is CancellationError {
             throw CancellationError()

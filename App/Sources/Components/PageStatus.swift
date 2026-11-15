@@ -2,12 +2,12 @@ import SwiftUI
 import YTMCore
 
 /// What `page-view.slint` shows in place of a page: the spinner while it
-/// loads, or a message, such as why it failed, with a button to act on it,
+/// loads, or a message, such as why it failed, with a button to try again,
 /// under the page's tint as the page itself would be.
 struct PageStatus: View {
     enum Phase {
         case loading
-        case failed(message: String, action: String, perform: () -> Void)
+        case failed(message: String, retry: () -> Void)
         /// Nothing to show yet, and nothing to do about it.
         case empty(String)
     }
@@ -17,16 +17,27 @@ struct PageStatus: View {
     let tint: RGB?
 
     @Environment(\.theme) private var theme
+    @State private var spinnerDue = false
 
     var body: some View {
         Group {
             switch phase {
             case .loading:
+                // Held back a moment, so a page from the cache or a quick reply never flashes it.
                 Spinner(size: 40)
-            case .failed(let message, let action, let perform):
+                    .opacity(spinnerDue ? 1 : 0)
+                    .task {
+                        do {
+                            try await Task.sleep(for: .milliseconds(250))
+                        } catch {
+                            return
+                        }
+                        withAnimation(Theme.normal) { spinnerDue = true }
+                    }
+            case .failed(let message, let retry):
                 VStack(spacing: 20) {
                     Message(text: message)
-                    PillButton(title: action, primary: true, action: perform)
+                    PillButton(title: "Try again", primary: true, action: retry)
                 }
                 .padding(48)
             case .empty(let message):
