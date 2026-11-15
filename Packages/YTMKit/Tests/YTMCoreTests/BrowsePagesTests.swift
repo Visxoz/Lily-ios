@@ -40,6 +40,23 @@ private func carousel(_ title: String, _ items: [String]) -> String {
         #expect(mixes.layout == .carousel && mixes.cards[0].subtitle == "Juice WRLD, MXZI", "subtitles as YouTube words them")
     }
 
+    @Test func readsSongListsAndGridsAmongTheCarousels() throws {
+        let page = try json(#"""
+        {"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{
+          "contents":[{"musicShelfRenderer":{"title":{"runs":[{"text":"Songs for you"}]},"contents":[\#(row(1)),\#(row(2))]}},
+            {"gridRenderer":{"header":{"gridHeaderRenderer":{"title":{"runs":[{"text":"Your tiles"}]}}},"items":[\#(mixTile)]}},
+            {"musicCardShelfRenderer":{"title":{"runs":[{"text":"Not a shelf of the feed"}]}}}]}}}}]}}}
+        """#)
+        let sections = try HomeFeed.firstPage(page).sections
+        #expect(sections.map(\.title) == ["Songs for you", "Your tiles"])
+        guard case .tracks(let songs) = sections[0], case .cards(let tiles) = sections[1] else {
+            Issue.record("expected a track list then a card grid")
+            return
+        }
+        #expect(songs.tracks.map(\.id) == ["v1", "v2"])
+        #expect(tiles.layout == .grid)
+    }
+
     @Test func readsContinuationPages() throws {
         let page = try json(#"""
         {"continuationContents":{"sectionListContinuation":{"contents":[\#(carousel("Mixed for you", [mixTile]))],

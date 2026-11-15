@@ -156,7 +156,6 @@ final class FakeMusic: MusicService {
     var bufferedFraction = 0.0
     var equaliser: (enabled: Bool, gains: [Float]) = (false, [])
     var normalise = true
-    var volume: Float = 1
     var isMuted = false
     let crossfadeSeconds = 6.0
     private(set) var played: [(item: AudioItem, from: Double, paused: Bool)] = []
@@ -190,7 +189,7 @@ final class FakeMusic: MusicService {
     func pause() { log.append("pause") }
     func resume() { log.append("resume") }
 
-    func stop() {
+    func stop(keepingOutput: Bool) {
         next = nil
         log.append("stop")
     }

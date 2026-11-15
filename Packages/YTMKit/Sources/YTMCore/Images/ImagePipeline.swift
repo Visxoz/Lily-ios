@@ -13,9 +13,10 @@ import os
 public final class ImagePipeline: Sendable {
     public static let shared = ImagePipeline()
 
-    /// The playing song's artwork, in pixels: the lock screen at its largest,
-    /// and what its colours are sampled from, so both share one decode.
-    public static let playerEdge = 600
+    /// The playing song's artwork, in pixels: Now Playing's (the phone's
+    /// width less its margins, at 3x) and the lock screen's, so both share
+    /// one decode, fetched ahead with the song.
+    public static let playerEdge = 1080
     /// Any artwork drawn 56 points or smaller (56 at 3x), in pixels. Small
     /// artwork shares this one size, as ytm-native's fixed buckets, so a row's
     /// copy, the mini player's and the one fetched ahead are the same decode.
@@ -47,8 +48,11 @@ public final class ImagePipeline: Sendable {
         memory[Self.key(url, pixelEdge)]
     }
 
-    private static func key(_ url: String, _ edge: Int) -> String {
-        "\(edge):\(url)"
+    /// Keyed by what is requested, so artwork stored at different sizes, as
+    /// a row's and an album header's copies are, shares one decode and one
+    /// download.
+    static func key(_ url: String, _ edge: Int) -> String {
+        "\(edge):\(isWide(url) ? url : Thumbnail.resized(url, edge: edge))"
     }
 
     @concurrent

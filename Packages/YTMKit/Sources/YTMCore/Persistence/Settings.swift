@@ -50,8 +50,6 @@ public enum Accent: String, Codable, CaseIterable, Sendable {
 
 /// The user's preferences, saved as settings.json.
 public struct Settings: Codable, Equatable, Sendable {
-    /// The app's own volume, as ytm-native, apart from the system's.
-    public var volume: Float = 0.8
     public var muted = false
     public var quality: AudioQuality = .high
     public var normalise = true
@@ -82,7 +80,6 @@ public struct Settings: Codable, Equatable, Sendable {
     public init(from decoder: any Decoder) throws {
         self.init()
         let file = try decoder.container(keyedBy: CodingKeys.self)
-        file.read(&volume, .volume)
         file.read(&muted, .muted)
         file.read(&quality, .quality)
         file.read(&normalise, .normalise)

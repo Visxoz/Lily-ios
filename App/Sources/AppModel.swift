@@ -48,6 +48,9 @@ final class AppModel {
 
     var tab: AppTab = .home
     var sheet: AppSheet?
+    /// The search field is active, with the keyboard up, so the mini player
+    /// steps aside rather than ride up above the keyboard.
+    var isSearching = false
 
     /// Whether a sign-in cookie is stored, which counts as signed in, so
     /// pages load without waiting for YouTube to confirm it.
@@ -88,12 +91,12 @@ final class AppModel {
         }
     }
 
-    /// Restores the last session and reads the stored sign-in, then keeps
-    /// the account's details current.
+    /// Reads the stored sign-in, which is all pages wait for, then restores
+    /// the last session and keeps the account's details current.
     func start() async {
-        await player.start()
         isSignedIn = await api.auth.isSignedIn
         accountGeneration += 1
+        await player.start()
         await refreshAccount()
     }
 
@@ -109,16 +112,16 @@ final class AppModel {
     }
 
     /// Takes the colours of the playing song's artwork, for an accent that
-    /// follows it and for Now Playing. They are sampled from the lock
-    /// screen's copy, which is fetched ahead with the song, so they need no
-    /// download of their own.
+    /// follows it and for Now Playing. They are sampled from the small copy
+    /// the mini player shows, as the palette reads only 16 pixels square,
+    /// so they come with it rather than waiting for the large one.
     func followArtwork(of url: String?) async {
         // Without artwork, the last song's colour would linger.
         guard let url else {
             artwork = nil
             return
         }
-        guard let colours = await ArtworkColours.of(url: url, pixelEdge: ImagePipeline.playerEdge), !Task.isCancelled else { return }
+        guard let colours = await ArtworkColours.of(url: url, pixelEdge: ImagePipeline.smallEdge), !Task.isCancelled else { return }
         artwork = colours
     }
 

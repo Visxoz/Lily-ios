@@ -9,6 +9,15 @@ struct PageScreen: View {
 
     @State private var model: PageModel
     @Environment(AppModel.self) private var app
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// What the page loads afresh for: a new account, or the app coming back
+    /// from the background, as Home may have aged meanwhile. Control Centre
+    /// and the like leave the app in the foreground, so don't count.
+    private struct Visit: Hashable {
+        let account: Int
+        let foreground: Bool
+    }
 
     init(route: Route) {
         self.route = route
@@ -31,8 +40,11 @@ struct PageScreen: View {
             }
         }
         .animation(.easeOut(duration: 0.3), value: model.page != nil)
-        // A new account loads the page afresh.
-        .task(id: app.accountGeneration) { await model.appear(in: app) }
+        // A new account loads the page afresh, and so may a return to the app.
+        .task(id: Visit(account: app.accountGeneration, foreground: scenePhase != .background)) {
+            guard scenePhase != .background else { return }
+            await model.appear(in: app)
+        }
         // Completes the page while it is on screen, as ytm-native's
         // `complete_page`, so Home is saved whole.
         .task(id: model.step) { await model.loadMore(in: app) }

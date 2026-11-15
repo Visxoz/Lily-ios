@@ -2,9 +2,9 @@ import SwiftUI
 import YTMCore
 
 /// The seek bar with the time played and the song's length, as the player
-/// bar's. The position is pulled ten times a second while the song plays,
-/// never while paused or while the bar is being dragged; the drag shows where
-/// it would seek to and seeks once let go.
+/// bar's. The position is pulled four times a second, as the player ticks,
+/// while the song plays, never while paused or while the bar is being
+/// dragged; the drag shows where it would seek to and seeks once let go.
 struct Scrubber: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
@@ -14,7 +14,7 @@ struct Scrubber: View {
     var body: some View {
         let player = app.player
         let length = player.duration
-        TimelineView(.animation(minimumInterval: 0.1, paused: !player.isPlaying || scrubbing != nil)) { _ in
+        TimelineView(.animation(minimumInterval: 0.25, paused: !player.isPlaying || scrubbing != nil)) { _ in
             let position = scrubbing.map { $0 * length } ?? player.currentTime
             VStack(spacing: 0) {
                 BarSlider(value: length > 0 ? position / length : 0, buffered: player.bufferedFraction, changed: { scrubbing = $0 }) { fraction in

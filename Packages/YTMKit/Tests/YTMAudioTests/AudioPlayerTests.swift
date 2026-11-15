@@ -28,14 +28,11 @@ struct AudioPlayerTests {
         #expect(!player.isPlaying, "nothing to resume after a stop")
     }
 
-    @Test func keepsTheVolumeApartFromTheMute() {
+    @Test func mutesWithNothingPlaying() {
         let player = player(serving: [:])
-        player.volume = 1.5
-        #expect(player.volume == 1)
-        player.volume = 0.6
         player.isMuted = true
         player.isMuted = false
-        #expect(player.volume == 0.6)
+        #expect(!player.isMuted)
         #expect(player.currentTime == 0 && player.duration == nil)
     }
 }

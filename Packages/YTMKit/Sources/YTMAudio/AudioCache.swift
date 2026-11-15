@@ -16,7 +16,8 @@ final class AudioCache {
     private static let partExtension = "part"
 
     /// Works on the disk, so it is made on the engine's queue. Leftover
-    /// parts, from downloads cut short by the app ending, are removed.
+    /// parts, from downloads cut short by the app ending, are removed, and
+    /// the cache is trimmed to its cap, which may have shrunk since.
     init(_ location: Location) {
         directory = location.directory
         limit = location.limit
@@ -24,6 +25,7 @@ final class AudioCache {
         for url in contents() where url.pathExtension == Self.partExtension {
             try? files.removeItem(at: url)
         }
+        evict()
     }
 
     static var defaultDirectory: URL {
@@ -79,7 +81,7 @@ final class AudioCache {
         }
     }
 
-    private func evict(sparing kept: URL) {
+    private func evict(sparing kept: URL? = nil) {
         var entries = completeFiles().sorted { $0.used < $1.used }
         var total = entries.reduce(0) { $0 + $1.size }
         while total > limit, let oldest = entries.first, oldest.url != kept {

@@ -76,6 +76,11 @@ extension PlaybackEngine {
                 break
             }
             let outgoing = fade.from.supply()
+            // The item fading out has fallen behind its download: it has no
+            // samples to mix, so the fade waits for them as for the incoming.
+            if outgoing == .waiting {
+                break
+            }
             // Either side may have ended, and is silence from there: the
             // incoming item if shorter than the fade.
             let taken = min(Self.frames(in: incoming), Self.frames(in: outgoing), count - filled)
@@ -244,6 +249,7 @@ extension PlaybackEngine {
             heard = nil
             producing = nil
             resetPlayer()
+            // Should the player not answer the failure, the output still sleeps.
             stopOutputWhenIdle()
         } else if let next {
             if isReady(next) {
@@ -256,14 +262,22 @@ extension PlaybackEngine {
         }
     }
 
-    /// Reports the end of the item heard, which must have made a sound.
+    /// Reports the end of the item heard, which must have made a sound. Once
+    /// it has, the output runs on: the player's answer, the next song or a
+    /// stop, says whether anything follows. A silent item's failure may go
+    /// unanswered, as for a next the player no longer holds, so the output
+    /// still sleeps after it.
     func finish() {
         guard let track = producing ?? heard else { return }
         heard = nil
         producing = nil
         resetPlayer()
-        emit(track.hasSounded ? .finished : .failed(id: track.item.id, message: AudioFailure.silent.message))
-        stopOutputWhenIdle()
+        if track.hasSounded {
+            emit(.finished)
+        } else {
+            emit(.failed(id: track.item.id, message: AudioFailure.silent.message))
+            stopOutputWhenIdle()
+        }
     }
 
     /// Starts the next item on a fresh player timeline, as one of another

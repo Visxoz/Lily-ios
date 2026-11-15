@@ -10,7 +10,6 @@ import Testing
     @Test func anUnreadableSettingResetsOnlyItself() throws {
         let settings = try decode(#"{"youtubeHistory": false, "accent": "beige", "equaliserGains": [1], "volume": 0.5}"#)
         #expect(!settings.youtubeHistory, "the opt-out is kept")
-        #expect(settings.volume == 0.5)
         #expect(settings.accent == .red)
         #expect(settings.equaliserGains == Array(repeating: 0, count: 6))
     }

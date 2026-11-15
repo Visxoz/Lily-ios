@@ -16,6 +16,7 @@ struct PageContent: View {
     @Environment(\.theme) private var theme
     @Environment(\.displayScale) private var displayScale
     @State private var frame = Frame()
+    @State private var position = ScrollPosition(edge: .top)
     @State private var titleShown = false
     /// The header artwork's colour, once sampled.
     @State private var artworkTint: RGB?
@@ -62,6 +63,8 @@ struct PageContent: View {
                 PageTint(colour: artworkTint ?? Theme.routeTint(route), top: frame.top)
             }
         }
+        .scrollPosition($position)
+        .onChange(of: model?.replacements) { position.scrollTo(edge: .top) }
         .background(theme.panel)
         // The tint runs unbroken under the bar, whose edge shows only with
         // the sticky title, as ytm-native's.
@@ -129,16 +132,27 @@ private struct Greeting: View {
 }
 
 /// The page's colour fading into the panel behind its top, reaching up under
-/// the bar, and easing to a new colour as ytm-native's does.
+/// the bar, and easing to a new colour as ytm-native's does. Above the page
+/// it carries on solid, so pulling to refresh opens on the colour rather
+/// than on the bare panel.
 struct PageTint: View {
+    /// Further than a pull can open.
+    private static let overscroll: CGFloat = 1000
+
     let colour: RGB?
     let top: CGFloat
 
     @Environment(\.theme) private var theme
 
     var body: some View {
-        LinearGradient(colors: [theme.pageTint(colour), theme.panel], startPoint: .top, endPoint: .bottom)
+        let tint = theme.pageTint(colour)
+        LinearGradient(colors: [tint, theme.panel], startPoint: .top, endPoint: .bottom)
             .frame(height: Metrics.tintHeight + top)
+            .background(alignment: .top) {
+                tint
+                    .frame(height: Self.overscroll)
+                    .offset(y: -Self.overscroll)
+            }
             .padding(.top, -top)
             .animation(.easeOut(duration: 0.5), value: colour)
             .accessibilityHidden(true)

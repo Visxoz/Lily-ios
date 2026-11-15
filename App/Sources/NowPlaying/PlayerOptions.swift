@@ -1,7 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// The player bar's right side: the app's own volume with its mute button,
+/// The player bar's right side: the volume with its mute button,
 /// then the quality badge and the buttons that open the panel on Lyrics or
 /// Up next, closing it when it already shows that.
 struct PlayerOptions: View {
@@ -31,27 +31,32 @@ struct PlayerOptions: View {
     }
 }
 
-/// Mute and the volume slider, which follows the finger.
+/// Mute and the phone's own volume, which the slider shows and sets and
+/// which follows the side buttons.
 private struct VolumeControl: View {
     @Environment(AppModel.self) private var app
+    @State private var volume = SystemVolume()
 
     var body: some View {
         let player = app.player
-        let settings = app.settings.value
+        let muted = app.settings.value.muted
         HStack(spacing: 8) {
-            IconButton(icon: icon(settings), size: 36, iconSize: 20) { player.toggleMute() }
-                .accessibilityLabel(settings.muted ? "Unmute" : "Mute")
-            BarSlider(value: settings.muted ? 0 : Double(settings.volume), changed: setVolume, committed: setVolume)
+            IconButton(icon: icon(muted: muted), size: 36, iconSize: 20) { player.toggleMute() }
+                .accessibilityLabel(muted ? "Unmute" : "Mute")
+            BarSlider(value: muted ? 0 : Double(volume.level), changed: setVolume, committed: setVolume)
                 .accessibilityLabel("Volume")
+                .background { SystemVolumeView(volume: volume).frame(width: 1, height: 1).accessibilityHidden(true) }
         }
     }
 
-    private func icon(_ settings: Settings) -> Icon {
-        if settings.muted || settings.volume == 0 { return .volumeOff }
-        return settings.volume < 0.5 ? .volumeLow : .volume
+    private func icon(muted: Bool) -> Icon {
+        if muted || volume.level == 0 { return .volumeOff }
+        return volume.level < 0.5 ? .volumeLow : .volume
     }
 
+    /// Moving the slider unmutes, as it would on a muted phone.
     private func setVolume(_ value: Double) {
-        app.player.setVolume(Float(value))
+        if app.settings.value.muted { app.player.toggleMute() }
+        volume.set(Float(value))
     }
 }

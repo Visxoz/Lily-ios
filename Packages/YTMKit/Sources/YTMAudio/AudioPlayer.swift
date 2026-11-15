@@ -21,16 +21,12 @@ import Foundation
         }
     }
 
-    /// From 0 to 1, with the mute kept apart so unmuting restores it.
-    public var volume: Float = 1 {
-        didSet {
-            volume = min(max(volume, 0), 1)
-            applyLevel()
-        }
-    }
-
+    /// Silences the app's own output; the level otherwise is the system volume's alone.
     public var isMuted = false {
-        didSet { applyLevel() }
+        didSet {
+            let level: Float = isMuted ? 0 : 1
+            engine.send { $0.setLevel(level) }
+        }
     }
 
     /// How long a crossfade lasts, for `setNext(_:crossfade:)`.
@@ -53,7 +49,7 @@ import Foundation
     private var session: UInt64 = 0
     private var currentID: String?
 
-    public convenience init(cacheLimitBytes: Int64 = 512 << 20) {
+    public convenience init(cacheLimitBytes: Int64 = 40 << 20) {
         let cache = AudioCache.Location(directory: AudioCache.defaultDirectory, limit: cacheLimitBytes)
         self.init(output: .device, source: HTTPByteSource(), cache: cache)
     }
@@ -110,16 +106,19 @@ import Foundation
         engine.send { $0.resume() }
     }
 
-    public func stop() {
+    /// Stops the sound; the output stops after a while, so the device can
+    /// sleep, unless `keepingOutput`, for a change of song: a running output
+    /// keeps the app awake in the background until the next one plays.
+    public func stop(keepingOutput: Bool = false) {
         session += 1
         currentID = nil
         isPlaying = false
         let session = session
-        engine.send { $0.stop(session: session) }
+        engine.send { $0.stop(session: session, keepingOutput: keepingOutput) }
     }
 
     /// Stops, and makes the engine's audio graph afresh, as the system's
-    /// media services reset takes the old one with it. The volume, mute and
+    /// media services reset takes the old one with it. The mute and
     /// equaliser carry over.
     public func rebuild() {
         stop()
@@ -147,12 +146,6 @@ import Foundation
 
     public func clearCache() async {
         await engine.clearCache()
-    }
-
-    private func applyLevel() {
-        // Squared, so the slider feels even to the ear.
-        let level = isMuted ? 0 : volume * volume
-        engine.send { $0.setLevel(level) }
     }
 
     private func deliver(_ stamped: PlaybackEngine.Stamped) {

@@ -2,8 +2,8 @@ import SwiftUI
 import YTMCore
 
 /// ytm-native's window on a phone: the sidebar's pages and the top bar's
-/// search become tabs, the player bar a mini player above them that opens
-/// Now Playing, and the dialogs sheets.
+/// search become tabs, the player bar a mini player above them (in each
+/// tab, see `TabRoot`) that opens Now Playing, and the dialogs sheets.
 struct RootView: View {
     @Environment(AppModel.self) private var app
     @Namespace private var transition
@@ -12,32 +12,28 @@ struct RootView: View {
         @Bindable var app = app
         TabView(selection: $app.tab) {
             Tab(value: AppTab.home) {
-                TabRoot(tab: .home) { PageScreen(route: .home) }
+                TabRoot(tab: .home, transition: transition) { PageScreen(route: .home) }
             } label: {
                 TabLabel(title: "Home", icon: app.tab == .home ? .home : .homeOutline)
             }
             Tab(value: AppTab.explore) {
-                TabRoot(tab: .explore) { PageScreen(route: .explore) }
+                TabRoot(tab: .explore, transition: transition) { PageScreen(route: .explore) }
             } label: {
                 TabLabel(title: "Explore", icon: .explore)
             }
             Tab(value: AppTab.library) {
-                TabRoot(tab: .library) { LibraryScreen() }
+                TabRoot(tab: .library, transition: transition) { LibraryScreen() }
             } label: {
                 TabLabel(title: "Library", icon: .library)
             }
             Tab(value: AppTab.history) {
-                TabRoot(tab: .history) { HistoryScreen() }
+                TabRoot(tab: .history, transition: transition) { HistoryScreen() }
             } label: {
                 TabLabel(title: "History", icon: .history)
             }
             Tab(value: AppTab.search, role: .search) {
-                TabRoot(tab: .search) { SearchScreen() }
+                TabRoot(tab: .search, transition: transition) { SearchScreen() }
             }
-        }
-        .tabViewBottomAccessory(isEnabled: app.player.current != nil) {
-            MiniPlayer()
-                .matchedTransitionSource(id: AppSheet.nowPlaying, in: transition)
         }
         .sheet(item: $app.sheet) { sheet in
             SheetContent(sheet: sheet, transition: transition)
@@ -68,7 +64,7 @@ private struct TabLabel: View {
 
 /// What `AppSheet` presents, each with the toast over it, as ytm-native's
 /// toast shows above its dialogs and panel. Now Playing grows out of the
-/// mini player.
+/// mini player of the tab in view.
 private struct SheetContent: View {
     let sheet: AppSheet
     let transition: Namespace.ID
@@ -80,7 +76,7 @@ private struct SheetContent: View {
             switch sheet {
             case .nowPlaying:
                 NowPlayingScreen()
-                    .navigationTransition(.zoom(sourceID: AppSheet.nowPlaying, in: transition))
+                    .navigationTransition(.zoom(sourceID: app.tab, in: transition))
             case .settings:
                 SettingsScreen()
             case .signIn:

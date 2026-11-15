@@ -2,8 +2,8 @@ import Foundation
 
 /// The signed-in Home feed (`FEmusic_home`): shelves such as Listen again,
 /// Quick picks and Mixed for you, a port of ytm-native's `api/home_feed.rs`.
-/// Its carousels are read by the shared shelf parser, with subtitles as
-/// YouTube words them.
+/// Its carousels, song lists and grids are read by the shared shelf parser,
+/// with subtitles as YouTube words them.
 enum HomeFeed {
     /// Requests made for one page of the feed before giving up.
     static let attempts = 4
@@ -11,6 +11,11 @@ enum HomeFeed {
     static let continuations = 2
     /// Longest list shelf shown, such as Quick picks.
     static let listLimit = 10
+    /// The shelves the feed lists songs or tiles in: carousels, and the
+    /// song lists and grids it mixes in among them.
+    private static let shelfKinds: Set<String> = [
+        "musicCarouselShelfRenderer", "musicImmersiveCarouselShelfRenderer", "musicShelfRenderer", "gridRenderer",
+    ]
 
     /// YouTube refuses a share of requests for the signed-in feed, in bursts,
     /// with "400: Request contains an invalid argument", and answers the same
@@ -39,13 +44,13 @@ enum HomeFeed {
         return (shelves(list), Renderers.continuation(list))
     }
 
-    /// The carousels of a section list, each a card row or, when it lists
-    /// songs, a track list of at most `listLimit`. Other shelves (the taste
-    /// picker, banners) are skipped.
+    /// The shelves of a section list, each a card row or grid or, when it
+    /// lists songs, a track list of at most `listLimit`. Other shelves (the
+    /// taste picker, banners) are skipped.
     private static func shelves(_ list: JSON) -> [Section] {
         let context = ItemContext(subtitles: .asShown)
         return list["contents"].array.compactMap { wrapped -> Section? in
-            guard wrapped["musicCarouselShelfRenderer"].exists else { return nil }
+            guard let kind = wrapped.onlyValue?.key, shelfKinds.contains(kind) else { return nil }
             switch Renderers.section(wrapped, context: context) {
             case .tracks(var shelf)?:
                 shelf.tracks = Array(shelf.tracks.prefix(listLimit))

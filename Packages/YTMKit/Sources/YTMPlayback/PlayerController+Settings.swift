@@ -4,17 +4,10 @@ import YTMCore
 
 /// The settings the player follows, and the account it plays for. Any
 /// change to `SettingsStore.value`, from here or from Settings, takes effect
-/// as it is made: volume, mute and the equaliser at once, normalisation
+/// as it is made: mute and the equaliser at once, normalisation
 /// within the few seconds the engine has scheduled; shuffle in the queue;
 /// quality and crossfade from the next song queued.
 extension PlayerController {
-    /// Sets the app's own volume, from 0 to 1, which unmutes it.
-    public func setVolume(_ volume: Float) {
-        settings.value.volume = min(max(volume, 0), 1)
-        settings.value.muted = false
-        apply(settings.value)
-    }
-
     public func toggleMute() {
         settings.value.muted.toggle()
         apply(settings.value)
@@ -68,7 +61,6 @@ extension PlayerController {
     func apply(_ new: Settings) {
         let old = applied
         applied = new
-        if audio.volume != new.volume { audio.volume = new.volume }
         if audio.isMuted != new.muted { audio.isMuted = new.muted }
         if audio.normalise != new.normalise { audio.normalise = new.normalise }
         if old?.equaliserEnabled != new.equaliserEnabled || old?.equaliserGains != new.equaliserGains {

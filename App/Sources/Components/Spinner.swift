@@ -12,7 +12,9 @@ struct Spinner: View {
 
     var body: some View {
         let line = size / 12
-        TimelineView(.animation) { timeline in
+        // 60 a second, as the arc looks no smoother at the display's 120,
+        // and it often runs while Now Playing animates.
+        TimelineView(.animation(minimumInterval: 1.0 / 60)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let breath = 0.5 - 0.5 * cos(t.truncatingRemainder(dividingBy: 1.4) / 1.4 * 2 * .pi)
             let spin = t.truncatingRemainder(dividingBy: 1.1) / 1.1 * 360 + breath * 120

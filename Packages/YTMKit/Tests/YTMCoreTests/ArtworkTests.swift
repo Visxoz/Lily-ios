@@ -85,6 +85,15 @@ private func image(_ width: Int = 8, _ height: Int = 8, _ colour: (Int, Int) -> 
         #expect(ImagePipeline.requestURL("https://example.com/a.jpg", edge: 120) == nil, "not on the allowlist")
     }
 
+    @Test func sharesOneDecodeForArtworkStoredAtDifferentSizes() {
+        let row = "https://lh3.googleusercontent.com/abc=w120-h120-l90-rj"
+        let header = "https://lh3.googleusercontent.com/abc=w544-h544-l90-rj"
+        #expect(ImagePipeline.key(row, 168) == ImagePipeline.key(header, 168))
+        #expect(ImagePipeline.key(row, 168) != ImagePipeline.key(row, 1080))
+        let banner = "https://lh3.googleusercontent.com/abc=w1440-h600-p-l90-rj"
+        #expect(ImagePipeline.key(banner, 360) != ImagePipeline.key(row, 360), "a banner keeps its own rendition")
+    }
+
     @Test func decodesWithTheShorterSideAtTheEdge() throws {
         let data = NSMutableData()
         let destination = try #require(CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))

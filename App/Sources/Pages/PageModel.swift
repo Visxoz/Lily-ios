@@ -17,13 +17,20 @@ final class PageModel {
     /// Counts the pages shown, so the screen asks for the next step of
     /// `Page.more` once the last has arrived.
     private(set) var step = 0
+    /// Counts the pages that replaced one shown when the screen came back
+    /// (Home's fresh feed over a saved or aged one), which start from the
+    /// top: the reader's place belonged to the feed replaced.
+    private(set) var replacements = 0
 
     @ObservationIgnored private var generation = 0
     /// The account the page shown was loaded for.
     @ObservationIgnored private var shownFor: Int?
-    /// Whether the page shown is Home's saved feed, standing in for one
-    /// YouTube refused, which the next visit replaces.
+    /// Whether the page shown is Home's saved feed, standing in while YouTube
+    /// is first asked, or for a feed it refused, which the next visit replaces.
     @ObservationIgnored private var showsSaved = false
+    /// When the page shown was put on screen, so Home loads afresh once older
+    /// than the page cache keeps pages; one from the cache may be older still.
+    @ObservationIgnored private var shownAt: ContinuousClock.Instant?
     @ObservationIgnored private var loadingMore = false
 
     init(route: Route) {
@@ -37,10 +44,12 @@ final class PageModel {
     /// Loads the page when the screen shows, unless it already holds this
     /// account's. The account's History is fetched afresh each visit, as
     /// ytm-native does, keeping the songs shown meanwhile, and so is Home
-    /// while its saved feed stands in.
+    /// while its saved feed stands in, or once its feed has aged past the
+    /// page cache's five minutes: the app stays alive for days, so a feed
+    /// loaded once would otherwise never change.
     func appear(in app: AppModel) async {
         guard app.accountGeneration > 0 else { return }
-        if shownFor == app.accountGeneration, route != .history, !showsSaved { return }
+        if shownFor == app.accountGeneration, route != .history, !showsSaved, !isStale { return }
         if shownFor != app.accountGeneration { phase = .loading }
         await load(in: app, cached: true)
     }
@@ -73,26 +82,39 @@ final class PageModel {
         let generation = generation
         let account = app.accountGeneration
         loadingMore = false
+        // On a visit, a page over one already shown starts from the top.
+        func present(_ page: Page, saved: Bool = false) {
+            if cached, self.page != nil { replacements += 1 }
+            show(page, for: app, saved: saved)
+        }
         if cached, let page = app.cachedPage(route) {
-            show(page, for: app)
+            present(page)
             return
         }
         // Signed in, Home asks for the feed once. Refused, the feed as it last
         // loaded shows at once, and the retries behind it wait for the next
-        // visit, so the page never changes under the reader, as ytm-native's
-        // `load_personal_home`. With nothing saved, the retries and then the
-        // charts follow below.
+        // visit, as ytm-native's `load_personal_home`. With nothing saved, the
+        // retries and then the charts follow below. With nothing shown yet, as
+        // at launch, the saved feed stands in for the spinner during that one
+        // request, and what it brings replaces it a moment later, as it does
+        // a feed aged past the page cache's time.
         if route == .home, app.isSignedIn {
+            if page == nil, let saved = await app.savedHome() {
+                guard isCurrent(generation, account, in: app) else { return }
+                present(saved, saved: true)
+            }
             do {
                 let page = try await app.fetchHomeFirstTry()
                 guard isCurrent(generation, account, in: app) else { return }
-                show(page, for: app)
+                present(page)
                 return
             } catch {
                 guard isCurrent(generation, account, in: app), !Task.isCancelled else { return }
-                if let saved = await app.savedHome() {
+                if !showsSaved, let saved = await app.savedHome() {
                     guard isCurrent(generation, account, in: app) else { return }
-                    show(saved, for: app, saved: true)
+                    present(saved, saved: true)
+                }
+                if showsSaved {
                     app.refreshHome()
                     return
                 }
@@ -101,7 +123,7 @@ final class PageModel {
         do {
             let page = try await app.fetchPage(route)
             guard isCurrent(generation, account, in: app) else { return }
-            show(page, for: app)
+            present(page)
         } catch {
             guard generation == self.generation, !Task.isCancelled else { return }
             if self.page == nil {
@@ -119,9 +141,16 @@ final class PageModel {
         generation == self.generation && account == app.accountGeneration
     }
 
+    /// Home's feed is older than the page cache keeps pages.
+    private var isStale: Bool {
+        guard route == .home, let shownAt else { return false }
+        return shownAt.duration(to: .now) >= AppModel.pageCacheFor
+    }
+
     private func show(_ page: Page, for app: AppModel, saved: Bool = false) {
         phase = .loaded(page)
         shownFor = app.accountGeneration
+        shownAt = .now
         showsSaved = saved
         step += 1
     }

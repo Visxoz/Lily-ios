@@ -13,7 +13,6 @@ struct SearchScreen: View {
 
     @Environment(AppModel.self) private var app
     @State private var query = ""
-    @State private var searching = false
     /// The user has typed since focusing the field, so suggestions replace
     /// the recent searches.
     @State private var typed = false
@@ -22,8 +21,9 @@ struct SearchScreen: View {
     @State private var shown: String?
 
     var body: some View {
+        @Bindable var app = app
         Group {
-            if searching {
+            if app.isSearching {
                 SearchChoices(
                     choices: showsRecent ? app.history.searches.queries : suggestions,
                     recent: showsRecent,
@@ -38,15 +38,15 @@ struct SearchScreen: View {
         }
         // Always showing, so the query stays in view over its results, as
         // ytm-native's search box.
-        .searchable(text: $query, isPresented: $searching, placement: .navigationBarDrawer(displayMode: .always), prompt: "What do you want to play?")
+        .searchable(text: $query, isPresented: $app.isSearching, placement: .navigationBarDrawer(displayMode: .always), prompt: "What do you want to play?")
         .onSubmit(of: .search) { search(query) }
-        .onChange(of: searching) { _, active in
+        .onChange(of: app.isSearching) { _, active in
             // Each focus starts with the recent searches, even over the last query.
             typed = false
             if !active { suggestions = [] }
         }
         .onChange(of: query) {
-            if searching { typed = true }
+            if app.isSearching { typed = true }
         }
         .task(id: suggestKey) { await suggest(suggestKey) }
     }
@@ -60,7 +60,7 @@ struct SearchScreen: View {
     /// The query to suggest for, or nil when none is wanted; each change
     /// restarts the wait, dropping the request for the last keystroke.
     private var suggestKey: String? {
-        guard searching, !showsRecent else { return nil }
+        guard app.isSearching, !showsRecent else { return nil }
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         return trimmed.count >= Self.suggestFrom ? trimmed : nil
     }
@@ -84,7 +84,7 @@ struct SearchScreen: View {
     private func search(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        searching = false
+        app.isSearching = false
         query = trimmed
         app.history.recordSearch(trimmed)
         app.navigation(for: .search).routes.removeAll()

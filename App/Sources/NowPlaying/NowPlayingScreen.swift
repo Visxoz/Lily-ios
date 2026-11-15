@@ -2,10 +2,10 @@ import SwiftUI
 import YTMCore
 
 /// ytm-native's player bar and right-hand panel as one screen, grown out of
-/// the mini player: the artwork, or with the panel open the Up next and
-/// Lyrics chips over the queue or the lyrics; then the seek bar, the
-/// transport, and the volume, quality badge and panel buttons, all over the
-/// artwork's colour.
+/// the mini player: the artwork, which a swipe up turns to Up next, or with
+/// the panel open the Up next and Lyrics chips over the queue or the
+/// lyrics; then the seek bar, the transport, and the volume, quality badge
+/// and panel buttons, all over the artwork's colour.
 struct NowPlayingScreen: View {
     static let padding: CGFloat = 24
 
@@ -29,6 +29,11 @@ struct NowPlayingScreen: View {
                 } else {
                     LargeArtwork(url: track.thumbnail)
                         .matchedGeometryEffect(id: track.id, in: artwork)
+                        .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { drag in
+                            let up = -drag.translation.height
+                            if up > 60, up > abs(drag.translation.width) { panel = .upNext }
+                        })
+                        .accessibilityAction(named: "Up next") { panel = .upNext }
                         .padding(.horizontal, Self.padding)
                         .padding(.vertical, 12)
                     TrackTitle(track: track, compact: false)
@@ -81,7 +86,8 @@ private struct NowPlayingTopBar: View {
     }
 }
 
-/// The artwork as large as the room left for it, square.
+/// The artwork as large as the room left for it, square, decoded at the
+/// player's shared size, which is fetched ahead with the song.
 private struct LargeArtwork: View {
     let url: String?
 
@@ -89,8 +95,16 @@ private struct LargeArtwork: View {
 
     var body: some View {
         GeometryReader { space in
-            ArtworkView(url: url, size: min(space.size.width, space.size.height), radius: 8)
-                .shadow(color: theme.shadowSoft, radius: 16, y: 8)
+            let edge = min(space.size.width, space.size.height)
+            ArtworkView(url: url, size: edge, radius: 8, pixelEdge: ImagePipeline.playerEdge)
+                // Cast by a shape behind the opaque artwork rather than by the
+                // image, so the blur comes from a path once instead of being
+                // rendered off screen each frame Now Playing grows or shrinks.
+                .background {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(theme.highlight)
+                        .shadow(color: theme.shadowSoft, radius: 16, y: 8)
+                }
                 .frame(width: space.size.width, height: space.size.height)
         }
     }

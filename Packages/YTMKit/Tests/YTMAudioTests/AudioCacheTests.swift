@@ -46,6 +46,15 @@ struct AudioCacheTests {
         #expect(!FileManager.default.fileExists(atPath: part.path))
     }
 
+    @Test func trimsToASmallerCapAtLaunch() throws {
+        let cache = AudioCache(.init(directory: directory, limit: 1 << 20))
+        try store("old", bytes: 10, age: 300, in: cache)
+        try store("new", bytes: 10, age: 0, in: cache)
+        let smaller = AudioCache(.init(directory: directory, limit: 15))
+        #expect(smaller.completeFile(for: "old", length: 10) == nil)
+        #expect(smaller.completeFile(for: "new", length: 10) != nil)
+    }
+
     @Test func namesFilesSafely() throws {
         let cache = AudioCache(.init(directory: directory, limit: 1 << 20))
         let part = try cache.makePart(for: "../escape")

@@ -7,7 +7,7 @@ import YTMCore
 ///
 /// Load it once at launch with `load()` (the player's `start()` does), before
 /// anything changes it. The player follows every change to `value` on its
-/// own: volume, mute, the equaliser, crossfade, normalisation, quality,
+/// own: mute, the equaliser, crossfade, normalisation, quality,
 /// shuffle and repeat take effect as they are set.
 @MainActor @Observable public final class SettingsStore {
     public static let shared = SettingsStore(store: .shared)

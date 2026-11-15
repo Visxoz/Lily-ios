@@ -187,13 +187,16 @@ actor PlaybackEngine {
         updateBuffering()
     }
 
-    func stop(session: UInt64) {
+    /// Stops the sound. `keepingOutput` for a change of song: the output
+    /// runs on, silent, until the next one plays, as a stopped output lets
+    /// iOS suspend the app in the background while it fetches that song.
+    func stop(session: UInt64, keepingOutput: Bool = false) {
         self.session = session
         clear()
         clock.pin(0, since: nil)
         describeHeard()
         updateBuffering()
-        stopOutputWhenIdle()
+        if !keepingOutput { stopOutputWhenIdle() }
     }
 
     func setLevel(_ level: Float) {
@@ -214,7 +217,7 @@ actor PlaybackEngine {
 
     /// Makes the graph afresh, as after the system's media services reset,
     /// when the old one no longer reaches the device. Drops anything playing;
-    /// the volume and equaliser carry over, and the next `play` follows the
+    /// the mute and equaliser carry over, and the next `play` follows the
     /// new graph's output changes.
     func rebuildGraph() {
         clear()

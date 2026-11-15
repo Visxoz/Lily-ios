@@ -1,12 +1,12 @@
 import AVFoundation
 
-/// The engine's nodes: one player, into a mixer that carries the volume,
-/// mute and pause ramps and converts each item's rate to the output's, into
+/// The engine's nodes: one player, into a mixer that carries the mute and
+/// pause ramps and converts each item's rate to the output's, into
 /// the equaliser, and out. Gains and fades that must land on a given sample,
 /// normalisation and crossfades, are applied to the buffers before they are
 /// scheduled, so one player is all the graph needs. The mixer smooths every
-/// change of its volume over about 25 ms, so neither pausing nor a volume
-/// change ever clicks.
+/// change of its volume over about 25 ms, so neither pausing nor muting
+/// ever clicks.
 final class AudioGraph {
     let engine = AVAudioEngine()
     let player = AVAudioPlayerNode()
@@ -72,7 +72,7 @@ final class AudioGraph {
         }
     }
 
-    /// The volume as a factor, before any mute.
+    /// The output's level as a factor: 0 muted, 1 otherwise.
     func setLevel(_ level: Float) {
         self.level = level
         applyVolume()
@@ -89,7 +89,7 @@ final class AudioGraph {
         applyEqualiser()
     }
 
-    /// Takes on `old`'s volume and equaliser, as a graph made in its place.
+    /// Takes on `old`'s mute and equaliser, as a graph made in its place.
     func adoptSettings(of old: AudioGraph) {
         setLevel(old.level)
         setEqualiser(enabled: old.equaliserSetting.enabled, gains: old.equaliserSetting.gains)

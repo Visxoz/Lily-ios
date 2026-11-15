@@ -24,7 +24,11 @@ import os
         let center = NotificationCenter.default
         observers = [
             center.addObserver(of: session, for: .didBecomeInactive) { [weak self, weak player] message in
-                guard let self, let player, case .systemInterruption = message.deactivationResult else { return }
+                guard let self else { return }
+                // However the system took the session, the next play must ask
+                // for it again; only an interruption pauses the player.
+                isActive = false
+                guard let player, case .systemInterruption = message.deactivationResult else { return }
                 interrupted(player)
             },
             center.addObserver(of: session, for: .resumptionRecommendation) { [weak self, weak player] message in
@@ -46,12 +50,15 @@ import os
     }
 
     /// Makes the session active for playback, as it must be before the
-    /// engine plays; only the first call, or the first after an
-    /// interruption, reaches the system.
+    /// engine plays; only the first call, or the first after the system
+    /// took the session away, reaches the system.
     func activate() {
         guard !isActive else { return }
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: .longFormAudio)
+            // The default route sharing, not long-form audio's, under which
+            // headphone presses (AirPods squeezes) never reached the app,
+            // though the lock screen's buttons did.
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
             isActive = true
         } catch {
@@ -62,7 +69,6 @@ import os
     /// The system has stopped the sound, for a call or another app; the
     /// player follows, so it shows paused and its position holds.
     private func interrupted(_ player: PlayerController) {
-        isActive = false
         resumeAfterInterruption = player.isPlaying
         if player.isPlaying { player.setPaused(true) }
     }

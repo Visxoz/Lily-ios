@@ -126,7 +126,9 @@ extension PlayerController {
             gapless.forget()
         }
         for task in [resolving, queueing, autoplay] { task?.cancel() }
-        audio.stop()
+        // The output runs on while the stream resolves, so iOS keeps the app
+        // running, and the system's Now Playing, through a slow fetch.
+        audio.stop(keepingOutput: true)
         playback.itemID = nil
         let resume = playback.resume.flatMap { $0.id == track.id ? $0.position : nil } ?? 0
         present(track, at: resume)
@@ -221,7 +223,7 @@ extension PlayerController {
         playback.itemID = nil
         resolving?.cancel()
         gapless.unqueue(into: &prefetcher)
-        audio.stop()
+        audio.stop(keepingOutput: false)
         isPlaying = false
         updateBuffering()
         publishPlayback()
