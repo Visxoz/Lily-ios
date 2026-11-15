@@ -2,57 +2,155 @@ import SwiftUI
 import YTMCore
 
 /// ytm-native's player bar and right-hand panel as one screen, grown out of
-/// the mini player: the artwork, which a swipe up turns to Up next, or with
-/// the panel open the Up next and Lyrics chips over the queue or the
-/// lyrics; then the seek bar, the transport, and the volume, quality badge
-/// and panel buttons, all over the artwork's colour.
+/// the mini player, in two pages a swipe moves between: the artwork, title,
+/// seek bar, transport, and the volume, quality badge and panel buttons;
+/// and below it the same controls folded into one row over the Up next and
+/// Lyrics chips with the queue or the lyrics, all over the artwork's colour.
+///
+/// The pages scroll natively, so a swipe follows the finger and can't be
+/// lost to the zoom's own close. At the artwork a swipe down closes the
+/// screen into the mini player; on the panel it scrolls back to the artwork
+/// first.
 struct NowPlayingScreen: View {
     static let padding: CGFloat = 24
 
+    private enum Page: Hashable {
+        case artwork, panel
+    }
+
     @Environment(AppModel.self) private var app
-    @State private var panel: PanelTab?
-    @Namespace private var artwork
+    @State private var page: Page? = .artwork
+    /// What the panel page shows, kept while the artwork does.
+    @State private var tab = PanelTab.upNext
 
     var body: some View {
         @Bindable var app = app
         VStack(spacing: 0) {
             if let track = app.player.current {
                 NowPlayingTopBar(track: track)
-                if let tab = panel {
-                    HStack(spacing: 14) {
-                        ArtworkView(url: track.thumbnail, size: 56)
-                            .matchedGeometryEffect(id: track.id, in: artwork)
-                        TrackTitle(track: track, compact: true)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Each page hidden from VoiceOver while off screen,
+                        // so it reads one set of controls.
+                        artworkPage(track)
+                            .containerRelativeFrame(.vertical)
+                            .accessibilityHidden(page != .artwork)
+                            .id(Page.artwork)
+                        panelPage(track)
+                            .containerRelativeFrame(.vertical)
+                            .accessibilityHidden(page != .panel)
+                            .id(Page.panel)
                     }
-                    .padding(.horizontal, Self.padding)
-                    .padding(.vertical, 8)
-                    SidePanel(tab: tab) { panel = $0 }
-                } else {
-                    LargeArtwork(url: track.thumbnail)
-                        .matchedGeometryEffect(id: track.id, in: artwork)
-                        .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { drag in
-                            let up = -drag.translation.height
-                            if up > 60, up > abs(drag.translation.width) { panel = .upNext }
-                        })
-                        .accessibilityAction(named: "Up next") { panel = .upNext }
-                        .padding(.horizontal, Self.padding)
-                        .padding(.vertical, 12)
-                    TrackTitle(track: track, compact: false)
-                        .padding(.horizontal, Self.padding)
+                    .scrollTargetLayout()
+                    .background(PagerBounceOff())
                 }
-                Group {
-                    Scrubber()
-                        .padding(.top, 12)
-                    TransportControls()
-                    PlayerOptions(panel: $panel)
-                }
-                .padding(.horizontal, Self.padding)
+                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+                // The page counts as shown once past halfway, so a swipe
+                // down from the panel stays one page until it settles.
+                .scrollPosition(id: $page, anchor: .center)
+                .scrollIndicators(.hidden)
             }
         }
         .padding(.bottom, 8)
         .background { NowPlayingBackground() }
-        .animation(Theme.normal, value: panel)
+        // On the panel a pull down, even on the queue at its top, goes back
+        // to the artwork rather than closing the screen.
+        .interactiveDismissDisabled(page == .panel)
         .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0) }
+        .onAppear { app.nowPlayingShown = true }
+        .onDisappear { app.nowPlayingShown = false }
+    }
+
+    private func artworkPage(_ track: Track) -> some View {
+        VStack(spacing: 0) {
+            LargeArtwork(url: track.thumbnail)
+                .accessibilityAction(named: "Up next") { show(.upNext) }
+                .padding(.vertical, 12)
+            TrackTitle(track: track, compact: false)
+            Scrubber()
+                .padding(.top, 12)
+            TransportControls()
+            PlayerOptions(open: show)
+        }
+        .padding(.horizontal, Self.padding)
+    }
+
+    private func panelPage(_ track: Track) -> some View {
+        VStack(spacing: 0) {
+            CompactControls(track: track)
+            SidePanel(tab: tab, isShown: page == .panel) { next in
+                if let next { show(next) } else { withAnimation(Theme.normal) { page = .artwork } }
+            }
+        }
+    }
+
+    private func show(_ next: PanelTab) {
+        withAnimation(Theme.normal) {
+            tab = next
+            page = .panel
+        }
+    }
+}
+
+/// Stops the pager bouncing, so a swipe down at the artwork goes straight to
+/// the zoom's own close, which follows the finger, rather than stretching
+/// the page inside the shrinking screen. SwiftUI's `scrollBounceBehavior`
+/// can't stop it while the content overflows, as two pages always do. Its
+/// nearest scroll view is the pager, never the queue, whose bounce a pull
+/// past its top needs.
+// shortcut: relies on SwiftUI's ScrollView being a UIScrollView; drop it once SwiftUI can turn the bounce off.
+private struct PagerBounceOff: UIViewRepresentable {
+    func makeUIView(context: Context) -> Probe { Probe() }
+
+    // The work is done in `didMoveToWindow`, once the probe is in the pager.
+    func updateUIView(_ probe: Probe, context: Context) {}
+
+    final class Probe: UIView {
+        // Behind both pages, so it must never take a touch meant for them.
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+        }
+
+        required init?(coder: NSCoder) {
+            super.init(coder: coder)
+            isUserInteractionEnabled = false
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            apply()
+        }
+
+        func apply() {
+            var view = superview
+            while let current = view, !(current is UIScrollView) { view = current.superview }
+            (view as? UIScrollView)?.bounces = false
+        }
+    }
+}
+
+/// Above the panel, the controls folded into one row, as the mini player's:
+/// the artwork, the title, play and next, over how far the song has got.
+private struct CompactControls: View {
+    let track: Track
+
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                ArtworkView(url: track.thumbnail, size: 52)
+                TrackTitle(track: track, compact: true)
+                PlayPauseButton(size: 44)
+                IconButton(icon: .next, size: 44, iconSize: 26, colour: theme.text) { app.player.next() }
+                    .accessibilityLabel("Next")
+            }
+            MiniProgress()
+        }
+        .padding(.horizontal, NowPlayingScreen.padding)
+        .padding(.vertical, 8)
     }
 }
 

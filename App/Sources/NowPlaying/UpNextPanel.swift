@@ -15,6 +15,12 @@ import YTMPlayback
 /// the rows it touched while the rest keep their state, and an open swipe or
 /// menu acts on its own song however the queue has moved meanwhile.
 struct UpNextPanel: View {
+    /// Whether the panel is on screen; off it, the list keeps the song
+    /// playing at its top, ready for the swipe up.
+    let isShown: Bool
+    /// Closes the panel, for a pull down past the top of the list.
+    let close: () -> Void
+
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var editMode = EditMode.inactive
@@ -81,8 +87,17 @@ struct UpNextPanel: View {
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, Theme.queueRow)
             .environment(\.editMode, $editMode)
+            .onScrollPhaseChange { old, new, context in
+                if pulledPastTop(old, new, context.geometry) { close() }
+            }
             .onAppear {
                 if let currentId { proxy.scrollTo(currentId, anchor: .top) }
+            }
+            .onChange(of: currentId) {
+                if !isShown, let currentId { proxy.scrollTo(currentId, anchor: .top) }
+            }
+            .onChange(of: isShown) {
+                if !isShown, let currentId { proxy.scrollTo(currentId, anchor: .top) }
             }
         }
     }

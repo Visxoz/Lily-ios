@@ -67,11 +67,15 @@ struct PageContent: View {
             .padding(.bottom, Metrics.pageBottom)
             .background(alignment: .top) {
                 PageTint(colour: artworkTint ?? tintSource.flatMap { Self.tints[$0.url] } ?? Theme.routeTint(route), top: frame.top)
+                    .modifier(PastEdges())
             }
         }
+        // Clipped as before, but past the sides while the page's colours are.
+        .scrollClipDisabled()
+        .mask { Rectangle().modifier(PastEdges()).ignoresSafeArea() }
         .scrollPosition($position)
         .onChange(of: model?.replacements) { position.scrollTo(edge: .top) }
-        .background(theme.panel)
+        .background { theme.panel.modifier(PastEdges()).ignoresSafeArea() }
         // The tint runs unbroken under the bar, whose edge shows only with
         // the sticky title, as ytm-native's.
         .scrollEdgeEffectHidden(!titleShown, for: .top)
@@ -207,6 +211,20 @@ struct PageTint: View {
             .padding(.top, -top)
             .animation(.easeOut(duration: 0.5), value: colour)
             .accessibilityHidden(true)
+    }
+}
+
+/// While Now Playing opens, shows or closes, the page's colours run past
+/// the screen's sides. The zoom shrinks the screen behind it a little, which
+/// would otherwise show the black behind the app down each side. Only then,
+/// as a page sliding in or out would show them over the page beside it.
+private struct PastEdges: ViewModifier {
+    static let width: CGFloat = 16
+
+    @Environment(AppModel.self) private var app
+
+    func body(content: Content) -> some View {
+        content.padding(.horizontal, app.sheet == .nowPlaying || app.nowPlayingShown ? -Self.width : 0)
     }
 }
 

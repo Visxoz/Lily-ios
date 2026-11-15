@@ -21,6 +21,9 @@ struct BarSlider: View {
     @Environment(\.isEnabled) private var isEnabled
     @State private var width: CGFloat = 0
     @State private var dragging = false
+    /// Whether a finger is on the bar; reset by SwiftUI when a scroll around
+    /// the bar takes the touch over, which never ends the drag.
+    @GestureState private var touching = false
 
     private static let touchHeight: CGFloat = 32
     private static let barHeight: CGFloat = 4
@@ -56,6 +59,13 @@ struct BarSlider: View {
         .contentShape(Rectangle())
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
         .gesture(drag, isEnabled: isEnabled)
+        // A drag taken over by a scroll is let go where it was, so the bar
+        // and its owner never stay mid-drag.
+        .onChange(of: touching) { _, touching in
+            guard !touching, dragging else { return }
+            dragging = false
+            committed(shown)
+        }
         .accessibilityElement()
         .accessibilityValue(valueText.map { Text($0) } ?? Text(shown, format: .percent.precision(.fractionLength(0))))
         .accessibilityAdjustableAction { direction in
@@ -69,6 +79,7 @@ struct BarSlider: View {
 
     private var drag: some Gesture {
         DragGesture(minimumDistance: 0)
+            .updating($touching) { _, touching, _ in touching = true }
             .onChanged { gesture in
                 dragging = true
                 changed(fraction(at: gesture.location.x))

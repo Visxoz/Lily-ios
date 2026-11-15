@@ -5,6 +5,9 @@ import YTMCore
 /// the spinner while they load, then the lines, or what stands in for them,
 /// in the same words. The player loads them only while this shows.
 struct LyricsPanel: View {
+    /// Closes the panel, for a pull down past the top of the lines.
+    let close: () -> Void
+
     @Environment(AppModel.self) private var app
 
     var body: some View {
@@ -15,10 +18,10 @@ struct LyricsPanel: View {
                 Spinner(size: 32)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .loaded(let lyrics):
-                LyricsLines(lyrics: lyrics)
+                LyricsLines(lyrics: lyrics, close: close)
             case .idle, .unavailable, .failed:
                 // ytm-native shows the reason as a lyric of its own.
-                LyricsLines(lyrics: Lyrics(lines: [player.lyrics.message ?? ""]))
+                LyricsLines(lyrics: Lyrics(lines: [player.lyrics.message ?? ""]), close: close)
             }
         }
         // Each song starts afresh: at the top, following the singing.
@@ -34,6 +37,7 @@ struct LyricsPanel: View {
 /// rest.
 private struct LyricsLines: View {
     let lyrics: Lyrics
+    let close: () -> Void
 
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
@@ -69,7 +73,10 @@ private struct LyricsLines: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollPosition($position, anchor: .center)
-        .onScrollPhaseChange { _, new in scrolled(new) }
+        .onScrollPhaseChange { old, new, context in
+            scrolled(new)
+            if pulledPastTop(old, new, context.geometry) { close() }
+        }
         .task(id: released) {
             guard released > 0 else { return }
             try? await Task.sleep(for: Self.resumeAfter)

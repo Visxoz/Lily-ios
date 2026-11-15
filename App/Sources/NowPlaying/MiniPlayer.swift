@@ -62,8 +62,8 @@ struct MiniPlayer: View {
 
 /// How far the song has got, pulled twice a second while it plays and left
 /// alone while paused, apart from showing a seek made then. A 2-point line
-/// moves too little to need more.
-private struct MiniProgress: View {
+/// moves too little to need more. Also under Now Playing's folded controls.
+struct MiniProgress: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     /// The place last sought, shown while paused until the song plays or

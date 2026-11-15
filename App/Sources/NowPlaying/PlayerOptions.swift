@@ -3,9 +3,9 @@ import YTMCore
 
 /// The player bar's right side: the volume with its mute button,
 /// then the quality badge and the buttons that open the panel on Lyrics or
-/// Up next, closing it when it already shows that.
+/// Up next.
 struct PlayerOptions: View {
-    @Binding var panel: PanelTab?
+    let open: (PanelTab) -> Void
 
     @Environment(AppModel.self) private var app
 
@@ -17,17 +17,15 @@ struct PlayerOptions: View {
                     QualityBadge(stream: stream)
                 }
                 Spacer()
-                toggle(.lyrics, icon: .lyrics, label: "Lyrics")
-                toggle(.upNext, icon: .queue, label: "Up next")
+                opener(.lyrics, icon: .lyrics, label: "Lyrics")
+                opener(.upNext, icon: .queue, label: "Up next")
             }
         }
     }
 
-    private func toggle(_ tab: PanelTab, icon: Icon, label: String) -> some View {
-        IconButton(icon: icon, size: 44, iconSize: 22, active: panel == tab) {
-            panel = panel == tab ? nil : tab
-        }
-        .accessibilityLabel(label)
+    private func opener(_ tab: PanelTab, icon: Icon, label: String) -> some View {
+        IconButton(icon: icon, size: 44, iconSize: 22) { open(tab) }
+            .accessibilityLabel(label)
     }
 }
 

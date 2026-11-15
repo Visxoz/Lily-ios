@@ -3,10 +3,11 @@ import YTMCore
 
 /// The song's title, which leads to its album, over its artists, which lead
 /// to the first of them, with the like and dislike buttons beside them, as
-/// the player bar's left side.
+/// the player bar's left side. Compact, beside play and next, it leaves the
+/// buttons to the artwork page, so the title has room.
 struct TrackTitle: View {
     let track: Track
-    /// Small beside the artwork above the panel; large under the artwork.
+    /// Small in the row above the panel; large under the artwork.
     let compact: Bool
 
     @Environment(AppModel.self) private var app
@@ -33,7 +34,9 @@ struct TrackTitle: View {
             }
             .buttonStyle(PressScale(scale: 0.98))
             .frame(maxWidth: .infinity, alignment: .leading)
-            RatingButtons(track: track)
+            if !compact {
+                RatingButtons(track: track)
+            }
         }
     }
 }

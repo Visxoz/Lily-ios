@@ -7,10 +7,12 @@ enum PanelTab: Int {
 
 /// ytm-native's right-hand panel (`panel/side-panel.slint`) inside Now
 /// Playing: the Up next and Lyrics chips with the close button, over the
-/// queue or the lyrics, which fade out above the seek bar rather than end in
-/// a hard cut across the artwork's colour.
+/// queue or the lyrics, which fade out at the bottom of the screen rather
+/// than end in a hard cut across the artwork's colour.
 struct SidePanel: View {
     let tab: PanelTab
+    /// Whether the panel's page is the one on screen.
+    let isShown: Bool
     /// Shows another page, or with nil closes the panel.
     let show: (PanelTab?) -> Void
 
@@ -36,12 +38,27 @@ struct SidePanel: View {
             .padding(.trailing, NowPlayingScreen.padding - 8)
             Group {
                 switch tab {
-                case .upNext: UpNextPanel()
-                case .lyrics: LyricsPanel()
+                case .upNext:
+                    UpNextPanel(isShown: isShown) { show(nil) }
+                case .lyrics:
+                    // Only while on screen, as the player loads lyrics then
+                    // and they follow the song many times a second.
+                    if isShown {
+                        LyricsPanel { show(nil) }
+                    } else {
+                        Color.clear
+                    }
                 }
             }
             .mask(Self.fade)
         }
         .frame(maxHeight: .infinity)
     }
+}
+
+/// Whether letting go of a list pulled well down past its top asks for the
+/// panel to close, as a swipe down on the rest of it does; the list and the
+/// page share the swipe's direction, so the list would only bounce.
+func pulledPastTop(_ old: ScrollPhase, _ new: ScrollPhase, _ geometry: ScrollGeometry) -> Bool {
+    old == .interacting && new != .interacting && geometry.contentOffset.y + geometry.contentInsets.top < -60
 }

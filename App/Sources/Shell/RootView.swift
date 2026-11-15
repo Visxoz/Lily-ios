@@ -35,7 +35,13 @@ struct RootView: View {
                 TabRoot(tab: .search, transition: transition) { SearchScreen() }
             }
         }
-        .sheet(item: $app.sheet) { sheet in
+        .sheet(item: presented { $0 != .nowPlaying }) { sheet in
+            SheetContent(sheet: sheet, transition: transition)
+        }
+        // Full screen rather than a sheet, so a swipe down is the zoom's own
+        // close, shrinking into the mini player under the finger, not the
+        // sheet sliding away and then zooming once let go.
+        .fullScreenCover(item: presented { $0 == .nowPlaying }) { sheet in
             SheetContent(sheet: sheet, transition: transition)
         }
         .environment(\.theme, app.theme)
@@ -45,6 +51,15 @@ struct RootView: View {
         .task { await app.followTheme() }
         .task(id: app.player.current?.thumbnail) { await app.followArtwork(of: app.player.current?.thumbnail) }
         .onChange(of: app.player.libraryRevision) { app.libraryChanged() }
+    }
+
+    /// `app.sheet` while it is one `shows` takes, which a dismissal clears.
+    private func presented(_ shows: @escaping (AppSheet) -> Bool) -> Binding<AppSheet?> {
+        Binding {
+            app.sheet.flatMap { shows($0) ? $0 : nil }
+        } set: { sheet in
+            if sheet == nil, let current = app.sheet, shows(current) { app.sheet = nil }
+        }
     }
 }
 

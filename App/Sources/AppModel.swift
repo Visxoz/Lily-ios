@@ -52,6 +52,9 @@ final class AppModel {
         // binding back, so it would reopen with the next Now Playing.
         didSet { if sheet != .nowPlaying, nowPlayingPicker != nil { nowPlayingPicker = nil } }
     }
+    /// Now Playing is on screen or still zooming away, while the zoom shrinks
+    /// the screen behind it and pages fill past its edges (`PastEdges`).
+    var nowPlayingShown = false
     /// The playlist picker opened from Now Playing, shown over it rather than
     /// in its place, so Now Playing and its open panel stay.
     var nowPlayingPicker: Track?
