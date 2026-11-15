@@ -65,9 +65,10 @@ extension PlayerController {
         store.save(snapshot, to: .session)
     }
 
-    /// Shows the last launch's song, paused, ready to resume where it was.
-    func restoreSession() async {
-        guard let session = await SessionSnapshot.load(from: store), current == nil else { return }
+    /// Shows the last launch's song, paused, ready to resume where it was,
+    /// and returns it.
+    func restoreSession() async -> Track? {
+        guard let session = await SessionSnapshot.load(from: store), current == nil else { return nil }
         let track = session.queue[session.index]
         replaceQueue(with: session.queue, start: session.index, shuffle: false)
         queue.markRecommended(session.recommended)
@@ -78,9 +79,21 @@ extension PlayerController {
         duration = playback.duration
         nowPlaying?.show(track, duration: duration)
         publishPlayback()
-        loadRating(of: track.id)
-        // So the launch's first play starts without waiting on YouTube. Not
-        // warmed: the play fetches the start itself.
-        resolveAhead(track, warming: false)
+        return track
+    }
+
+    /// The launch's network work: Premium's player script, and the restored
+    /// song's rating and stream while it is still the song shown. The rating
+    /// only while none has been set or loaded since `rating`, the rating
+    /// generation at restore.
+    func warmUp(_ restored: Track?, rating: UInt64) {
+        preparePremium()
+        guard let restored, current?.id == restored.id else { return }
+        if ratingGeneration == rating { loadRating(of: restored.id) }
+        // So the launch's first play starts without waiting on YouTube,
+        // unless a play is already fetching or playing it. Not warmed: the
+        // play fetches the start itself.
+        guard isStopped else { return }
+        resolveAhead(restored, warming: false)
     }
 }

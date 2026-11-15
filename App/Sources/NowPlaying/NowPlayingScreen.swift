@@ -100,29 +100,19 @@ struct NowPlayingScreen: View {
 /// past its top needs.
 // shortcut: relies on SwiftUI's ScrollView being a UIScrollView; drop it once SwiftUI can turn the bounce off.
 private struct PagerBounceOff: UIViewRepresentable {
-    func makeUIView(context: Context) -> Probe { Probe() }
+    func makeUIView(context: Context) -> Probe {
+        let probe = Probe()
+        // Behind both pages, so it must never take a touch meant for them.
+        probe.isUserInteractionEnabled = false
+        return probe
+    }
 
     // The work is done in `didMoveToWindow`, once the probe is in the pager.
     func updateUIView(_ probe: Probe, context: Context) {}
 
     final class Probe: UIView {
-        // Behind both pages, so it must never take a touch meant for them.
-        override init(frame: CGRect) {
-            super.init(frame: frame)
-            isUserInteractionEnabled = false
-        }
-
-        required init?(coder: NSCoder) {
-            super.init(coder: coder)
-            isUserInteractionEnabled = false
-        }
-
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            apply()
-        }
-
-        func apply() {
             var view = superview
             while let current = view, !(current is UIScrollView) { view = current.superview }
             (view as? UIScrollView)?.bounces = false

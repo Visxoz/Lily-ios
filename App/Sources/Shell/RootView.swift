@@ -47,7 +47,6 @@ struct RootView: View {
         .environment(\.theme, app.theme)
         .preferredColorScheme(app.theme.colorScheme)
         .tint(app.theme.accent)
-        .task { await app.start() }
         .task { await app.followTheme() }
         .task(id: app.player.current?.thumbnail) { await app.followArtwork(of: app.player.current?.thumbnail) }
         .onChange(of: app.player.libraryRevision) { app.libraryChanged() }

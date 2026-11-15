@@ -9,11 +9,6 @@ import YTMAudio
 /// for, what it hands the engine, and what it records, in ytm-native's terms.
 @MainActor
 struct PlayerControllerTests {
-    private func started(_ rig: Rig = Rig()) async -> Rig {
-        await rig.player.start()
-        return rig
-    }
-
     @Test func playsAnAlbumGaplesslyRecordingEachPlayOnce() async throws {
         let rig = await started()
         let album = [song("a", album: "x", number: 1), song("b", album: "x", number: 2), song("c", album: "x", number: 3)]

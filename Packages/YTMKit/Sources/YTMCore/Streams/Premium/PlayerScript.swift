@@ -111,16 +111,15 @@ actor PlayerScripts {
         if backingOff {
             throw YTMError.playerUnprepared
         }
-        if loading == nil { refresh(store: store) }
-        guard let loading else { throw YTMError(.unplayable, "YouTube's player couldn't be prepared.") }
-        return try await loading.value
+        return try await (loading ?? refresh(store: store)).value
     }
 
     /// Starts the load on the actor, which records its outcome for every
     /// caller. The task can't run before `loading` is set, as the actor is
     /// busy until this returns.
-    private func refresh(store: FileStore) {
-        loading = Task {
+    @discardableResult
+    private func refresh(store: FileStore) -> Task<PlayerScript, any Error> {
+        let task = Task {
             defer { loading = nil }
             do {
                 let script = try await PlayerScript.load(store: store)
@@ -133,6 +132,8 @@ actor PlayerScripts {
                 throw error
             }
         }
+        loading = task
+        return task
     }
 }
 

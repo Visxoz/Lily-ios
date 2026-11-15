@@ -33,11 +33,13 @@ struct SectionRows: View {
                 CardGrid(cards: cards.cards, width: width)
             case .chips where width > 0:
                 GenreGrid(cards: cards.cards, width: width)
+            case .speedDial where width > 0:
+                SpeedDial(cards: cards.cards, width: width)
             case .top:
                 if let card = cards.cards.first {
                     TopResultCard(card: card)
                 }
-            case .grid, .chips:
+            case .grid, .chips, .speedDial:
                 // Until the page's width is measured, so no card is sized to nothing.
                 EmptyView()
             }

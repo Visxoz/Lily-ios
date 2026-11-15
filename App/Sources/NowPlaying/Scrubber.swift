@@ -19,13 +19,15 @@ struct Scrubber: View {
     var body: some View {
         let player = app.player
         let length = player.duration
+        let total = Formatting.duration(Int(length))
         TimelineView(.animation(minimumInterval: 0.25, paused: !player.isPlaying || scrubbing != nil)) { _ in
             let position = scrubbing.map { $0 * length } ?? (player.isPlaying ? nil : sought) ?? player.currentTime
+            let played = Formatting.duration(Int(position))
             VStack(spacing: 0) {
                 BarSlider(
                     value: length > 0 ? position / length : 0,
                     buffered: player.bufferedFraction,
-                    valueText: "\(Formatting.duration(Int(position))) of \(Formatting.duration(Int(length)))",
+                    valueText: "\(played) of \(total)",
                     changed: { scrubbing = $0 }
                 ) { fraction in
                     player.seek(to: fraction * length)
@@ -34,9 +36,9 @@ struct Scrubber: View {
                 .disabled(length <= 0)
                 .accessibilityLabel("Position")
                 HStack {
-                    Text(Formatting.duration(Int(position)))
+                    Text(played)
                     Spacer()
-                    Text(Formatting.duration(Int(length)))
+                    Text(total)
                 }
                 .font(.system(size: 12).monospacedDigit())
                 .foregroundStyle(theme.textSecondary)

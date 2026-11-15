@@ -7,10 +7,29 @@ import Foundation
 enum HomeFeed {
     /// Requests made for one page of the feed before giving up.
     static let attempts = 4
-    /// Pages fetched after the first, as YouTube Music loads while scrolling.
-    static let continuations = 2
+    /// Pages fetched at most after the first; the whole feed is five or six,
+    /// and the shelves Home keeps come from any of them.
+    static let continuations = 8
     /// Longest list shelf shown, such as Quick picks.
     static let listLimit = 10
+    /// The web feed's Listen again, which YouTube's phone apps show as
+    /// Speed dial: theirs leads to the same page, and the web has no other.
+    static let speedDialId = "FEmusic_listen_again"
+    /// The title it shows under, as on YouTube's phone apps.
+    static let speedDialTitle = "Speed dial"
+    /// Its titles, for the feed as usually sent, whose title leads nowhere.
+    /// The feed is always asked for in English (`InnerTube.language`).
+    private static let speedDialTitles: Set<String> = ["Listen again", speedDialTitle]
+    /// The shelves Home shows, in this order, as ytm-native's `SHELVES`:
+    /// those made from the account's own listening. The rest, such as
+    /// charts, community playlists, new releases and recaps, are left out.
+    static let shelfOrder = [
+        speedDialTitle, "Quick picks", "Forgotten favorites", "Trending songs for you", "Mixed for you",
+        "Fresh finds, old favorites",
+    ]
+    /// Songs played lately that lead Speed dial, which YouTube fills with
+    /// older favourites and seldom the latest plays.
+    static let recentPlays = 10
     /// The shelves the feed lists songs or tiles in: carousels, and the
     /// song lists and grids it mixes in among them.
     private static let shelfKinds: Set<String> = [
@@ -55,9 +74,104 @@ enum HomeFeed {
             case .tracks(var shelf)?:
                 shelf.tracks = Array(shelf.tracks.prefix(listLimit))
                 return .tracks(shelf)
-            case let section:
-                return section
+            case let section?:
+                return asSpeedDial(section)
+            case nil:
+                return nil
             }
         }
+    }
+
+    /// Listen again as Speed dial; any other section as it is.
+    private static func asSpeedDial(_ section: Section) -> Section {
+        guard case .cards(var shelf) = section, isSpeedDial(shelf), !shelf.cards.isEmpty else { return section }
+        shelf.title = speedDialTitle
+        shelf.layout = .speedDial
+        return .cards(shelf)
+    }
+
+    /// Listen again, by the page its title leads to, or else by its title.
+    private static func isSpeedDial(_ shelf: CardSection) -> Bool {
+        if case .browse(let id, _)? = shelf.more, id == speedDialId { return true }
+        return speedDialTitles.contains(shelf.title)
+    }
+
+    /// The shelves to show after `shown`, taken from `held`, the shelves read
+    /// but not yet shown, as ytm-native's `Feed::release`. YouTube orders
+    /// them differently on every load, so each in `shelfOrder` is held back
+    /// until every one above it has arrived: Home fills from the top down,
+    /// always in one order, and never moves what is already on screen. Once
+    /// the feed has ended (`done`), whatever of `shelfOrder` is left, and
+    /// nothing else; unless none of it came, as when YouTube renames them,
+    /// when the feed is kept whole rather than left empty. Songs from a list
+    /// shelf such as Quick picks play with a radio after them, as YouTube
+    /// Music does, rather than the shelf's ten on their own.
+    static func release(_ held: inout [Section], after shown: [Section], done: Bool) -> [Section] {
+        var out: [Section] = []
+        if done, shown.isEmpty, !held.contains(where: { shelfOrder.contains($0.title) }) {
+            out = held
+            held = []
+        }
+        for title in shelfOrder {
+            guard !(shown + out).contains(where: { $0.title == title }) else { continue }
+            if let index = held.firstIndex(where: { $0.title == title }) {
+                out.append(held.remove(at: index))
+            } else if !done {
+                break
+            }
+        }
+        if done { held = [] }
+        return out.map { section in
+            guard case .tracks(var shelf) = section else { return section }
+            shelf.mode = .radio
+            return .tracks(shelf)
+        }
+    }
+
+    /// Whether every shelf Home shows has arrived, after which nothing later in the feed can show.
+    static func isComplete(_ sections: [Section]) -> Bool {
+        shelfOrder.allSatisfy { title in sections.contains { $0.title == title } }
+    }
+
+    /// A whole feed, such as the saved one, as `release` shows it; one saved
+    /// by an earlier version has Listen again under that name.
+    static func arranged(_ sections: [Section]) -> [Section] {
+        var held = sections.map(asSpeedDial)
+        return release(&held, after: [], done: true)
+    }
+
+    /// Puts the latest of `recent`, songs played newest first, at the start
+    /// of Speed dial, keeping its length, or makes the shelf of them when
+    /// the feed has none, as ytm-native's `recent_first`.
+    static func recentFirst(_ sections: [Section], recent: [Track]) -> [Section] {
+        let fresh = recent.prefix(recentPlays).map { track in
+            Card(
+                kind: .song, id: track.id, title: track.title, subtitle: track.artistNames,
+                thumbnail: track.thumbnail.map { Thumbnail.resized($0, edge: Thumbnail.card) }, track: track
+            )
+        }
+        guard !fresh.isEmpty else { return sections }
+        var sections = sections
+        guard let index = sections.firstIndex(where: { if case .cards(let s) = $0 { s.layout == .speedDial } else { false } }),
+              case .cards(var shelf) = sections[index]
+        else {
+            sections.insert(.cards(CardSection(title: speedDialTitle, cards: fresh, layout: .speedDial)), at: 0)
+            return sections
+        }
+        let length = max(shelf.cards.count, fresh.count)
+        let ids = Set(fresh.map(\.id))
+        shelf.cards = Array((fresh + shelf.cards.filter { !ids.contains($0.id) }).prefix(length))
+        sections[index] = .cards(shelf)
+        return sections
+    }
+}
+
+extension Page {
+    /// Home with the latest of `recent`, songs played on this phone newest
+    /// first, leading Speed dial, as ytm-native shows it: applied as it
+    /// shows rather than as it loads, so a Home from the cache or the disk
+    /// leads with what played since too.
+    public func leadingWithRecentPlays(_ recent: [Track]) -> Page {
+        Page(header: header, sections: HomeFeed.recentFirst(sections, recent: recent), more: more)
     }
 }

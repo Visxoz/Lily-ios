@@ -13,6 +13,8 @@ struct StreamPrefetcher {
     struct Prefetched {
         let stream: ResolvedStream
         let resolvedAt: ContinuousClock.Instant
+        /// The prefetcher's `epoch` when it was asked for, so `store` can refuse one from before a `clear`.
+        let epoch: Int
     }
 
     private var streams: [String: Prefetched] = [:]
@@ -20,6 +22,9 @@ struct StreamPrefetcher {
     /// song started or queued meanwhile waits on its resolve rather than
     /// asking again.
     private var pending: [String: Task<ResolvedStream, any Error>] = [:]
+    /// Bumped by `clear`, so a stream resolved before it, for the old
+    /// quality or account, is never kept again.
+    private(set) var epoch = 0
 
     /// Whether a fresh stream for `id` is waiting.
     func has(_ id: String, at now: ContinuousClock.Instant = .now) -> Bool {
@@ -33,12 +38,15 @@ struct StreamPrefetcher {
 
     /// Takes the stream resolved ahead for `id`, if still fresh.
     mutating func take(_ id: String, at now: ContinuousClock.Instant = .now) -> Prefetched? {
-        streams.removeValue(forKey: id).flatMap { now - $0.resolvedAt < Self.freshFor ? $0 : nil }
+        defer { streams[id] = nil }
+        return kept(id, at: now)
     }
 
     /// Keeps a stream for `id`, dropping stale ones, such as those of songs
     /// skipped past. One handed back keeps the time it was first resolved.
+    /// One asked for before a `clear` is not kept.
     mutating func store(_ id: String, _ prefetched: Prefetched, at now: ContinuousClock.Instant = .now) {
+        guard prefetched.epoch == epoch else { return }
         streams = streams.filter { now - $0.value.resolvedAt < Self.freshFor }
         streams[id] = prefetched
     }
@@ -83,6 +91,7 @@ struct StreamPrefetcher {
     /// Drops them all, and cancels any still resolving, as after a quality
     /// change or a Premium retry.
     mutating func clear() {
+        epoch += 1
         streams.removeAll()
         for task in pending.values { task.cancel() }
         pending.removeAll()
@@ -115,8 +124,8 @@ extension PlayerController {
 
     /// Resolves `track`'s stream ahead and keeps it, unless one is waiting,
     /// which is warmed instead, or on its way, or `keep` says otherwise once
-    /// it lands. `warming` has
-    /// the engine fetch its start too while it is still next.
+    /// it lands. `warming` has the engine fetch its start too while it is
+    /// still next.
     func resolveAhead(
         _ track: Track, warming: Bool = true, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }
     ) {
@@ -135,7 +144,7 @@ extension PlayerController {
             switch result {
             case .success(let stream):
                 guard keep(self) else { return }
-                prefetcher.store(track.id, .init(stream: stream, resolvedAt: .now))
+                prefetcher.store(track.id, .init(stream: stream, resolvedAt: .now, epoch: prefetcher.epoch))
                 if warming { warm(track, stream) }
             case .failure(let error):
                 Logger.playback.debug("\(track.id, privacy: .public): could not resolve ahead: \(sentence(for: error), privacy: .public)")
@@ -151,17 +160,18 @@ extension PlayerController {
     /// queueing, leaves it running for the song to start from.
     func streamSource(for id: String, owning: Bool = true) -> @Sendable () async throws -> StreamPrefetcher.Prefetched {
         if let prefetched = prefetcher.take(id) { return { prefetched } }
+        let epoch = prefetcher.epoch
         if !owning, let pending = prefetcher.pendingTask(id) {
-            return { .init(stream: try await pending.value, resolvedAt: .now) }
+            return { .init(stream: try await pending.value, resolvedAt: .now, epoch: epoch) }
         }
         if let pending = prefetcher.takePending(id) {
             return {
                 let stream = try await withTaskCancellationHandler { try await pending.value } onCancel: { pending.cancel() }
-                return .init(stream: stream, resolvedAt: .now)
+                return .init(stream: stream, resolvedAt: .now, epoch: epoch)
             }
         }
         let resolve = resolver(for: id)
-        return { .init(stream: try await resolve(), resolvedAt: .now) }
+        return { .init(stream: try await resolve(), resolvedAt: .now, epoch: epoch) }
     }
 
     /// Has the engine fetch the start of a stream resolved ahead, as

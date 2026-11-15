@@ -26,8 +26,14 @@ final class PageModel {
     @ObservationIgnored private var generation = 0
     /// The account the page shown was loaded for.
     @ObservationIgnored private var shownFor: Int?
-    /// Whether the page shown is Home's saved feed, standing in while YouTube
-    /// is first asked, or for a feed it refused, which the next visit replaces.
+    /// The page shown as YouTube sent it, before Home's latest plays lead its
+    /// Speed dial, so its further steps, the cache and the saved feed keep
+    /// YouTube's, and a fresh page is told apart from it by what YouTube changed.
+    @ObservationIgnored private var source: Page?
+
+    /// Whether the page shown stands in for Home's feed until the next visit
+    /// replaces it: the saved feed or the charts, for a feed YouTube kept
+    /// refusing, or a feed cut short by a step that failed.
     @ObservationIgnored private var showsSaved = false
     /// When the page shown was put on screen, so Home loads afresh once older
     /// than the page cache keeps pages; one from the cache may be older still.
@@ -46,20 +52,18 @@ final class PageModel {
     }
 
     /// Loads the page when the screen shows, unless it already holds this
-    /// account's. The account's History is fetched afresh each visit, as
-    /// ytm-native does, keeping the songs shown meanwhile, and so is Home
-    /// while its saved feed stands in, or once its feed has aged past the
-    /// page cache's five minutes: the app stays alive for days, so a feed
-    /// loaded once would otherwise never change. Any other page loads afresh
-    /// once it has left the page cache (aged past five minutes, pushed out,
-    /// or forgotten after a library change), as ytm-native's `navigate`
-    /// checks the cache on every visit. `returning` is a return to the app
-    /// with the page on screen, which ytm-native never refetches it for, so
-    /// only Home's age counts then.
+    /// account's, as ytm-native's `navigate`. History loads afresh each visit,
+    /// keeping the songs shown meanwhile, Home while a stand-in shows, and any
+    /// page once `isStale`. What is kept leads with what played since, while
+    /// any reload is under way too.
     func appear(in app: AppModel, returning: Bool) async {
         guard app.accountGeneration > 0 else { return }
-        if shownFor == app.accountGeneration, route != .history, !showsSaved, !isStale(in: app, returning: returning) { return }
-        if shownFor != app.accountGeneration { phase = .loading }
+        if shownFor == app.accountGeneration {
+            relead(in: app)
+            if route != .history, !showsSaved, !isStale(in: app, returning: returning) { return }
+        } else {
+            clear()
+        }
         await load(in: app, cached: true)
     }
 
@@ -70,33 +74,37 @@ final class PageModel {
     }
 
     func retry(in app: AppModel) async {
-        phase = .loading
+        clear()
         await load(in: app, cached: false)
     }
 
     /// The next step of what the page still has to fetch, asked for while
     /// the page is on screen.
     func loadMore(in app: AppModel) async {
-        guard let page, page.more != nil, !loadingMore else { return }
+        guard let source, source.more != nil, !loadingMore else { return }
         let generation = generation
         let account = app.accountGeneration
         loadingMore = true
         defer { if generation == self.generation { loadingMore = false } }
-        guard let more = try? await app.fetchMore(of: page, for: route), isCurrent(generation, account, in: app) else { return }
-        show(more, for: app)
+        guard let step = try? await app.fetchMore(of: source, for: route), isCurrent(generation, account, in: app) else { return }
+        show(step.page, for: app, saved: !step.whole)
     }
 
     private func load(in app: AppModel, cached: Bool) async {
         generation += 1
         let generation = generation
         let account = app.accountGeneration
-        loadingMore = false
+        // No step of the page shown starts meanwhile, as it would land over
+        // the page this load brings. Cleared before what this load shows asks
+        // for its own next step.
+        loadingMore = true
+        defer { if generation == self.generation { loadingMore = false } }
         // Home's fresh feed and History's latest plays start from the top when
         // they differ from what was shown; the same page again, or any other
         // page loaded afresh on a visit, keeps the reader's place, as
         // ytm-native's `restore_scroll`.
         func present(_ page: Page, saved: Bool = false) {
-            if cached, let shown = self.page, route == .home || route == .history,
+            if cached, let shown = source, route == .home || route == .history,
                shown.sections != page.sections || shown.header != page.header {
                 replacements += 1
             }
@@ -106,35 +114,6 @@ final class PageModel {
             present(page)
             return
         }
-        // Signed in, Home asks for the feed once. Refused, the feed as it last
-        // loaded shows at once, and the retries behind it wait for the next
-        // visit, as ytm-native's `load_personal_home`. With nothing saved, the
-        // retries and then the charts follow below. With nothing shown yet, as
-        // at launch, the saved feed stands in for the spinner during that one
-        // request, and what it brings replaces it a moment later, as it does
-        // a feed aged past the page cache's time.
-        if route == .home, app.isSignedIn {
-            if page == nil, let saved = await app.savedHome() {
-                guard isCurrent(generation, account, in: app) else { return }
-                present(saved, saved: true)
-            }
-            do {
-                let page = try await app.fetchHomeFirstTry()
-                guard isCurrent(generation, account, in: app) else { return }
-                present(page)
-                return
-            } catch {
-                guard isCurrent(generation, account, in: app), !Task.isCancelled else { return }
-                if !showsSaved, let saved = await app.savedHome() {
-                    guard isCurrent(generation, account, in: app) else { return }
-                    present(saved, saved: true)
-                }
-                if showsSaved {
-                    app.refreshHome()
-                    return
-                }
-            }
-        }
         do {
             let page = try await app.fetchPage(route)
             guard isCurrent(generation, account, in: app) else { return }
@@ -142,12 +121,29 @@ final class PageModel {
         } catch {
             // A change of account cancels the last account's requests, whose
             // failure is no news: the page loads afresh for the new one.
-            guard isCurrent(generation, account, in: app), !Task.isCancelled else { return }
-            if self.page == nil {
+            guard isCurrent(generation, account, in: app) else { return }
+            // This load dropped any step of the page shown in flight, so the
+            // page carries on from where it was.
+            guard !Task.isCancelled else {
+                if self.page != nil { step += 1 }
+                return
+            }
+            // Signed in, Home's feed as it last loaded, or with none the
+            // charts, stands in only once every request for a fresh one has
+            // failed, and the next visit asks again, as ytm-native's
+            // `load_personal_home`. A feed on screen, as when pulled to
+            // refresh, stays instead.
+            if route == .home, self.page == nil, let standIn = await app.homeStandIn() {
+                guard isCurrent(generation, account, in: app) else { return }
+                present(standIn, saved: true)
+            } else if self.page == nil {
                 phase = .failed(sentence(for: error))
             } else {
-                // What was shown stays.
+                // What was shown stays, led with what played since, and
+                // carries on from where it was.
+                relead(in: app)
                 app.showToast(sentence(for: error))
+                step += 1
             }
         }
     }
@@ -158,18 +154,41 @@ final class PageModel {
         generation == self.generation && account == app.accountGeneration
     }
 
-    /// Home's feed is older than the page cache keeps pages (one shown from the
-    /// cache may be older still); any other page is no longer in the cache, as
-    /// ytm-native's `navigate` refetches a page aged out or forgotten, though
-    /// not on a return to the app.
+    /// Home is older than the page cache keeps pages, as the app stays alive
+    /// for days and a feed loaded once would otherwise never change; any other
+    /// page has left the cache, unless `returning` to the app with it on
+    /// screen, which ytm-native never refetches for.
     private func isStale(in app: AppModel, returning: Bool) -> Bool {
         guard route == .home else { return !returning && app.cachedPage(route) == nil }
         guard let shownAt else { return false }
         return shownAt.duration(to: .now) >= AppModel.pageCacheFor
     }
 
+    /// Back to the spinner, with no page and so no saved feed shown.
+    private func clear() {
+        phase = .loading
+        source = nil
+        showsSaved = false
+    }
+
+    /// Leads the kept page with what played since it was put on screen. Not
+    /// a new feed, so the reader's place stays.
+    private func relead(in app: AppModel) {
+        guard let source, let shown = page else { return }
+        let latest = onScreen(source, in: app)
+        if latest != shown { phase = .loaded(latest) }
+    }
+
+    /// `page` as it shows: signed in, Home with the songs played on this
+    /// phone lately leading its Speed dial, as YouTube's seldom has them.
+    private func onScreen(_ page: Page, in app: AppModel) -> Page {
+        guard route == .home, app.isSignedIn else { return page }
+        return page.leadingWithRecentPlays(app.history.history.tracks)
+    }
+
     private func show(_ page: Page, for app: AppModel, saved: Bool = false) {
-        phase = .loaded(page)
+        source = page
+        phase = .loaded(onScreen(page, in: app))
         shownFor = app.accountGeneration
         shownAt = .now
         showsSaved = saved

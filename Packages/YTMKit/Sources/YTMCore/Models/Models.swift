@@ -125,6 +125,8 @@ public enum CardLayout: String, Codable, Hashable, Sendable {
     case carousel, grid, chips
     /// One large card for the best search match.
     case top
+    /// YouTube Music's Speed dial: pages of three by three tiles.
+    case speedDial
 }
 
 public struct TrackSection: Codable, Hashable, Sendable {
@@ -232,8 +234,9 @@ public struct PageHeader: Codable, Hashable, Sendable {
 public enum Continuation: Codable, Hashable, Sendable {
     /// The rest of a long playlist's tracks.
     case tracks(token: String, sectionIndex: Int)
-    /// The Home feed's further shelves, then sections shown after them.
-    case shelves(token: String, pagesLeft: Int, trailing: [Section])
+    /// The Home feed's further shelves, with those read but held back
+    /// until the ones above them in `HomeFeed.shelfOrder` arrive.
+    case shelves(token: String, pagesLeft: Int, held: [Section])
 }
 
 public struct Page: Codable, Hashable, Sendable {

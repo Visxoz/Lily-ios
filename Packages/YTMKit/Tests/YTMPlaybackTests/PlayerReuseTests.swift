@@ -9,11 +9,6 @@ import YTMAudio
 /// and lyrics already on their way.
 @MainActor
 struct PlayerReuseTests {
-    private func started(_ rig: Rig = Rig()) async -> Rig {
-        await rig.player.start()
-        return rig
-    }
-
     @Test func aPlaylistCardStartsOnItsFirstBatchAndQueuesTheRest() async {
         let rig = await started()
         rig.music.set { $0.playlistBatches["PL"] = [songs("a", "b"), songs("c", "a"), songs("d")] }

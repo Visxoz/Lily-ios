@@ -317,3 +317,9 @@ final class ObservedChange: Sendable {
         await settle()
     }
 }
+
+/// A rig whose player has started, as at launch.
+@MainActor func started(_ rig: Rig = Rig()) async -> Rig {
+    await rig.player.start()
+    return rig
+}

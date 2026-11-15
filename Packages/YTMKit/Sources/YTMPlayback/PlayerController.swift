@@ -108,6 +108,8 @@ import YTMCore
     /// them at once. Failures are never kept.
     @ObservationIgnored var lyricsCache: [String: Lyrics?] = [:]
     static let lyricsCacheLimit = 32
+    /// Songs whose lyrics are being fetched ahead, so each is asked for once.
+    @ObservationIgnored var lyricsAhead: Set<String> = []
     /// Bumped as the playing song changes or is rated, so a rating fetched
     /// before then is not shown.
     @ObservationIgnored var ratingGeneration: UInt64 = 0
@@ -185,10 +187,12 @@ import YTMCore
 
     /// Readies the player at launch, as ytm-native's `App::start`: reads the
     /// settings and history, puts the settings into effect and follows their
-    /// changes from then on, prepares the Premium path, and shows the last
-    /// launch's song, paused, ready to resume where it was. Later calls do
-    /// nothing.
-    public func start() async {
+    /// changes from then on, and shows the last launch's song at once,
+    /// paused, ready to resume where it was. Its network work, the Premium
+    /// path and the song's rating and stream, waits until `launchLoad`
+    /// returns, so it doesn't compete with what the launch is waiting on.
+    /// Later calls do nothing.
+    public func start(after launchLoad: @escaping @Sendable () async -> Void = {}) async {
         guard !hasStarted else { return }
         hasStarted = true
         await settings.load()
@@ -198,8 +202,12 @@ import YTMCore
         premiumStatus = chooser.status
         apply(settings.value)
         followSettings()
-        preparePremium()
-        await restoreSession()
+        let restored = await restoreSession()
+        let rating = ratingGeneration
+        Task { [weak self] in
+            await launchLoad()
+            self?.warmUp(restored, rating: rating)
+        }
     }
 
     // MARK: Engine events

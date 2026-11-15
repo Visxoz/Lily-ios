@@ -105,6 +105,125 @@ private func carousel(_ title: String, _ items: [String]) -> String {
         #expect(!HomeFeed.isRefusal(CancellationError()))
         #expect(HomeFeed.retryDelay(after: 2) == .milliseconds(600))
     }
+
+    @Test func showsListenAgainAsSpeedDial() throws {
+        let listenAgain = #"{"musicCarouselShelfRenderer":{"header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Listen again","navigationEndpoint":{"browseEndpoint":{"browseId":"FEmusic_listen_again"}}}]}}},"contents":[\#(mixTile)]}}"#
+        let page = try json(#"{"continuationContents":{"sectionListContinuation":{"contents":[\#(listenAgain),\#(carousel("Mixed for you", [mixTile]))]}}}"#)
+        let sections = HomeFeed.nextPage(page).sections
+        guard case .cards(let dial) = sections[0], case .cards(let mixes) = sections[1] else {
+            Issue.record("expected two card shelves")
+            return
+        }
+        #expect(dial.title == "Speed dial" && dial.layout == .speedDial)
+        #expect(mixes.layout == .carousel)
+        let unlinked = try json(#"{"continuationContents":{"sectionListContinuation":{"contents":[\#(carousel("Listen again", [mixTile]))]}}}"#)
+        guard case .cards(let titled)? = HomeFeed.nextPage(unlinked).sections.first else {
+            Issue.record("expected a card shelf")
+            return
+        }
+        #expect(titled.layout == .speedDial, "known by its title when it leads nowhere, as the feed usually sends it")
+    }
+
+    private func shelf(_ title: String, _ ids: [String], layout: CardLayout = .carousel) -> Section {
+        .cards(CardSection(title: title, cards: ids.map { Card(kind: .album, id: $0, title: $0) }, layout: layout))
+    }
+
+    private func dial(_ ids: [String]) -> Section {
+        shelf(HomeFeed.speedDialTitle, ids, layout: .speedDial)
+    }
+
+    private func ids(_ section: Section) -> [String] {
+        switch section {
+        case .cards(let s): s.cards.map(\.id)
+        case .tracks(let s): s.tracks.map(\.id)
+        }
+    }
+
+    @Test func arrangesOwnShelvesInOneOrder() {
+        let quickPicks = Section.tracks(TrackSection(title: "Quick picks", tracks: [Track(id: "q", title: "q")], mode: .section))
+        let arranged = HomeFeed.arranged([
+            shelf("Today's biggest hits", ["h"]), quickPicks, shelf("Recaps", ["r"]), dial(["a"]), dial(["b"]),
+            shelf("Forgotten favorites", ["f"]), shelf("Browse moods & genres", ["g"], layout: .chips),
+        ])
+        #expect(arranged.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks", "Forgotten favorites"])
+        #expect(ids(arranged[0]) == ["a"], "the first of two with one title")
+        guard case .tracks(let picks) = arranged[1] else {
+            Issue.record("expected Quick picks as a track list")
+            return
+        }
+        #expect(picks.mode == .radio, "a Quick pick plays with a radio after it")
+
+        let older = HomeFeed.arranged([shelf("Quick picks", ["q"]), shelf("Listen again", ["l"])])
+        #expect(older.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks"], "a feed saved before Speed dial has it under its old name")
+        guard case .cards(let dial) = older[0] else {
+            Issue.record("expected Speed dial's tiles")
+            return
+        }
+        #expect(dial.layout == .speedDial)
+
+        let renamed = HomeFeed.arranged([shelf("Neu", ["n"]), shelf("Alt", ["o"])])
+        #expect(renamed.map(\.title) == ["Neu", "Alt"], "kept whole when nothing matches")
+    }
+
+    @Test func releasesShelvesFromTheTopDown() {
+        var held = [shelf("Forgotten favorites", ["f"]), shelf("Recaps", ["r"]), dial(["a"])]
+        var shown = HomeFeed.release(&held, after: [], done: false)
+        #expect(shown.map(\.title) == [HomeFeed.speedDialTitle], "Forgotten favorites waits for Quick picks")
+
+        held += [shelf("Mixed for you", ["m"]), shelf("Quick picks", ["q"]), dial(["b"])]
+        shown += HomeFeed.release(&held, after: shown, done: false)
+        #expect(
+            shown.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks", "Forgotten favorites"],
+            "Mixed for you waits for Trending songs for you, which may yet come"
+        )
+
+        shown += HomeFeed.release(&held, after: shown, done: true)
+        #expect(
+            shown.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks", "Forgotten favorites", "Mixed for you"],
+            "the rest once the feed ends, without the others"
+        )
+        #expect(ids(shown[0]) == ["a"], "the first of two with one title")
+        #expect(held.isEmpty)
+    }
+
+    @Test func isCompleteOnceEveryShelfHasArrived() {
+        let all = HomeFeed.shelfOrder.map { $0 == HomeFeed.speedDialTitle ? dial(["a"]) : shelf($0, ["x"]) }
+        #expect(HomeFeed.isComplete(all))
+        #expect(!HomeFeed.isComplete(Array(all.dropLast())), "a shelf may yet come")
+        #expect(!HomeFeed.isComplete(Array(all.dropFirst())), "Speed dial may yet come")
+    }
+
+    @Test func keepsARenamedFeedWholeOnceItEnds() {
+        var held = [shelf("Neu", ["n"]), shelf("Alt", ["o"])]
+        #expect(HomeFeed.release(&held, after: [], done: false).isEmpty, "nothing yet: Speed dial may come")
+        #expect(HomeFeed.release(&held, after: [], done: true).map(\.title) == ["Neu", "Alt"])
+    }
+
+    @Test func speedDialLeadsWithRecentPlays() throws {
+        let recent = [
+            Track(id: "c", title: "c", thumbnail: "https://lh3.googleusercontent.com/c=w120-h120-l90-rj"),
+            Track(id: "d", title: "d"),
+        ]
+        let sections = HomeFeed.recentFirst([dial(["a", "b", "c"]), shelf("Mixed for you", ["m"])], recent: recent)
+        #expect(ids(sections[0]) == ["c", "d", "a"], "newest first, length kept")
+        #expect(ids(sections[1]) == ["m"])
+        guard case .cards(let tiles) = sections[0] else {
+            Issue.record("expected Speed dial's tiles")
+            return
+        }
+        #expect(tiles.cards[0].kind == .song && tiles.cards[0].track?.id == "c")
+        #expect(tiles.cards[0].thumbnail == Thumbnail.resized("https://lh3.googleusercontent.com/c=w120-h120-l90-rj", edge: Thumbnail.card))
+
+        let made = HomeFeed.recentFirst([shelf("Quick picks", ["q"])], recent: recent)
+        #expect(made.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks"], "made when the feed has none")
+        #expect(ids(made[0]) == ["c", "d"])
+
+        let none = HomeFeed.recentFirst([dial(["a"])], recent: [])
+        #expect(ids(none[0]) == ["a"], "unchanged with nothing played")
+
+        let many = (0..<15).map { Track(id: "p\($0)", title: "") }
+        #expect(ids(HomeFeed.recentFirst([dial(["a"])], recent: many)[0]) == (0..<HomeFeed.recentPlays).map { "p\($0)" })
+    }
 }
 
 @Suite struct ExploreTests {

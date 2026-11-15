@@ -83,10 +83,8 @@ final class AppModel {
     @ObservationIgnored private let search = TabNavigation()
     @ObservationIgnored var pageCache: [Route: CachedPage] = [:]
     /// The page requests in flight, shared by every screen asking for the
-    /// same route, and Home's first try apart, as `refreshHome` wants the
-    /// retries that joining it would lose.
+    /// same route.
     @ObservationIgnored var pageLoads: [Route: Task<Page, any Error>] = [:]
-    @ObservationIgnored var homeFirstTryLoad: Task<Page, any Error>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// The wait for Last.fm access, which outlives Settings, as ytm-native's.
     private var lastFMWait: Task<Void, Never>?
@@ -107,12 +105,29 @@ final class AppModel {
     }
 
     /// Reads the stored sign-in, which is all pages wait for, then restores
-    /// the last session and keeps the account's details current.
+    /// the last session and keeps the account's details current. Signed in,
+    /// Home's feed is asked for at once, rather than once its page's task
+    /// restarts, and the launch's other requests wait until it has arrived
+    /// (two seconds at most), so they don't slow the one being waited on.
     func start() async {
         isSignedIn = await api.auth.isSignedIn
+        // Before the request, which belongs to the generation it starts in.
         accountGeneration += 1
-        await player.start()
+        let home = isSignedIn ? Task { try await fetchPage(.home) } : nil
+        let homeSettled = Task { await Self.settled(home, within: .seconds(2)) }
+        await player.start { await homeSettled.value }
+        await homeSettled.value
         await refreshAccount()
+    }
+
+    /// Returns once `load` has finished, or after `limit`, whichever is first.
+    /// Not a task group, which would wait out `load` all the same.
+    private nonisolated static func settled(_ load: Task<Page, any Error>?, within limit: Duration) async {
+        guard let load else { return }
+        let (done, finish) = AsyncStream.makeStream(of: Void.self)
+        Task { _ = try? await load.value; finish.finish() }
+        Task { try? await Task.sleep(for: limit); finish.finish() }
+        for await _ in done {}
     }
 
     /// Keeps `theme` in step with the look, the accent and the artwork, only
@@ -187,8 +202,6 @@ final class AppModel {
         // A request the last account made must not be shared with the next.
         pageLoads.values.forEach { $0.cancel() }
         pageLoads.removeAll()
-        homeFirstTryLoad?.cancel()
-        homeFirstTryLoad = nil
         accountGeneration += 1
         if !quietly {
             sheet = nil

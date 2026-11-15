@@ -111,13 +111,12 @@ extension PlayerController {
     /// Fetches the lyrics of the song coming next ahead, only while lyrics
     /// are on screen, so the panel fills as the song changes.
     func prefetchLyrics(of id: String) {
-        guard showsLyrics, id != current?.id, lyricsCache[id] == nil else { return }
-        // shortcut: asks again for a song whose fetch is still running, as on a quick skip or a
-        // queue edit; keep the task by ID if the duplicates show up.
+        guard showsLyrics, id != current?.id, lyricsCache[id] == nil, lyricsAhead.insert(id).inserted else { return }
         let music = music
         Task { [weak self] in
             // Not `try?`, which would fold a song without lyrics into a failure.
             let result = await Result { try await music.lyrics(videoId: id) }
+            self?.lyricsAhead.remove(id)
             if case .success(let found) = result { self?.remember(found, for: id) }
         }
     }

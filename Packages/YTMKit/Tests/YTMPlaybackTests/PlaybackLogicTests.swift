@@ -176,12 +176,22 @@ struct PrefetcherTests {
     @Test func keepsStreamsForAnHour() {
         var prefetcher = StreamPrefetcher()
         let now = ContinuousClock.now
-        prefetcher.store("a", .init(stream: FakeMusic.stream("a"), resolvedAt: now), at: now)
+        prefetcher.store("a", .init(stream: FakeMusic.stream("a"), resolvedAt: now, epoch: prefetcher.epoch), at: now)
         #expect(prefetcher.has("a", at: now + .seconds(3599)))
         #expect(!prefetcher.has("a", at: now + .seconds(3600)), "too old to trust")
         let result13 = prefetcher.take("a", at: now + .seconds(3600))
         #expect(result13 == nil)
         #expect(!prefetcher.has("a", at: now), "taken, even when stale")
+    }
+
+    @Test func refusesAStreamAskedForBeforeAClear() {
+        var prefetcher = StreamPrefetcher()
+        let asked = prefetcher.epoch
+        prefetcher.clear()
+        prefetcher.store("a", .init(stream: FakeMusic.stream("a"), resolvedAt: .now, epoch: asked))
+        #expect(!prefetcher.has("a"), "resolved for the old quality or account")
+        prefetcher.store("a", .init(stream: FakeMusic.stream("a"), resolvedAt: .now, epoch: prefetcher.epoch))
+        #expect(prefetcher.has("a"))
     }
 
     @Test func dropsAResolveCleared() async {

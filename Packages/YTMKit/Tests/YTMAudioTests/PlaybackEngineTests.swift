@@ -326,7 +326,7 @@ private final class StallingByteSource: ByteSource {
     private let stalling: String
     private let after: Int
     /// The held request is kept open here rather than left to end.
-    private let state = Mutex<(ranges: [Range<Int64>], held: [AsyncThrowingStream<Data, any Error>.Continuation])>(([], []))
+    private let state = Mutex<(ranges: [Range<Int64>], held: AsyncThrowingStream<Data, any Error>.Continuation?)>(([], nil))
 
     init(files: [String: Data], stalling: String, after: Int) {
         served = MemoryByteSource(files: files)
@@ -345,7 +345,7 @@ private final class StallingByteSource: ByteSource {
         guard first, let file = served.files[stalling] else { return served.bytes(of: url, headers: headers, range: range) }
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: Data.self)
         continuation.yield(file.subdata(in: Int(range.lowerBound)..<after))
-        state.withLock { $0.held.append(continuation) }
+        state.withLock { $0.held = continuation }
         return stream
     }
 }

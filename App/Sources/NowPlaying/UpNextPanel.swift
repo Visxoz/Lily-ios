@@ -93,11 +93,9 @@ struct UpNextPanel: View {
             .onAppear {
                 if let currentId { proxy.scrollTo(currentId, anchor: .top) }
             }
-            .onChange(of: currentId) {
-                if !isShown, let currentId { proxy.scrollTo(currentId, anchor: .top) }
-            }
-            .onChange(of: isShown) {
-                if !isShown, let currentId { proxy.scrollTo(currentId, anchor: .top) }
+            // Off screen, back to the song playing whenever it changes or the panel goes.
+            .onChange(of: isShown ? nil : currentId) { _, id in
+                if let id { proxy.scrollTo(id, anchor: .top) }
             }
         }
     }

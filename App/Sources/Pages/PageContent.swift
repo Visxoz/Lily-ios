@@ -25,7 +25,7 @@ struct PageContent: View {
     /// colour, as ytm-native's accent cache has it. Keyed by URL alone, as
     /// the size isn't known until the header is measured and doesn't change
     /// the colour.
-    @MainActor private static var tints: [String: RGB] = [:]
+    private static var tints: [String: RGB] = [:]
 
     /// The scroll view's width and the bar's height over it.
     private nonisolated struct Frame: Equatable {
@@ -70,9 +70,13 @@ struct PageContent: View {
                     .modifier(PastEdges())
             }
         }
-        // Clipped as before, but past the sides while the page's colours are.
+        // The mask stands in for the scroll view's own clip, so it can run past
+        // the sides (`PastEdges`). It overhangs the top and bottom too, as the
+        // safe area it ignores eases in on a tab's first page, briefly clipping
+        // the tint below the bar and leaving the bare panel above it; not while
+        // Now Playing shrinks the screen, whose edges still clip.
         .scrollClipDisabled()
-        .mask { Rectangle().modifier(PastEdges()).ignoresSafeArea() }
+        .mask { PastEdgesMask() }
         .scrollPosition($position)
         .onChange(of: model?.replacements) { position.scrollTo(edge: .top) }
         .background { theme.panel.modifier(PastEdges()).ignoresSafeArea() }
@@ -108,7 +112,7 @@ struct PageContent: View {
             }
             if let colours = await ArtworkColours.of(url: tintSource.url, pixelEdge: tintSource.pixels) {
                 artworkTint = colours.background
-                // shortcut: drops everything once full; upgrade to LRU only if revisits show the fade again.
+                // Emptied once full rather than evicted one by one: past 64 pages, a revisit only fades in again.
                 if Self.tints.count >= 64 { Self.tints.removeAll() }
                 Self.tints[tintSource.url] = colours.background
             }
@@ -146,7 +150,7 @@ struct PageContent: View {
             switch section {
             case .tracks(let s) where !s.numbered:
                 tracks += s.tracks.compactMap(\.thumbnail)
-            case .cards(let s) where s.layout == .carousel || s.layout == .grid:
+            case .cards(let s) where [.carousel, .grid, .speedDial].contains(s.layout):
                 cards += s.cards.compactMap(\.thumbnail)
             case .tracks, .cards:
                 break
@@ -159,7 +163,7 @@ struct PageContent: View {
     private var tintSource: TintSource? {
         guard let header = page.header, let url = header.thumbnail else { return nil }
         let edge = PageHeaderView.artEdge(header, topInset: frame.top)
-        return TintSource(url: url, pixels: Int((edge * displayScale).rounded(.up)))
+        return TintSource(url: url, pixels: ArtworkImage.pixels(edge: edge, scale: displayScale))
     }
 }
 
@@ -192,7 +196,7 @@ private struct Greeting: View {
 /// than on the bare panel.
 struct PageTint: View {
     /// Further than a pull can open.
-    private static let overscroll: CGFloat = 1000
+    static let overscroll: CGFloat = 1000
 
     let colour: RGB?
     let top: CGFloat
@@ -223,8 +227,26 @@ private struct PastEdges: ViewModifier {
 
     @Environment(AppModel.self) private var app
 
+    /// Whether Now Playing is opening, showing or closing.
+    static func shown(in app: AppModel) -> Bool {
+        app.sheet == .nowPlaying || app.nowPlayingShown
+    }
+
     func body(content: Content) -> some View {
-        content.padding(.horizontal, app.sheet == .nowPlaying || app.nowPlayingShown ? -Self.width : 0)
+        content.padding(.horizontal, Self.shown(in: app) ? -Self.width : 0)
+    }
+}
+
+/// The page's clip, a view of its own so Now Playing opening or closing
+/// redraws only it rather than the whole page.
+private struct PastEdgesMask: View {
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        Rectangle()
+            .padding(.vertical, PastEdges.shown(in: app) ? 0 : -PageTint.overscroll)
+            .modifier(PastEdges())
+            .ignoresSafeArea()
     }
 }
 
