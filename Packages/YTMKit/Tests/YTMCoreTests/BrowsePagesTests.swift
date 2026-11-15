@@ -205,24 +205,25 @@ private func carousel(_ title: String, _ items: [String]) -> String {
             Track(id: "d", title: "d"),
         ]
         let sections = HomeFeed.recentFirst([dial(["a", "b", "c"]), shelf("Mixed for you", ["m"])], recent: recent)
-        #expect(ids(sections[0]) == ["c", "d", "a"], "newest first, length kept")
+        #expect(ids(sections[0]) == ["d", "a", "b", "c"], "YouTube's picks all kept, one it has left in place")
         #expect(ids(sections[1]) == ["m"])
-        guard case .cards(let tiles) = sections[0] else {
+
+        let made = HomeFeed.recentFirst([shelf("Quick picks", ["q"])], recent: recent)
+        #expect(made.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks"], "made when the feed has none")
+        #expect(ids(made[0]) == ["c", "d"])
+        guard case .cards(let tiles) = made[0] else {
             Issue.record("expected Speed dial's tiles")
             return
         }
         #expect(tiles.cards[0].kind == .song && tiles.cards[0].track?.id == "c")
         #expect(tiles.cards[0].thumbnail == Thumbnail.resized("https://lh3.googleusercontent.com/c=w120-h120-l90-rj", edge: Thumbnail.card))
 
-        let made = HomeFeed.recentFirst([shelf("Quick picks", ["q"])], recent: recent)
-        #expect(made.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks"], "made when the feed has none")
-        #expect(ids(made[0]) == ["c", "d"])
-
         let none = HomeFeed.recentFirst([dial(["a"])], recent: [])
         #expect(ids(none[0]) == ["a"], "unchanged with nothing played")
 
         let many = (0..<15).map { Track(id: "p\($0)", title: "") }
-        #expect(ids(HomeFeed.recentFirst([dial(["a"])], recent: many)[0]) == (0..<HomeFeed.recentPlays).map { "p\($0)" })
+        #expect(ids(HomeFeed.recentFirst([dial(["a"])], recent: many)[0]) == ["p0", "p1", "p2", "a"], "only the latest few")
+        #expect(ids(HomeFeed.recentFirst([], recent: many)[0]).count == HomeFeed.recentShelf)
     }
 }
 

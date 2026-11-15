@@ -27,9 +27,11 @@ enum HomeFeed {
         speedDialTitle, "Quick picks", "Forgotten favorites", "Trending songs for you", "Mixed for you",
         "Fresh finds, old favorites",
     ]
-    /// Songs played lately that lead Speed dial, which YouTube fills with
-    /// older favourites and seldom the latest plays.
-    static let recentPlays = 10
+    /// The latest plays put before YouTube's Speed dial, which seldom has
+    /// them: few, so its own picks still fill most of the first page.
+    static let recentPlays = 3
+    /// Plays that make Speed dial when the feed has none: a first page beside the die.
+    static let recentShelf = 8
     /// The shelves the feed lists songs or tiles in: carousels, and the
     /// song lists and grids it mixes in among them.
     private static let shelfKinds: Set<String> = [
@@ -140,37 +142,41 @@ enum HomeFeed {
         return release(&held, after: [], done: true)
     }
 
-    /// Puts the latest of `recent`, songs played newest first, at the start
-    /// of Speed dial, keeping its length, or makes the shelf of them when
-    /// the feed has none, as ytm-native's `recent_first`.
+    /// Puts the latest `recentPlays` of `recent`, songs played newest first,
+    /// before Speed dial's own picks, which all stay, in YouTube's order; one
+    /// it already has stays where YouTube put it. With no Speed dial in the
+    /// feed, the shelf is made of the latest `recentShelf` instead.
     static func recentFirst(_ sections: [Section], recent: [Track]) -> [Section] {
-        let fresh = recent.prefix(recentPlays).map { track in
-            Card(
-                kind: .song, id: track.id, title: track.title, subtitle: track.artistNames,
-                thumbnail: track.thumbnail.map { Thumbnail.resized($0, edge: Thumbnail.card) }, track: track
-            )
-        }
-        guard !fresh.isEmpty else { return sections }
         var sections = sections
         guard let index = sections.firstIndex(where: { if case .cards(let s) = $0 { s.layout == .speedDial } else { false } }),
               case .cards(var shelf) = sections[index]
         else {
-            sections.insert(.cards(CardSection(title: speedDialTitle, cards: fresh, layout: .speedDial)), at: 0)
+            let cards = recent.prefix(recentShelf).map(card)
+            if !cards.isEmpty { sections.insert(.cards(CardSection(title: speedDialTitle, cards: cards, layout: .speedDial)), at: 0) }
             return sections
         }
-        let length = max(shelf.cards.count, fresh.count)
-        let ids = Set(fresh.map(\.id))
-        shelf.cards = Array((fresh + shelf.cards.filter { !ids.contains($0.id) }).prefix(length))
+        let picked = Set(shelf.cards.map(\.id))
+        let fresh = recent.prefix(recentPlays).filter { !picked.contains($0.id) }.map(card)
+        guard !fresh.isEmpty else { return sections }
+        shelf.cards = fresh + shelf.cards
         sections[index] = .cards(shelf)
         return sections
+    }
+
+    /// A song played, as a Speed dial tile.
+    private static func card(_ track: Track) -> Card {
+        Card(
+            kind: .song, id: track.id, title: track.title, subtitle: track.artistNames,
+            thumbnail: track.thumbnail.map { Thumbnail.resized($0, edge: Thumbnail.card) }, track: track
+        )
     }
 }
 
 extension Page {
-    /// Home with the latest of `recent`, songs played on this phone newest
-    /// first, leading Speed dial, as ytm-native shows it: applied as it
-    /// shows rather than as it loads, so a Home from the cache or the disk
-    /// leads with what played since too.
+    /// Home with the latest few of `recent`, songs played on this phone
+    /// newest first, before Speed dial's own picks (`HomeFeed.recentFirst`):
+    /// applied as it shows rather than as it loads, so a Home from the cache
+    /// or the disk leads with what played since too.
     public func leadingWithRecentPlays(_ recent: [Track]) -> Page {
         Page(header: header, sections: HomeFeed.recentFirst(sections, recent: recent), more: more)
     }
