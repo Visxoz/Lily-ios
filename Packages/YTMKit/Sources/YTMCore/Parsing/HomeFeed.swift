@@ -133,6 +133,18 @@ enum HomeFeed {
         return sections
     }
 
+    /// YouTube can send Trending songs for you as a copy of Quick picks, so a
+    /// track list drops songs an earlier one has, and goes if none are left.
+    static func withoutRepeats(_ sections: [Section]) -> [Section] {
+        var seen: Set<String> = []
+        return sections.compactMap { section in
+            guard case .tracks(var shelf) = section else { return section }
+            shelf.tracks.removeAll { seen.contains($0.id) }
+            seen.formUnion(shelf.tracks.map(\.id))
+            return shelf.tracks.isEmpty ? nil : .tracks(shelf)
+        }
+    }
+
     private static func card(_ track: Track) -> Card {
         Card(
             kind: .song, id: track.id, title: track.title, subtitle: track.artistNames,
@@ -143,8 +155,8 @@ enum HomeFeed {
 
 extension Page {
     /// Applied as Home shows rather than as it loads, so a Home from the cache
-    /// or the disk leads with what played since too.
+    /// or the disk leads with what played since too, and repeats no list's songs.
     public func leadingWithRecentPlays(_ recent: [Track]) -> Page {
-        Page(header: header, sections: HomeFeed.recentFirst(sections, recent: recent), more: more)
+        Page(header: header, sections: HomeFeed.recentFirst(HomeFeed.withoutRepeats(sections), recent: recent), more: more)
     }
 }

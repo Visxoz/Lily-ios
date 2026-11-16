@@ -224,6 +224,20 @@ private func carousel(_ title: String, _ items: [String]) -> String {
         #expect(ids(HomeFeed.recentFirst([dial(["a"])], recent: many)[0]) == ["p0", "p1", "p2", "a"], "only the latest few")
         #expect(ids(HomeFeed.recentFirst([], recent: many)[0]).count == HomeFeed.recentShelf)
     }
+
+    @Test func dropsAListRepeatingAnEarlierOne() {
+        func list(_ title: String, _ ids: [String]) -> Section {
+            .tracks(TrackSection(title: title, tracks: ids.map { Track(id: $0, title: $0) }, mode: .radio))
+        }
+        let copied = HomeFeed.withoutRepeats([
+            dial(["a"]), list("Quick picks", ["a", "q", "r"]), list("Trending songs for you", ["q", "r"]), shelf("Mixed for you", ["q"]),
+        ])
+        #expect(copied.map(\.title) == [HomeFeed.speedDialTitle, "Quick picks", "Mixed for you"], "a copy goes; cards are never compared")
+        #expect(ids(copied[1]) == ["a", "q", "r"])
+
+        let shared = HomeFeed.withoutRepeats([list("Quick picks", ["q", "r"]), list("Trending songs for you", ["r", "t"])])
+        #expect(ids(shared[1]) == ["t"], "only the songs already shown go")
+    }
 }
 
 @Suite struct ExploreTests {
