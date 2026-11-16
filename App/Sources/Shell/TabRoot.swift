@@ -20,15 +20,33 @@ struct TabRoot<Content: View>: View {
         @Bindable var navigation = app.navigation(for: tab)
         NavigationStack(path: $navigation.routes) {
             content
+                .modifier(MiniPlayerRoom(tab: tab))
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) { AccountButton() }
                 }
-                .navigationDestination(for: Route.self) { PageScreen(route: $0, app: app) }
+                .navigationDestination(for: Route.self) { route in
+                    PageScreen(route: route, app: app)
+                        .modifier(MiniPlayerRoom(tab: tab))
+                }
         }
         .overlay(alignment: .bottom) { ToastView() }
-        // Empty without a song, which leaves the pages their full height.
+        // Keeps the toast clear of the capsule; the pages keep their own room (`MiniPlayerRoom`).
         .safeAreaInset(edge: .bottom) {
             MiniPlayer(tab: tab, transition: transition)
+        }
+    }
+}
+
+/// The stack's inset doesn't reach the pages' scroll views, so each page keeps
+/// the mini player's room itself, or its last rows sit under it out of reach.
+private struct MiniPlayerRoom: ViewModifier {
+    let tab: AppTab
+
+    @Environment(AppModel.self) private var app
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: MiniPlayer.shown(on: tab, in: app) ? MiniPlayer.room : 0)
         }
     }
 }

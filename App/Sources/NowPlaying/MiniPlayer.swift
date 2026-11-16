@@ -7,6 +7,9 @@ struct MiniPlayer: View {
     private static let art: CGFloat = 44
     /// The tab bar's own margins, so the two line up.
     private static let margin: CGFloat = 20
+    private static let bottomGap: CGFloat = 8
+    /// The height it takes from the page, gap below included.
+    static let room = height + bottomGap
 
     /// Names it as the source Now Playing's zoom grows out of.
     let tab: AppTab
@@ -16,7 +19,7 @@ struct MiniPlayer: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        if let track = app.player.current, !(tab == .search && app.isSearching) {
+        if let track = app.player.current, Self.shown(on: tab, in: app) {
             HStack(spacing: 12) {
                 ArtworkView(url: track.thumbnail, size: Self.art, radius: 8)
                 VStack(alignment: .leading, spacing: 2) {
@@ -51,8 +54,12 @@ struct MiniPlayer: View {
             .accessibilityElement(children: .contain)
             .accessibilityAction(named: "Open Now Playing") { app.sheet = .nowPlaying }
             .padding(.horizontal, Self.margin)
-            .padding(.bottom, 8)
+            .padding(.bottom, Self.bottomGap)
         }
+    }
+
+    static func shown(on tab: AppTab, in app: AppModel) -> Bool {
+        app.player.current != nil && !(tab == .search && app.isSearching)
     }
 }
 
