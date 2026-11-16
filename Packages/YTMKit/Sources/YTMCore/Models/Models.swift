@@ -176,11 +176,11 @@ public enum Section: Codable, Hashable, Sendable {
     }
 
     /// Empty sections are not worth a row.
-    static func tracks(_ title: String, _ tracks: [Track], mode: QueueMode, numbered: Bool = false, more: Route? = nil) -> Section? {
+    public static func tracks(_ title: String, _ tracks: [Track], mode: QueueMode, numbered: Bool = false, more: Route? = nil) -> Section? {
         tracks.isEmpty ? nil : .tracks(TrackSection(title: title, tracks: tracks, mode: mode, numbered: numbered, more: more))
     }
 
-    static func cards(_ title: String, _ cards: [Card], layout: CardLayout, more: Route? = nil) -> Section? {
+    public static func cards(_ title: String, _ cards: [Card], layout: CardLayout, more: Route? = nil) -> Section? {
         cards.isEmpty ? nil : .cards(CardSection(title: title, cards: cards, layout: layout, more: more))
     }
 }
@@ -265,6 +265,8 @@ public enum Route: Codable, Hashable, Sendable {
     /// "More" on an artist's discography or a Home shelf.
     case browse(id: String, params: String?)
     case newReleases, charts, moodsAndGenres
+    /// The songs, albums and playlists kept on the phone, which the app lists itself.
+    case downloads
 
     public static let likedSongs = Route.playlist(BuiltInPlaylist.likedMusic)
 }

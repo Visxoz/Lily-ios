@@ -9,10 +9,11 @@ struct SettingsScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    PillGroup(titles: ["Playback", "Appearance", "Account"], selection: $tab)
+                    PillGroup(titles: ["Playback", "Downloads", "Appearance", "Account"], selection: $tab)
                     switch tab {
                     case 0: PlaybackSettings()
-                    case 1: AppearanceSettings()
+                    case 1: DownloadSettings()
+                    case 2: AppearanceSettings()
                     default: AccountSettings()
                     }
                 }

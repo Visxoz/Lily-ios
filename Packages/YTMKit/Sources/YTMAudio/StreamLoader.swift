@@ -33,7 +33,8 @@ final class StreamLoader {
         url = item.url
         headers = item.headers
         do {
-            if let file = cache.completeFile(for: item.cacheKey, length: item.contentLength) {
+            // A downloaded song plays from its own file, which the cache never holds.
+            if let file = item.url.isFileURL ? item.url : cache.completeFile(for: item.cacheKey, length: item.contentLength) {
                 reader = try FileHandle(forReadingFrom: file)
                 total = try Int64(reader.seekToEnd())
                 try reader.seek(toOffset: 0)

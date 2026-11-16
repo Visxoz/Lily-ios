@@ -18,6 +18,12 @@ extension YTMusic {
         try await playlistTracks(playlistId, limit: Self.playlistLimit, asOwner: true)
     }
 
+    /// Throws rather than end short, so a downloaded playlist kept in step never loses songs to a bad connection.
+    @concurrent
+    public func wholePlaylistTracks(_ playlistId: String) async throws -> [Track] {
+        try await playlistTracks(playlistId, limit: Self.playlistLimit, asOwner: true, whole: true)
+    }
+
     /// Found by title and artists. Uploads, such as slowed or sped-up edits,
     /// have none.
     @concurrent

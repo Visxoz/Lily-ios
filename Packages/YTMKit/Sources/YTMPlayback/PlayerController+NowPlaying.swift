@@ -3,10 +3,11 @@ import os
 import YTMCore
 
 extension PlayerController {
-    /// Rates `videoId` (nil for the one playing), or takes the rating back if the
+    /// Rates `track` (nil for the one playing), or takes the rating back if the
     /// playing song already had it. Disliking the playing song skips it. Signed in only.
-    public func rate(_ rating: Rating, videoId: String? = nil) {
-        guard let id = videoId ?? current?.id else { return }
+    public func rate(_ rating: Rating, track: Track? = nil) {
+        guard let track = track ?? current else { return }
+        let id = track.id
         let playing = id == current?.id
         let before = playing ? self.rating : .none
         let rating = rating == before ? .none : rating
@@ -26,6 +27,7 @@ extension PlayerController {
             switch result {
             case .success:
                 libraryRevision += 1
+                downloads.rated(track, rating)
                 let message = switch (rating, before) {
                 case (.like, _): "Added to your liked songs"
                 case (.dislike, _): "Disliked"

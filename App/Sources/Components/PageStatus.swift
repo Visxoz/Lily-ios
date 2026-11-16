@@ -12,6 +12,8 @@ struct PageStatus: View {
     /// The route's tint, as `Theme.routeTint` gives it.
     let tint: RGB?
 
+    @Environment(AppModel.self) private var app
+
     @Environment(\.theme) private var theme
     @State private var spinnerDue = false
 
@@ -34,6 +36,10 @@ struct PageStatus: View {
                 VStack(spacing: 20) {
                     Message(text: message)
                     PillButton(title: "Try again", primary: true, action: retry)
+                    // Offline, as in YouTube Music, it points to the downloads.
+                    if app.player.downloads.online == false, !app.player.downloads.isEmpty {
+                        PillButton(title: "Go to downloads") { app.open(.downloads) }
+                    }
                 }
                 .padding(48)
             case .empty(let message):

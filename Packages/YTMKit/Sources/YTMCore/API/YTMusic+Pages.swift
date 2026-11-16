@@ -18,6 +18,7 @@ extension YTMusic {
         case .newReleases: try await newReleasesPage()
         case .charts: try await chartsPage()
         case .moodsAndGenres: try await moodsAndGenresPage()
+        case .downloads: throw YTMError(.notFound, "Downloads are kept on the phone, not on YouTube.")
         }
     }
 

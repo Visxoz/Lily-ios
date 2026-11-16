@@ -73,6 +73,7 @@ final class AppModel {
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// The wait for Last.fm access, which outlives Settings.
     private var lastFMWait: Task<Void, Never>?
+    @ObservationIgnored private var downloadTime = UIBackgroundTaskIdentifier.invalid
 
     init(api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared) {
         self.api = api
@@ -221,6 +222,18 @@ final class AppModel {
             try? await Task.sleep(for: Self.toastFor)
             guard !Task.isCancelled else { return }
             self?.toast = nil
+        }
+    }
+
+    /// iOS gives downloads only a short while in the background; while music plays they carry on anyway.
+    func keepDownloading(_ active: Bool) {
+        if active, downloadTime == .invalid {
+            downloadTime = UIApplication.shared.beginBackgroundTask(withName: "Downloads") { [weak self] in
+                self?.keepDownloading(false)
+            }
+        } else if !active, downloadTime != .invalid {
+            UIApplication.shared.endBackgroundTask(downloadTime)
+            downloadTime = .invalid
         }
     }
 

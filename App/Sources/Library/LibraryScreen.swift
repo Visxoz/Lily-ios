@@ -5,10 +5,19 @@ struct LibraryScreen: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
-        if app.isSignedIn {
-            PageScreen(route: .library, app: app)
-        } else {
-            BringYourLibrary()
+        Group {
+            if app.isSignedIn {
+                PageScreen(route: .library, app: app)
+            } else {
+                BringYourLibrary()
+            }
+        }
+        // In the toolbar, so downloads stay reachable offline when the library page can't load.
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { app.open(.downloads) } label: { Image(icon: .downloaded) }
+                    .accessibilityLabel("Downloads")
+            }
         }
     }
 }

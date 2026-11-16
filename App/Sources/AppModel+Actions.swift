@@ -55,7 +55,7 @@ extension AppModel {
     /// Toggles the rating; `.none` removes either. The player says how it went and skips a
     /// disliked song that is playing.
     func rate(_ track: Track, _ requested: Rating) {
-        player.rate(requested, videoId: track.id)
+        player.rate(requested, track: track)
     }
 
     func addToPlaylist(_ track: Track) {

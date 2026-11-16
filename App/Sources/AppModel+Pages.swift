@@ -17,12 +17,19 @@ extension AppModel {
 
     /// History isn't cached, so a song just played shows next time. Leaving the screen doesn't
     /// cancel the request: the page still lands in the cache, and a second visit shares it.
+    /// If YouTube fails, a downloaded album or playlist falls back to the songs on the phone, uncached.
     func fetchPage(_ route: Route) async throws -> Page {
         if let load = pageLoads[route] { return try await load.value }
         let generation = accountGeneration
         let load = Task<Page, any Error> { [api] in
             defer { if generation == self.accountGeneration { self.pageLoads[route] = nil } }
-            let page = try await api.page(route)
+            let page: Page
+            do {
+                page = try await api.page(route)
+            } catch {
+                if !Task.isCancelled, let local = self.player.downloads.page(for: route) { return local }
+                throw error
+            }
             if generation == self.accountGeneration, route != .history {
                 self.cache(page, for: route)
             }

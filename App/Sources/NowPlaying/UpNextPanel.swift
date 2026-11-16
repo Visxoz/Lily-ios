@@ -112,6 +112,7 @@ struct UpNextPanel: View {
                 .disabled(current)
             Button("Remove from queue") { app.player.removeFromQueue(atOffsets: offsets([entry.id])) }
                 .disabled(current)
+            TrackDownloadItem(track: entry.item)
             TrackLibraryMenu(track: entry.item)
         }
     }

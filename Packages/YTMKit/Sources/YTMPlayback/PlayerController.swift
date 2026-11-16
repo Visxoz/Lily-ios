@@ -71,6 +71,7 @@ import YTMCore
     @ObservationIgnored let store: FileStore
     @ObservationIgnored let chooser: StreamChooser
     @ObservationIgnored let recorder: PlayRecorder
+    public let downloads: Downloads
     @ObservationIgnored var nowPlaying: NowPlayingCenter?
     @ObservationIgnored private var audioSession: AudioSessionController?
     @ObservationIgnored private let toastSink: AsyncStream<String>.Continuation
@@ -139,6 +140,7 @@ import YTMCore
         chooser = StreamChooser(music: music)
         recorder = PlayRecorder(history: history, music: music, lastFM: lastFM)
         (toasts, toastSink) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(4))
+        downloads = Downloads(music: music, chooser: chooser, settings: settings, history: history, store: store, toasts: toastSink)
         if system {
             nowPlaying = NowPlayingCenter(player: self)
             audioSession = AudioSessionController(player: self)
@@ -172,6 +174,7 @@ import YTMCore
         hasStarted = true
         await settings.load()
         await history.load()
+        await downloads.load()
         signedIn = await music.isSignedIn
         chooser.seed(known: settings.value.premiumAccount, none: settings.value.noPremium)
         premiumStatus = chooser.status
@@ -317,20 +320,36 @@ import YTMCore
         return { try await chooser.resolve(videoId: videoId, wantPremium: wantPremium, signedIn: signedIn, quality: quality) }
     }
 
+    /// A downloaded song plays its file even online, until the file fails to play; then it streams.
+    func localStream(_ videoId: String) -> StreamPrefetcher.Prefetched? {
+        guard playback.forceFree != videoId, let stream = downloads.stream(for: videoId) else { return nil }
+        return .init(stream: stream, resolvedAt: .now, epoch: prefetcher.epoch)
+    }
+
     /// Each item has its own ID, so a song queued after itself is told apart.
     /// A URL googlevideo refuses partway is refreshed only for the same file,
     /// so the download carries on from the same byte, with the issuing
     /// client's headers, as googlevideo checks them. The engine can't import
     /// YTMCore, so every URL, refreshed ones too, passes the allowlist here.
     func audioItem(for track: Track, stream: ResolvedStream) throws(YTMError) -> AudioItem {
-        guard HostAllowlist.allows(stream.url) else { throw Self.blocked }
         itemSerial += 1
+        return try Self.audioItem(
+            id: "\(track.id)#\(itemSerial)", videoId: track.id, stream: stream,
+            chooser: chooser, quality: settings.value.quality, signedIn: signedIn, local: downloads.holds(stream.url)
+        )
+    }
+
+    /// `local` for a downloaded song's own file, the one URL the allowlist doesn't cover.
+    nonisolated static func audioItem(
+        id: String, videoId: String, stream: ResolvedStream, chooser: StreamChooser, quality: AudioQuality, signedIn: Bool,
+        local: Bool
+    ) throws(YTMError) -> AudioItem {
+        guard local || HostAllowlist.allows(stream.url) else { throw Self.blocked }
         // Only ever turned down: YouTube's loudness above its reference level.
         let loudness = -Float(max(stream.loudnessDb ?? 0, 0))
-        let (chooser, quality, signedIn, videoId) = (chooser, settings.value.quality, signedIn, track.id)
         return AudioItem(
-            id: "\(track.id)#\(itemSerial)", url: stream.url, headers: stream.headers, contentLength: stream.contentLength,
-            cacheKey: "\(track.id)-\(stream.itag)", loudnessDB: loudness
+            id: id, url: stream.url, headers: stream.headers, contentLength: stream.contentLength,
+            cacheKey: "\(videoId)-\(stream.itag)", loudnessDB: loudness
         ) {
             let fresh = try await chooser.refresh(videoId: videoId, wasPremium: stream.isPremium, signedIn: signedIn, quality: quality)
             guard fresh.itag == stream.itag, fresh.contentLength == stream.contentLength else { throw Self.otherFile }

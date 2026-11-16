@@ -148,6 +148,7 @@ private struct NowPlayingTopBar: View {
                 if app.isSignedIn {
                     Button("Save to playlist") { app.addToPlaylist(track) }
                 }
+                TrackDownloadItem(track: track)
                 TrackLinks(track: track)
             } label: {
                 IconView(icon: .more, size: 22, colour: theme.text)

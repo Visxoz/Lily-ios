@@ -1,4 +1,4 @@
-enum AudioFailure: Error, Equatable {
+public enum AudioFailure: Error, Equatable, Sendable {
     /// The network failed after every retry.
     case download
     /// The server kept refusing the stream, even at a fresh URL.
@@ -12,7 +12,7 @@ enum AudioFailure: Error, Equatable {
     case output
     case silent
 
-    var message: String {
+    public var message: String {
         switch self {
         case .download: "The song couldn't be downloaded. Check your connection and try again."
         case .refused: "YouTube refused to send this song."

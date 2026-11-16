@@ -1,10 +1,11 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import ImageIO
 import os
 
-/// Artwork decoded off the main actor at the size shown, from memory, then
-/// `HTTP.media`'s disk URL cache, then the network.
+/// Artwork decoded off the main actor at the size shown, from memory, then the
+/// downloads' artwork, then `HTTP.media`'s disk URL cache, then the network.
 public final class ImagePipeline: Sendable {
     public static let shared = ImagePipeline()
 
@@ -22,6 +23,8 @@ public final class ImagePipeline: Sendable {
     /// queues behind a page's worth for the media host's connections.
     private static let prefetchWidth = 4
     private static let log = Logger(subsystem: "YTMusic", category: "ImagePipeline")
+    /// Downloaded songs' artwork, at the player's size, which serves every smaller one.
+    private static let kept = FileStore.shared.downloads.appending(path: "Artwork", directoryHint: .isDirectory)
 
     private let memory = MemoryCache(limit: memoryLimit)
     private let downloads = Downloads()
@@ -67,6 +70,32 @@ public final class ImagePipeline: Sendable {
         }
     }
 
+    /// Keeps `url`'s artwork on the phone until `keepOnly` lets it go, so it shows offline.
+    @concurrent
+    public func keep(_ url: String) async {
+        let file = Self.keptFile(url)
+        guard !FileManager.default.fileExists(atPath: file.path(percentEncoded: false)),
+              let request = Self.requestURL(url, edge: Self.playerEdge),
+              let data = try? await HTTP.data(for: URLRequest(url: request), session: HTTP.media).0
+        else { return }
+        try? FileManager.default.createDirectory(at: Self.kept, withIntermediateDirectories: true)
+        try? data.write(to: file, options: .atomic)
+    }
+
+    @concurrent
+    public func keepOnly(_ urls: Set<String>) async {
+        let names = Set(urls.map { Self.keptFile($0).lastPathComponent })
+        let files = (try? FileManager.default.contentsOfDirectory(at: Self.kept, includingPropertiesForKeys: nil)) ?? []
+        for file in files where !names.contains(file.lastPathComponent) {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
+    private static func keptFile(_ url: String) -> URL {
+        let name = SHA256.hash(data: Data(url.utf8)).map { String(format: "%02x", $0) }.joined()
+        return kept.appending(path: name)
+    }
+
     /// Keyed by what is requested, so artwork stored at different sizes
     /// shares one decode and one download.
     static func key(_ url: String, _ edge: Int) -> String {
@@ -75,6 +104,9 @@ public final class ImagePipeline: Sendable {
 
     @concurrent
     private static func fetch(_ url: String, edge: Int) async -> CGImage? {
+        if let data = try? Data(contentsOf: keptFile(url)), let image = decode(data, edge: edge) {
+            return image
+        }
         guard let request = requestURL(url, edge: edge) else {
             log.debug("Skipped artwork from a host the app doesn't use.")
             return nil
@@ -96,7 +128,8 @@ public final class ImagePipeline: Sendable {
     /// holds it. The bytes are dropped: `fetch` reads them back from the cache.
     @concurrent
     private static func download(_ url: String, edge: Int) async {
-        guard let request = requestURL(url, edge: edge).map({ URLRequest(url: $0) }),
+        guard !FileManager.default.fileExists(atPath: keptFile(url).path(percentEncoded: false)),
+              let request = requestURL(url, edge: edge).map({ URLRequest(url: $0) }),
               HTTP.media.configuration.urlCache?.cachedResponse(for: request) == nil
         else { return }
         _ = try? await HTTP.data(for: request, session: HTTP.media)

@@ -21,7 +21,16 @@ struct YTMusicApp: App {
                 .environment(app)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { app.player.persistSession() }
+            switch phase {
+            case .background:
+                app.player.persistSession()
+                // Asked for on every exit, as the last background allowance may have run out.
+                app.keepDownloading(app.player.downloads.isActive)
+            case .active:
+                app.player.downloads.resume()
+            default:
+                break
+            }
         }
     }
 }

@@ -25,8 +25,10 @@ struct TabRoot<Content: View>: View {
                     ToolbarItem(placement: .topBarTrailing) { AccountButton() }
                 }
                 .navigationDestination(for: Route.self) { route in
-                    PageScreen(route: route, app: app)
-                        .modifier(MiniPlayerRoom(tab: tab))
+                    Group {
+                        if route == .downloads { DownloadsScreen() } else { PageScreen(route: route, app: app) }
+                    }
+                    .modifier(MiniPlayerRoom(tab: tab))
                 }
         }
         .overlay(alignment: .bottom) { ToastView() }

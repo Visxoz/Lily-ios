@@ -126,6 +126,10 @@ final class FakeMusic: MusicService {
         return state.withLock { $0.radios[playlistId] } ?? []
     }
 
+    func wholePlaylistTracks(_ playlistId: String) async throws -> [Track] {
+        try await playlistTracks(playlistId)
+    }
+
     func page(_ route: Route) async throws -> Page {
         guard case .playlist(let id) = route else { throw YTMError(.notFound, "No such page.") }
         log("page \(id)")

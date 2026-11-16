@@ -70,6 +70,12 @@ public struct Settings: Codable, Equatable, Sendable {
     public var premiumAccount = false
     /// The account was taken as without Premium: songs start on the free stream while a background check confirms it.
     public var noPremium = false
+    public var downloadQuality: AudioQuality = .high
+    /// Downloads wait for a network that isn't metered, as cellular and hotspots are.
+    public var downloadOnWiFiOnly = true
+    /// Keeps a pick of the songs this phone plays downloaded, picked afresh each day.
+    public var smartDownloads = false
+    public var smartDownloadCount = 50
 
     public init() {}
 
@@ -93,6 +99,10 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&accent, .accent)
         file.read(&premiumAccount, .premiumAccount)
         file.read(&noPremium, .noPremium)
+        file.read(&downloadQuality, .downloadQuality)
+        file.read(&downloadOnWiFiOnly, .downloadOnWiFiOnly)
+        file.read(&smartDownloads, .smartDownloads)
+        file.read(&smartDownloadCount, .smartDownloadCount) { $0 > 0 }
     }
 }
 

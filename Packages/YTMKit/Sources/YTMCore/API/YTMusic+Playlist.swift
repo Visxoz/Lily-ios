@@ -8,13 +8,17 @@ extension YTMusic {
         try Renderers.playlistPage(try await playlistResponse(id, asOwner: true), id: id)
     }
 
-    /// A batch that fails ends the list with what arrived.
-    func playlistTracks(_ id: String, limit: Int, asOwner: Bool) async throws -> [Track] {
+    /// A batch that fails ends the list with what arrived, unless `whole`, when it throws instead.
+    func playlistTracks(_ id: String, limit: Int, asOwner: Bool, whole: Bool = false) async throws -> [Track] {
         let shelf = Renderers.trackShelf(in: try await playlistResponse(id, asOwner: asOwner))
         var tracks = Renderers.tracks(shelf["contents"].array)
         var token = Renderers.continuation(shelf)
         while let current = token, tracks.count < limit {
-            guard let batch = try await playlistBatch(after: current, asOwner: asOwner), !batch.tracks.isEmpty else { break }
+            guard let batch = try await playlistBatch(after: current, asOwner: asOwner) else {
+                if whole { throw YTMError(.network, "The whole playlist couldn't be loaded.") }
+                break
+            }
+            guard !batch.tracks.isEmpty else { break }
             tracks += batch.tracks
             token = batch.next
         }

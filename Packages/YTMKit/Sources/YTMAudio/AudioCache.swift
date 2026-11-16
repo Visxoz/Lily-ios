@@ -42,7 +42,7 @@ final class AudioCache {
 
     /// Each download has its own part, so the same song playing twice at once never shares one.
     func makePart(for key: String) throws -> URL {
-        let url = directory.appending(path: "\(Self.safeName(key)).\(UUID().uuidString).\(Self.partExtension)")
+        let url = partURL(for: key)
         guard files.createFile(atPath: url.path(percentEncoded: false), contents: nil) else {
             throw AudioFailure.storage
         }
@@ -64,6 +64,14 @@ final class AudioCache {
         try? files.removeItem(at: part)
     }
 
+    /// APFS clones the copy, so it takes no time.
+    func adopt(_ file: URL, as key: String) -> Bool {
+        let part = partURL(for: key)
+        guard (try? files.copyItem(at: file, to: part)) != nil else { return false }
+        commit(part, as: key)
+        return true
+    }
+
     /// The bytes of complete files.
     func size() -> Int64 {
         completeFiles().reduce(0) { $0 + $1.size }
@@ -72,12 +80,23 @@ final class AudioCache {
     /// Removes every complete file. Downloads under way carry on, and files
     /// still being read stay readable until closed.
     func clear() {
-        for entry in completeFiles() {
+        removeAll(except: [])
+    }
+
+    func remove(_ key: String) {
+        try? files.removeItem(at: file(for: key))
+    }
+
+    /// Parts under way are left to finish.
+    func removeAll(except keys: Set<String>) {
+        let kept = Set(keys.map(Self.safeName))
+        for entry in completeFiles() where !kept.contains(entry.url.lastPathComponent) {
             try? files.removeItem(at: entry.url)
         }
     }
 
     private func evict(sparing kept: URL? = nil) {
+        guard limit < .max else { return }
         var entries = completeFiles().sorted { $0.used < $1.used }
         var total = entries.reduce(0) { $0 + $1.size }
         while total > limit, let oldest = entries.first, oldest.url != kept {
@@ -89,6 +108,10 @@ final class AudioCache {
 
     private func file(for key: String) -> URL {
         directory.appending(path: Self.safeName(key))
+    }
+
+    private func partURL(for key: String) -> URL {
+        directory.appending(path: "\(Self.safeName(key)).\(UUID().uuidString).\(Self.partExtension)")
     }
 
     private func contents(keys: [URLResourceKey] = []) -> [URL] {
@@ -105,7 +128,7 @@ final class AudioCache {
     }
 
     /// Keys are video IDs and itags, but nothing from outside names a path unchecked.
-    private static func safeName(_ key: String) -> String {
+    static func safeName(_ key: String) -> String {
         String(key.unicodeScalars.map { CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_" ? Character($0) : "_" })
     }
 }

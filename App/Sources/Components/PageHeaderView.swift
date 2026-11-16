@@ -8,6 +8,7 @@ struct PageHeaderView: View {
     let canRadio: Bool
     /// The navigation bar's height, which a banner reaches up under.
     let topInset: CGFloat
+    let download: DownloadButton?
     let perform: (HeaderAction) -> Void
 
     @Environment(\.theme) private var theme
@@ -66,6 +67,7 @@ struct PageHeaderView: View {
                         IconButton(icon: .radio, size: 48, iconSize: 28) { perform(.radio) }
                             .accessibilityLabel("Start radio")
                     }
+                    download
                 }
                 .padding(.horizontal, Metrics.pagePadding)
                 .frame(height: Metrics.actionsHeight)

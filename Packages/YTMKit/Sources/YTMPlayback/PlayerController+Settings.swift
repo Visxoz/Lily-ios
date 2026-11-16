@@ -61,6 +61,7 @@ extension PlayerController {
             audio.equaliser = (new.equaliserEnabled, new.equaliserGains)
         }
         guard let old else { return }
+        downloads.settingsChanged(from: old, to: new)
         if old.shuffle != new.shuffle {
             if new.shuffle != .smart {
                 queue.removeRecommended()

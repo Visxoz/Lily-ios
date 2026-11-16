@@ -37,9 +37,12 @@ struct TrackRow: View {
                     Text(track.title)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(playing ? theme.accent : theme.text)
-                    Text(track.artistNames)
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.textSecondary)
+                    HStack(spacing: 4) {
+                        DownloadBadge(videoId: track.id)
+                        Text(track.artistNames)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.textSecondary)
+                    }
                 }
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)

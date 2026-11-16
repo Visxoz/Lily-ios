@@ -99,13 +99,16 @@ final class StreamChooser: Sendable {
         seed(known: false, none: false)
     }
 
-    /// `wantPremium` means signed in at High quality.
+    /// `wantPremium` means signed in at High quality. Downloads pass `counting` false: a
+    /// playlist of music videos, which have no Premium formats, says nothing of the account.
     @concurrent
-    func resolve(videoId: String, wantPremium: Bool, signedIn: Bool, quality: AudioQuality) async throws -> ResolvedStream {
+    func resolve(
+        videoId: String, wantPremium: Bool, signedIn: Bool, quality: AudioQuality, counting: Bool = true
+    ) async throws -> ResolvedStream {
         if wantPremium {
             if !counters.withLock({ $0.skipped(at: .now) }) {
-                if let stream = try await premium(videoId) { return stream }
-            } else if counters.withLock({ $0.takeRecheck(at: .now) }) {
+                if let stream = try await premium(videoId, counting: counting) { return stream }
+            } else if counting, counters.withLock({ $0.takeRecheck(at: .now) }) {
                 // Checked off the playback path: this song plays the free
                 // stream at once, and the next one gets Premium if it is back.
                 Task { [self] in await recheck(videoId) }
@@ -128,15 +131,15 @@ final class StreamChooser: Sendable {
 
     /// Nil to play the free stream. A known Premium account takes any format
     /// from the same answer, which saves asking the free clients.
-    private func premium(_ videoId: String) async throws -> ResolvedStream? {
+    private func premium(_ videoId: String, counting: Bool) async throws -> ResolvedStream? {
         let known = status == .premium
         do {
             switch try await music.premiumStream(videoId: videoId, anyFormat: known, maxKbps: nil) {
             case .stream(let stream):
-                counters.withLock { stream.isPremium ? $0.recordPremium() : $0.recordMiss(at: .now) }
+                if counting { counters.withLock { stream.isPremium ? $0.recordPremium() : $0.recordMiss(at: .now) } }
                 return stream
             case .noPremiumFormats:
-                counters.withLock { $0.recordMiss(at: .now) }
+                if counting { counters.withLock { $0.recordMiss(at: .now) } }
             }
         } catch is CancellationError {
             throw CancellationError()
@@ -145,7 +148,7 @@ final class StreamChooser: Sendable {
             Logger.playback.info("\(videoId, privacy: .public): could not prepare the player; using the free stream")
         } catch {
             Logger.playback.info("\(videoId, privacy: .public): Premium path failed, using the free stream: \(sentence(for: error), privacy: .public)")
-            if counters.withLock({ $0.recordError(at: .now) }) {
+            if counting, counters.withLock({ $0.recordError(at: .now) }) {
                 Logger.playback.info("Premium requests keep failing; using free streams for 10 minutes")
             }
         }

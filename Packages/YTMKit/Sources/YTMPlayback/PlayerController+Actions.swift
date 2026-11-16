@@ -32,20 +32,26 @@ extension PlayerController {
     }
 
     /// Returns once the songs have started, or failed to. With shuffle on, the
-    /// whole playlist loads first, so the first song can be any of it.
+    /// whole playlist loads first, so the first song can be any of it. A downloaded
+    /// album or playlist plays from the phone when YouTube can't load it.
     public func play(_ card: Card) async {
+        let local = card.route.flatMap(downloads.page(for:))
         switch card.kind {
         case .song:
             if let track = card.track { startRadio(from: track) }
         case .playlist where settings.value.shuffle == .off:
             let music = music
-            await load({ try await music.page(.playlist(card.id)) }, failure: "Couldn't load") { player, page in
+            await load({
+                do { return try await music.page(.playlist(card.id)) } catch { if let local { return local } else { throw error } }
+            }, failure: "Couldn't load") { player, page in
                 player.play(page.headerTracks)
                 player.continuePlaylist(page)
             }
         case .album, .playlist, .artist:
             let music = music
-            await load({ try await music.tracks(of: card) }, failure: "Couldn't load") { $0.play($1) }
+            await load({
+                do { return try await music.tracks(of: card) } catch { if let local { return local.headerTracks } else { throw error } }
+            }, failure: "Couldn't load") { $0.play($1) }
         case .genre:
             break
         }

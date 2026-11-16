@@ -37,8 +37,9 @@ struct StreamPrefetcher {
     }
 
     /// Drops stale streams too. One asked for before a `clear` is not kept.
+    /// Nor is a downloaded file's, as it may be removed before it plays.
     mutating func store(_ id: String, _ prefetched: Prefetched, at now: ContinuousClock.Instant = .now) {
-        guard prefetched.epoch == epoch else { return }
+        guard prefetched.epoch == epoch, !prefetched.stream.url.isFileURL else { return }
         streams = streams.filter { now - $0.value.resolvedAt < Self.freshFor }
         streams[id] = prefetched
     }
@@ -90,7 +91,8 @@ extension PlayerController {
     func prefetchNext() {
         topUpSmartShuffle()
         guard let next = queue.peekNext(repeat: repeatMode) else { return }
-        if next.isVideo { swapInSongVersion(next) }
+        // A downloaded video stays, as its song version may need the network.
+        if next.isVideo, localStream(next.id) == nil { swapInSongVersion(next) }
         prefetchLyrics(of: songVersions.knownSong(for: next.id)?.id ?? next.id)
         // Both sizes the playing song shows, so its artwork and colours are
         // there on the first frame.
@@ -110,6 +112,7 @@ extension PlayerController {
     func resolveAhead(
         _ track: Track, warming: Bool = true, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }
     ) {
+        guard localStream(track.id) == nil else { return }
         if let kept = prefetcher.kept(track.id) {
             // A kept stream may have lost its part file since; the engine skips
             // a file cached or open.
@@ -135,7 +138,7 @@ extension PlayerController {
     /// Unless `owning`, a pending resolve is waited on but left in place, so
     /// cancelling the wait, as a skip does to gapless queueing, leaves it running.
     func streamSource(for id: String, owning: Bool = true) -> @Sendable () async throws -> StreamPrefetcher.Prefetched {
-        if let prefetched = prefetcher.take(id) { return { prefetched } }
+        if let prefetched = localStream(id) ?? prefetcher.take(id) { return { prefetched } }
         let epoch = prefetcher.epoch
         if !owning, let pending = prefetcher.pendingTask(id) {
             return { .init(stream: try await pending.value, resolvedAt: .now, epoch: epoch) }

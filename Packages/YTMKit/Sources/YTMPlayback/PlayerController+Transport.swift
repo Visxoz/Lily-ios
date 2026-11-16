@@ -134,7 +134,7 @@ extension PlayerController {
         publishPlayback()
         // A stream resolved ahead needs no await, so the song loads on this
         // turn and the quality badge never shows empty in between.
-        if let prefetched = prefetcher.take(track.id) {
+        if let prefetched = localStream(track.id) ?? prefetcher.take(track.id) {
             load(track, prefetched)
             return
         }
@@ -174,25 +174,28 @@ extension PlayerController {
         return resume.position
     }
 
-    /// A Premium stream gets one retry on the free one without counting a
-    /// second play; otherwise the next song plays, until a few in a row fail.
+    /// A Premium stream or a downloaded file gets one retry on the free stream
+    /// without counting a second play; otherwise the next song plays, until a few in a row fail.
     func playbackFailed(_ title: String, _ message: String) {
         Logger.playback.warning("playback failed: \(message, privacy: .public)")
         if let id = queue.current?.id { prefetcher.remove(id) }
-        if let id = queue.current?.id, playback.currentPremium, playback.forceFree != id {
+        if let id = queue.current?.id, playback.currentPremium || stream?.url.isFileURL == true, playback.forceFree != id {
             playback.currentPremium = false
             playback.forceFree = id
             prefetcher.clear()
-            Logger.premium.info("\(id, privacy: .public): Premium stream failed to play (\(message, privacy: .public)); retrying the free stream")
+            Logger.premium.info("\(id, privacy: .public): stream failed to play (\(message, privacy: .public)); retrying the free stream")
             restartCurrent()
             return
         }
         playback.failures += 1
-        say("Couldn't play “\(title)”: \(message)")
-        if playback.failures < Self.maxConsecutiveFailures, queue.peekNext(repeat: repeatMode) != nil {
+        // Offline, YouTube Music skips songs not downloaded without a word, through the whole queue.
+        let offline = downloads.online == false
+        if !offline { say("Couldn't play “\(title)”: \(message)") }
+        if playback.failures < (offline ? queue.count : Self.maxConsecutiveFailures), queue.peekNext(repeat: repeatMode) != nil {
             next(user: true)
         } else {
             stop()
+            if offline { say("You're offline, and nothing else in the queue is downloaded.") }
         }
     }
 

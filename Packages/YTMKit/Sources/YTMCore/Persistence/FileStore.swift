@@ -6,6 +6,7 @@ public enum StoreFile: String, Sendable {
     case settings, session, history, searches, home, scrobbles, visitor
     /// The Premium path's trimmed player script.
     case player
+    case downloads
 }
 
 /// JSON files in Application Support/YTMusic/. Writes run in order on one
@@ -24,6 +25,11 @@ public final class FileStore: Sendable {
     /// `directory` is created on the first save.
     init(directory: URL) {
         self.directory = directory
+    }
+
+    /// Downloaded songs and their artwork, apart from the JSON files.
+    public var downloads: URL {
+        directory.appending(path: "Downloads", directoryHint: .isDirectory)
     }
 
     private func url(_ file: StoreFile) -> URL {

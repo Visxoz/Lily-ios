@@ -7,6 +7,7 @@ nonisolated enum Icon: CaseIterable, Sendable {
     case volume, volumeLow, volumeOff
     case close, queue, lyrics, radio, account, note, more, clock, history
     case thumbUp, thumbUpFilled, thumbDown, thumbDownFilled, check, add, chevron
+    case download, downloaded
 
     var path: Path { Self.paths[self] ?? Path() }
 
@@ -47,6 +48,8 @@ nonisolated enum Icon: CaseIterable, Sendable {
         case .check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
         case .add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"
         case .chevron: "M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"
+        case .download: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+        case .downloaded: "M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zM11 10V6h2v4h3l-4 4-4-4h3zM17 17H7v-2h10v2z"
         }
     }
 }

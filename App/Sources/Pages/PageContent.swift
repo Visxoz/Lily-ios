@@ -1,5 +1,6 @@
 import SwiftUI
 import YTMCore
+import YTMPlayback
 
 struct PageContent: View {
     let page: Page
@@ -42,7 +43,8 @@ struct PageContent: View {
                         canPlay: canPlay,
                         canShuffle: canPlay || header.shufflePlaylistId != nil,
                         canRadio: header.radioId != nil,
-                        topInset: frame.top
+                        topInset: frame.top,
+                        download: canPlay && Downloads.isDownloadable(route) ? DownloadButton(route: route, page: page) : nil
                     ) { app.perform($0, on: page) }
                 }
                 ForEach(page.sections.indices, id: \.self) { index in

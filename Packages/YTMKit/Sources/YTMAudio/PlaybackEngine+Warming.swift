@@ -9,7 +9,7 @@ extension PlaybackEngine {
 
     /// Replaces any earlier warm-up.
     func warm(_ item: AudioItem) {
-        guard item.contentLength > 0, warmed?.item.url != item.url,
+        guard item.contentLength > 0, !item.url.isFileURL, warmed?.item.url != item.url,
               ![heard, producing, next].contains(where: { $0?.item.cacheKey == item.cacheKey }),
               cache.completeFile(for: item.cacheKey, length: item.contentLength) == nil,
               let loader = try? StreamLoader(item: item, cache: cache) else { return }

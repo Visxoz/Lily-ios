@@ -11,6 +11,7 @@ struct TrackMenu: View {
         Button("Play next") { app.player.playNext([track]) }
         Button("Add to queue") { app.player.addToQueue([track]) }
         Button("Start radio") { app.player.startRadio(from: track) }
+        TrackDownloadItem(track: track)
 
         TrackLibraryMenu(track: track)
 
@@ -62,5 +63,6 @@ struct CardMenu: View {
             Button("Play") { app.play(card) }
             Button("Start radio") { app.startRadio(from: card) }
         }
+        CardDownloadItem(card: card)
     }
 }
