@@ -1,11 +1,9 @@
 import SwiftUI
 import YTMCore
 
-/// The lyrics under "Lyrics", as `panel/lyrics.slint` and `now_playing.rs`:
-/// the spinner while they load, then the lines, or what stands in for them,
-/// in the same words. The player loads them only while this shows.
+/// The player loads lyrics only while this shows.
 struct LyricsPanel: View {
-    /// Closes the panel, for a pull down past the top of the lines.
+    /// For a pull down past the top of the lines.
     let close: () -> Void
 
     @Environment(AppModel.self) private var app
@@ -20,7 +18,6 @@ struct LyricsPanel: View {
             case .loaded(let lyrics):
                 LyricsLines(lyrics: lyrics, close: close)
             case .idle, .unavailable, .failed:
-                // ytm-native shows the reason as a lyric of its own.
                 LyricsLines(lyrics: Lyrics(lines: [player.lyrics.message ?? ""]), close: close)
             }
         }
@@ -31,10 +28,7 @@ struct LyricsPanel: View {
     }
 }
 
-/// The lines, and for synced lyrics the one being sung lit and glided to
-/// the middle, the rest dimmed; tapping a line seeks to it. Scrolling by
-/// hand stops the following until a few seconds after the list comes to
-/// rest.
+/// Scrolling by hand stops the following until a few seconds after the list comes to rest.
 private struct LyricsLines: View {
     let lyrics: Lyrics
     let close: () -> Void
@@ -46,8 +40,7 @@ private struct LyricsLines: View {
     @State private var phase = ScrollPhase.idle
     /// Whether the list keeps the line being sung in the middle.
     @State private var following = true
-    /// Counts the times the user let go of the list, restarting the wait to
-    /// follow again.
+    /// Bumped each time the user lets go of the list, restarting the wait to follow again.
     @State private var released = 0
 
     private static let resumeAfter = Duration.seconds(3)
@@ -121,10 +114,8 @@ private struct LyricsLines: View {
     }
 }
 
-/// Finds the line being sung, pulled from the player twenty times a second
-/// while it plays, and again on a seek, which may come while paused, and
-/// reports it only when it changes, so the lines redraw once a line rather
-/// than every frame.
+/// The line being sung, polled while playing and on a seek, which may come while paused; reported
+/// only when it changes, so the lines redraw once a line rather than every frame.
 private struct LyricClock: View {
     let lyrics: Lyrics
     let changed: (Int?) -> Void
@@ -137,12 +128,11 @@ private struct LyricClock: View {
             Color.clear
                 .onChange(of: lyrics.lineIndex(at: player.currentTime), initial: true) { _, line in changed(line) }
         }
-        // As ytm-native's `seek_to` lights the line whatever the pause.
+        // A seek lights its line whatever the pause.
         .onChange(of: player.lastSeek) { _, seek in changed(lyrics.lineIndex(at: seek.to)) }
     }
 }
 
-/// One line, as the slint `Text`: large and bold, dimmed unless lit.
 private struct LyricLine: View {
     let text: String
     let lit: Bool

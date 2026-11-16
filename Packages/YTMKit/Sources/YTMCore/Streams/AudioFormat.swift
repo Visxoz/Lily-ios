@@ -1,16 +1,11 @@
 import Foundation
 
-/// The parts of a `player` response the stream paths use: whether YouTube
-/// will play the video, its audio formats and the loudness to normalise by.
-/// Both the free path and the Premium path read their answers with it.
 struct PlayerResponse: Sendable {
-    /// The adaptive audio formats; video formats are left out.
     let formats: [Format]
     /// The player-wide loudness, for formats that carry none of their own.
     let loudnessDb: Double?
 
-    /// Fails with YouTube's own reason when it won't play the video, such
-    /// as "Sign in to confirm your age".
+    /// Fails with YouTube's own reason when it won't play the video.
     init(json: JSON) throws {
         let playability = json["playabilityStatus"]
         guard let status = playability["status"].string else {
@@ -24,13 +19,10 @@ struct PlayerResponse: Sendable {
     }
 }
 
-/// One audio format of a player response.
 struct Format: Sendable, Hashable {
     let itag: Int
-    /// A plain URL, ready to download.
     let url: String?
-    /// `s`, `sp` and `url`, when the URL is scrambled and needs the player
-    /// script to unlock.
+    /// `s`, `sp` and `url`, when the URL is scrambled and needs the player script to unlock.
     let signatureCipher: String?
     /// In bits per second.
     let bitrate: Int
@@ -45,7 +37,6 @@ struct Format: Sendable, Hashable {
     /// False for a dubbed or described track beside the original.
     let isDefaultAudio: Bool
 
-    /// Nil for video formats and formats without an itag.
     init?(json: JSON) {
         guard let itag = json["itag"].int, let mime = json["mimeType"].string, mime.hasPrefix("audio/") else {
             return nil
@@ -64,9 +55,8 @@ struct Format: Sendable, Hashable {
         isDefaultAudio = track.exists ? track["audioIsDefault"].bool ?? false : true
     }
 
-    /// Opus in WebM, or AAC-LC in MP4. The quotes keep out `mp4a.40.29`;
-    /// HE-AAC (`mp4a.40.5`, itag 139) is left out as ytm-native leaves it,
-    /// so every quality plays the same files on both.
+    /// Opus in WebM, or AAC-LC in MP4: the quotes keep out `mp4a.40.29`, and HE-AAC
+    /// (`mp4a.40.5`, itag 139) is left out.
     private static func codec(mime: String) -> AudioCodec? {
         if mime.hasPrefix("audio/webm"), mime.contains("opus") { return .opus }
         if mime.hasPrefix("audio/mp4"), mime.contains("\"mp4a.40.2\"") { return .aac }
@@ -74,11 +64,8 @@ struct Format: Sendable, Hashable {
     }
 }
 
-/// The highest-bitrate Opus format, else the best AAC, as ytm-native's
-/// `best_audio`. Skips dynamic-range compressed variants, dubbed tracks and
-/// surround mixes. With `maxKbps`, the best within it, or the lowest there
-/// is when none fits. Scrambled formats count, so the Premium path can pick
-/// 774 and 141; the free path then takes only a plain URL.
+/// Opus before AAC. With `maxKbps`, the best within it, or the lowest when none fits. Scrambled
+/// formats count so the Premium path can pick 774 and 141; the free path takes only a plain URL.
 func bestAudio(_ formats: [Format], maxKbps: Int?) -> Format? {
     func pick(_ codec: AudioCodec) -> Format? {
         let candidates = formats.filter { format in
@@ -95,8 +82,7 @@ func bestAudio(_ formats: [Format], maxKbps: Int?) -> Format? {
     return pick(.opus) ?? pick(.aac)
 }
 
-/// The stream to play from one of `response`'s formats, downloaded as the
-/// client that asked, whose User-Agent googlevideo checks.
+/// googlevideo checks the User-Agent is that of the client that asked.
 func makeStream(_ format: Format, url: URL, userAgent: String, response: PlayerResponse, isPremium: Bool) -> ResolvedStream {
     ResolvedStream(
         url: url,

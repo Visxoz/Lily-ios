@@ -1,11 +1,10 @@
 import Foundation
 import YTMCore
 
-// ytmcheck: YTMCore and YTMAudio against live YouTube, signed out, as
-// ytm-native's canary test checks its stream paths. Run with `swift run
-// ytmcheck <command>`; exits non-zero when a check fails.
+// ytmcheck: YTMCore and YTMAudio against live YouTube, signed out. Run with
+// `swift run ytmcheck <command>`; exits non-zero when a check fails.
 
-/// The check groups, in the order `all` runs them.
+/// In the order `all` runs them.
 let groups: [(name: String, run: @MainActor (Report) async -> Void)] = [
     ("pages", { await PageChecks.run($0); await CatalogueChecks.run($0) }),
     ("streams", StreamChecks.run),
@@ -25,7 +24,7 @@ let usage = """
                                                   or a bare browse or playlist ID
     """
 
-/// Ends the run, leaving nothing of it behind on disk.
+/// Leaves nothing of the run behind on disk.
 func finish(_ status: Int32) -> Never {
     try? FileManager.default.removeItem(at: Live.directory)
     exit(status)

@@ -1,7 +1,6 @@
 import Foundation
 @testable import YTMCore
 
-/// Albums, artists, playlists and what playing each queues.
 enum CatalogueChecks {
     static func run(_ report: Report) async {
         await report.check("page album") { findings in

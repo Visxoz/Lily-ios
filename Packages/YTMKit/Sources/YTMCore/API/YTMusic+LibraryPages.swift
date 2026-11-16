@@ -1,16 +1,9 @@
 import Foundation
 
-// The signed-in library, as ytm-native's `api/pages.rs` lists it: Liked
-// music and the saved playlists, albums and artists, plus the liked songs,
-// each with a page of its own.
-
 extension YTMusic {
-    /// Songs shown on the library page itself; the rest are a tap away.
     private static let librarySongsShown = 10
     private static let librarySignIn = "Sign in to see your playlists, albums and artists."
 
-    /// The first batch of each library list, with "More" where there are
-    /// more.
     @concurrent
     func libraryPage() async throws -> Page {
         try await requireSignIn(Self.librarySignIn)
@@ -30,8 +23,7 @@ extension YTMusic {
         return Page(sections: sections.compactMap(\.self))
     }
 
-    /// One library list in full, or the liked songs' first batch with `more`
-    /// fetching the rest.
+    /// The list in full, but for the liked songs, whose rest `more` fetches.
     @concurrent
     func libraryListPage(_ route: Route) async throws -> Page {
         guard let list = LibraryList(route) else { throw YTMError(.notFound, "This page doesn't exist.") }
@@ -53,20 +45,16 @@ extension YTMusic {
         return Page(header: header, sections: [Section.cards("", cards, layout: .grid)].compactMap(\.self))
     }
 
-    /// Throws `message` as a sign-in error when no account is signed in.
     func requireSignIn(_ message: String) async throws {
         guard await auth.isSignedIn else { throw YTMError(.notSignedIn, message) }
     }
 
-    /// The library page's section for `list`: its first batch, with "More"
-    /// when there are more.
     private static func librarySection(_ list: LibraryList, _ shelf: JSON) -> Section? {
         let more = Renderers.continuation(shelf) == nil ? nil : list.route
         return .cards(list.title, Renderers.cards(LibraryList.items(shelf)), layout: .grid, more: more)
     }
 
-    /// Liked music, then the saved playlists: their first batch, and whether
-    /// more follow, or `all` of them.
+    /// Liked music, then the saved playlists.
     private func libraryPlaylists(all: Bool) async throws -> (cards: [Card], hasMore: Bool) {
         async let liked = likedMusic()
         let shelf = try await libraryShelf(.playlists)
@@ -80,19 +68,15 @@ extension YTMusic {
         return ((likedCard.map { [$0] } ?? []) + playlists, !all && Renderers.continuation(shelf) != nil)
     }
 
-    /// The Liked music card, with its song count; nil should it fail.
     private func likedMusic() async -> Card? {
         guard let response = try? await innerTube.browse("VL" + BuiltInPlaylist.likedMusic) else { return nil }
         return LibraryList.likedMusicCard(response)
     }
 
-    /// A library list's first batch: the grid or shelf holding it.
     private func libraryShelf(_ list: LibraryList) async throws -> JSON {
         LibraryList.shelf(in: try await innerTube.continuation(list.token))
     }
 
-    /// The cards of a list's first batch, and with `all` those of the
-    /// batches after it.
     private func libraryCards(_ shelf: JSON, all: Bool) async throws -> [Card] {
         var cards = Renderers.cards(LibraryList.items(shelf))
         if all { try await following(shelf, authenticated: true) { cards += Renderers.cards($0) } }
@@ -100,7 +84,6 @@ extension YTMusic {
     }
 }
 
-/// One of the library's lists.
 enum LibraryList: CaseIterable {
     case playlists, albums, artists, songs
 
@@ -127,8 +110,7 @@ enum LibraryList: CaseIterable {
         }
     }
 
-    /// The continuation token that opens the list sorted as YouTube Music's
-    /// library sorts it, as rustypipe's `music_userdata` asks for it.
+    /// Opens the list sorted as YouTube Music's library sorts it.
     var token: String {
         switch self {
         case .playlists: "4qmFsgIrEhdGRW11c2ljX2xpa2VkX3BsYXlsaXN0cxoQZ2dNR0tnUUlBQkFCb0FZQg%3D%3D"
@@ -138,8 +120,8 @@ enum LibraryList: CaseIterable {
         }
     }
 
-    /// The grid or shelf of a list's first batch, which comes in a section
-    /// list, or as the grid or shelf's own continuation.
+    /// The first batch comes in a section list, or as the grid or shelf's own
+    /// continuation.
     static func shelf(in response: JSON) -> JSON {
         let list = Renderers.sectionList(in: response)
         guard list.exists else { return response["continuationContents"].onlyValue?.value ?? .missing }
@@ -151,9 +133,8 @@ enum LibraryList: CaseIterable {
         shelf.first("items", "contents").array
     }
 
-    /// Liked music's card from its playlist page, counting its songs as
-    /// rustypipe does: those listed when they all are, else the header's
-    /// count. Nil when the page has no list of songs.
+    /// Counts the songs listed when they all are, else the header's count.
+    /// Nil when the page has no list of songs.
     static func likedMusicCard(_ response: JSON) -> Card? {
         let shelf = Renderers.trackShelf(in: response)
         guard shelf.exists else { return nil }

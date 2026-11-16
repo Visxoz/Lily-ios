@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import YTMCore
 
-/// A miniature player with the same shape as YouTube's, with code the
-/// scrambler does not need, as ytm-native's `trim.rs` tests use.
+/// A miniature player shaped like YouTube's, with code the scrambler does not need.
 private let testPlayer = #"""
 var _yt_player={};(function(g){var window=this;
 var helper = function(x) { return x.split("").reverse().join(""); };

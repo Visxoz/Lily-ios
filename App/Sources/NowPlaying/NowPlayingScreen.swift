@@ -1,16 +1,8 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's player bar and right-hand panel as one screen, grown out of
-/// the mini player, in two pages a swipe moves between: the artwork, title,
-/// seek bar, transport, and the volume, quality badge and panel buttons;
-/// and below it the same controls folded into one row over the Up next and
-/// Lyrics chips with the queue or the lyrics, all over the artwork's colours.
-///
-/// The pages scroll natively, so a swipe follows the finger and can't be
-/// lost to the zoom's own close. At the artwork a swipe down closes the
-/// screen into the mini player; on the panel it scrolls back to the artwork
-/// first.
+/// The two pages scroll natively, so a swipe follows the finger and can't be
+/// lost to the zoom's own close.
 struct NowPlayingScreen: View {
     static let padding: CGFloat = 24
 
@@ -20,7 +12,6 @@ struct NowPlayingScreen: View {
 
     @Environment(AppModel.self) private var app
     @State private var page: Page? = .artwork
-    /// What the panel page shows, kept while the artwork does.
     @State private var tab = PanelTab.upNext
 
     var body: some View {
@@ -93,11 +84,8 @@ struct NowPlayingScreen: View {
 }
 
 /// Stops the pager bouncing, so a swipe down at the artwork goes straight to
-/// the zoom's own close, which follows the finger, rather than stretching
-/// the page inside the shrinking screen. SwiftUI's `scrollBounceBehavior`
-/// can't stop it while the content overflows, as two pages always do. Its
-/// nearest scroll view is the pager, never the queue, whose bounce a pull
-/// past its top needs.
+/// the zoom's close; `scrollBounceBehavior` can't while content overflows. Its
+/// nearest scroll view is the pager, never the queue, which needs its bounce.
 // shortcut: relies on SwiftUI's ScrollView being a UIScrollView; drop it once SwiftUI can turn the bounce off.
 private struct PagerBounceOff: UIViewRepresentable {
     func makeUIView(context: Context) -> Probe {
@@ -120,8 +108,6 @@ private struct PagerBounceOff: UIViewRepresentable {
     }
 }
 
-/// Above the panel, the controls folded into one row, as the mini player's:
-/// the artwork, the title, play and next, over how far the song has got.
 private struct CompactControls: View {
     let track: Track
 
@@ -144,9 +130,8 @@ private struct CompactControls: View {
     }
 }
 
-/// The close button, and the song's menu as the player bar's: saving it
-/// (signed in), its artist and its album. Rating is beside the title, and
-/// queueing the song playing has no use.
+/// The menu leaves out rating, which is beside the title, and queueing, which
+/// has no use for the song playing.
 private struct NowPlayingTopBar: View {
     let track: Track
 
@@ -176,8 +161,7 @@ private struct NowPlayingTopBar: View {
     }
 }
 
-/// The artwork as large as the room left for it, square, decoded at the
-/// player's shared size, which is fetched ahead with the song.
+/// Decoded at the player's shared size, which is fetched ahead with the song.
 private struct LargeArtwork: View {
     let url: String?
 
@@ -192,13 +176,10 @@ private struct LargeArtwork: View {
     }
 }
 
-/// Behind the screen, the artwork's colours where they sit in it, as a
-/// blurred copy would show them without the cost of blurring, darkening
-/// downwards as Spotify's, and fading as the song changes; the panel's own
-/// colour without artwork.
+/// The artwork's colours where they sit in it, as a blurred copy would show
+/// them without the cost of blurring.
 private struct NowPlayingBackground: View {
     private static let edge = ArtworkPalette.meshEdge
-    /// An even grid, its outer points on the screen's edges.
     private static let points = (0..<edge * edge).map { cell in
         SIMD2(Float(cell % edge), Float(cell / edge)) / Float(edge - 1)
     }

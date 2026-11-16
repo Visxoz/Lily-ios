@@ -10,7 +10,7 @@ public struct RGB: Codable, Hashable, Sendable {
         self.b = b
     }
 
-    /// From `0xRRGGBB`, as `Accent.rgb` gives.
+    /// From `0xRRGGBB`.
     public init(hex: UInt32) {
         self.init(
             r: Double(hex >> 16 & 0xFF) / 255, g: Double(hex >> 8 & 0xFF) / 255, b: Double(hex & 0xFF) / 255
@@ -18,10 +18,7 @@ public struct RGB: Codable, Hashable, Sendable {
     }
 }
 
-/// Colours taken from artwork, as ytm-native's `images.rs`: a dark accent
-/// for page headers behind white text, a grid of the artwork's colours for
-/// Now Playing, and a vivid one for controls when the accent follows the
-/// artwork, each made readable in each look.
+/// Colours taken from artwork, each made readable in each look.
 public enum ArtworkPalette {
     /// The least saturation `accent` gives, which greyish artwork gets.
     private static let minSaturation = 0.25
@@ -31,28 +28,21 @@ public enum ArtworkPalette {
     /// Hue pools, so artwork of several colours gives its strongest one
     /// rather than their average, which tends to grey.
     private static let hues = 12
-    /// The edge of the copy sampled, never the full image.
     private static let sampleEdge = 16
-    /// The edge of the grid `colours` spreads the artwork's colours over,
-    /// each cell a block of the sample.
     public static let meshEdge = 4
 
-    /// One hue's pixels: red, green and blue summed by weight, the weight,
-    /// and how much colour they carry.
     private struct Pool {
         var r = 0.0, g = 0.0, b = 0.0, weight = 0.0, chroma = 0.0
     }
 
-    /// The artwork's `accent`, and its colours across a `meshEdge`-square
-    /// grid, row by row from the top, as a blurred copy of it would show
-    /// them, for Now Playing's background. One sample serves both.
+    /// The `accent`, and a `meshEdge`-square grid of the artwork's colours
+    /// row by row from the top, for Now Playing's background.
     public static func colours(_ image: CGImage) -> (accent: RGB, mesh: [RGB]) {
         let pixels = sample(image)
         return (accent(pixels), mesh(pixels))
     }
 
-    /// The artwork's strongest colour, darkened enough for white text, as
-    /// Spotify tints its page headers. ytm-native's `accent_of`.
+    /// The artwork's strongest colour, darkened enough for white text.
     public static func accent(_ image: CGImage) -> RGB {
         accent(sample(image))
     }
@@ -75,17 +65,14 @@ public enum ArtworkPalette {
             pools[index].weight += weight
             pools[index].chroma += chroma
         }
-        // The last of equals, as Rust's `max_by`, which only matters when
-        // every pool is empty.
         let best = pools.reduce(Pool()) { $1.weight >= $0.weight ? $1 : $0 }
         let mean = best.weight > 0
             ? RGB(r: best.r / best.weight, g: best.g / best.weight, b: best.b / best.weight)
             : RGB(r: 0, g: 0, b: 0)
         let (h, s, _) = hsl(mean)
-        // Muted artwork with a hue all the same, such as a bluish photo,
-        // stays clear of greyish artwork's floor, so `vivid` can tell them
-        // apart. Chroma, unlike saturation, stays low for near-black with a
-        // cast.
+        // Muted artwork with one hue stays above greyish artwork's floor, so
+        // `vivid` can tell them apart. Chroma, unlike saturation, stays low
+        // for near-black with a cast.
         let chroma = max(mean.r, mean.g, mean.b) - min(mean.r, mean.g, mean.b)
         let saturation = chroma >= 0.05 && best.chroma >= colourfulWeight
             ? min(max(s, minSaturation + 0.1), 0.7)
@@ -95,9 +82,8 @@ public enum ArtworkPalette {
         return readable(fromHSL(h, saturation, 0.32), light: true)
     }
 
-    /// Each cell's mean, keeping its hue with no more colour than the area
-    /// has, so greys stay grey, within the accent's band of lightness, so
-    /// white text reads across them all as it does on the accent.
+    /// Each cell's mean, no more colourful than the area and within the
+    /// accent's band of lightness, so white text reads across them all.
     private static func mesh(_ pixels: [RGB]) -> [RGB] {
         let block = sampleEdge / meshEdge
         let count = Double(block * block)
@@ -120,8 +106,7 @@ public enum ArtworkPalette {
         }
     }
 
-    /// The artwork's colour for controls drawn in it, or nil for greyish
-    /// artwork, whose hue means nothing.
+    /// The artwork's colour for controls, or nil for greyish artwork.
     public static func vivid(_ image: CGImage) -> RGB? {
         vivid(accent(image))
     }
@@ -134,9 +119,8 @@ public enum ArtworkPalette {
         return s > minSaturation + 0.05 ? fromHSL(h, max(s, 0.5), 0.5) : nil
     }
 
-    /// `colour` made just light or dark enough to read: as text on the light
-    /// look's white, or, in the dark looks, as text on black and behind
-    /// white icons. WCAG asks 4.5:1 of text and 3:1 of icons.
+    /// `colour` made just light or dark enough to read as text on the look's
+    /// background, and in the dark looks behind white icons (WCAG 4.5:1, 3:1).
     public static func readable(_ colour: RGB, look: Look) -> RGB {
         readable(colour, light: look == .light)
     }
@@ -176,7 +160,7 @@ public enum ArtworkPalette {
                       bytesPerRow: edge * 4, space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
                   )
             else { return }
-            // Averages each area, as ytm-native's triangle filter does.
+            // Averages each area rather than picking single pixels.
             context.interpolationQuality = .high
             // The centre square, as the artwork views crop to fill, so a video's
             // wide thumbnail gives the colours shown rather than its edges'.
@@ -190,8 +174,7 @@ public enum ArtworkPalette {
         }
     }
 
-    /// Through 8-bit channels, as ytm-native's colours are, which `vivid`'s
-    /// threshold allows for.
+    /// Rounded through 8-bit channels, which `vivid`'s threshold allows for.
     static func fromHSL(_ h: Double, _ s: Double, _ l: Double) -> RGB {
         func byte(_ c: Double) -> Double { min(max((c * 255).rounded(), 0), 255) / 255 }
         let colour = rgb(h, s, l)
@@ -233,7 +216,6 @@ public enum ArtworkPalette {
 }
 
 private extension Double {
-    /// The remainder in 0..<`divisor`, as Rust's `rem_euclid`.
     func euclideanRemainder(_ divisor: Double) -> Double {
         let remainder = truncatingRemainder(dividingBy: divisor)
         return remainder < 0 ? remainder + divisor : remainder

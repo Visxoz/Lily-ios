@@ -1,15 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's `TrackRow` (`page/track-row.slint`): the number, or the
-/// equaliser while it plays; the artwork unless the list is numbered (an
-/// album's); the title, in the accent while playing, over the artists; the
-/// menu button; and the length, when known. Tapping plays; holding opens the
-/// same menu.
-///
-/// The album column ytm-native shows on wide windows has no room here, and
-/// the menu button, which ytm-native shows on hover, sits tight against the
-/// length, so the title keeps the room.
+/// The menu button sits tight against the length, so the title keeps the room.
 struct TrackRow: View {
     let track: Track
     let number: Int
@@ -83,8 +75,7 @@ struct TrackRow: View {
     }
 }
 
-/// The equaliser of the playing row, apart so that play and pause redraw
-/// this alone rather than every row.
+/// Apart so that play and pause redraw this alone rather than every row.
 struct PlayingEqualizer: View {
     var colour: Color?
 
@@ -95,7 +86,6 @@ struct PlayingEqualizer: View {
     }
 }
 
-/// The column labels above an album's or playlist's track list.
 struct TrackColumns: View {
     @Environment(\.theme) private var theme
 

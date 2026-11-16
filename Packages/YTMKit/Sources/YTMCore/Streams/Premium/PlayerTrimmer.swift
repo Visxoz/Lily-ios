@@ -1,27 +1,17 @@
 import Foundation
 
-/// Cuts YouTube's player script down to the code that unscrambles stream
-/// URLs, so JavaScriptCore loads a few hundred KB instead of several MB.
-///
-/// This follows yt-dlp's solver (github.com/yt-dlp/ejs), as ytm-native's
-/// `trim.rs` does: the URL scrambler is the top-level function whose body
-/// calls `X.y("alr", "yes")`, and the script keeps every top-level statement
-/// it transitively depends on. ytm-native parses with oxc; here a native
-/// tokenizer finds the statements and the names they define and use. It
-/// tracks no inner scopes, so a local that shadows a top-level name keeps
-/// that name's statements too: harmless extra code, where a missed
-/// dependency would break the script.
+/// Keeps only the top-level statements the URL scrambler needs, as yt-dlp's solver (github.com/yt-dlp/ejs)
+/// does, so JavaScriptCore loads a few hundred KB, not several MB. Inner scopes aren't tracked, so a
+/// shadowing local keeps extra code: harmless, where a missed dependency breaks.
 enum PlayerTrimmer {
-    /// What a top-level statement defines or depends on.
     enum Key: Hashable {
         case symbol(String)
         /// A property of the player's namespace parameter, `g.X`.
         case namespace(String)
     }
 
-    /// Returns a script that, run as the body of `function (_result) {…}`,
-    /// sets `_result.n` and `_result.sig` to functions that unscramble
-    /// those URL parameters.
+    /// A script that, run as the body of `function (_result) {…}`, sets
+    /// `_result.n` and `_result.sig` to functions that unscramble them.
     static func trim(_ source: [UInt8]) throws -> String {
         let layout = YTMError(.parse, "YouTube's player script has an unexpected layout.")
         var reader = try StatementReader(source)
@@ -72,7 +62,6 @@ enum PlayerTrimmer {
             throw YTMError(.parse, "The URL scrambler wasn't found in YouTube's player script.")
         }
 
-        // Keep everything the scramblers transitively depend on.
         var keep = [Bool](repeating: false, count: statements.count)
         var pending = scramblers
         while let index = pending.popLast() {
@@ -91,8 +80,7 @@ enum PlayerTrimmer {
         out.append(UInt8(ascii: "\n"))
         for (statement, kept) in zip(statements, keep) where kept {
             out += source[statement.range]
-            // A statement JavaScript ended at a line break needs its
-            // semicolon now that another may follow on the same terms.
+            // A statement ended by a line break needs a semicolon now that another may follow.
             if !statement.isTerminated { out.append(UInt8(ascii: ";")) }
             out.append(UInt8(ascii: "\n"))
         }
@@ -104,8 +92,7 @@ enum PlayerTrimmer {
         return String(decoding: out, as: UTF8.self)
     }
 
-    /// Whether a key is one the player itself declares: a `g.X` property or
-    /// a top-level name, not a browser global.
+    /// A `g.X` property or a top-level name the player declares, not a browser global.
     private static func isTracked(_ key: Key, declared: Set<String>) -> Bool {
         switch key {
         case .namespace: true
@@ -113,12 +100,8 @@ enum PlayerTrimmer {
         }
     }
 
-    /// The top-level names and `g.X` properties a statement uses, read
-    /// again from its source only once the statement is kept. Property
-    /// names after a dot, object keys and the names a `var` list declares
-    /// are not uses; `g.X` depends on whatever defines `g.X`, not on all of
-    /// `g`. The player declares most of its names in one long `var` list,
-    /// which would otherwise keep everything.
+    /// Names after a dot, object keys and the names a `var` list declares aren't uses, and `g.X` depends
+    /// only on what defines `g.X`: the player's one long `var` list would otherwise keep everything.
     private static func references(
         in statement: StatementReader.Statement, of source: [UInt8], namespace: String, declared: Set<String>
     ) throws -> Set<Key> {

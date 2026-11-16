@@ -1,13 +1,8 @@
 import Foundation
 
-// The header and track list of album and playlist pages, which the album,
-// playlist and library pages share.
-
 extension Renderers {
-    /// The header renderer of an album or playlist page, in either layout:
-    /// the two-column page's first tab, else the page's own header. A
-    /// playlist the signed-in user owns comes wrapped in an editable header,
-    /// as the patched rustypipe reads it.
+    /// An album or playlist page's header renderer, from the two-column page's
+    /// first tab or else its own header; owned playlists wrap it as editable.
     static func detailHeader(in response: JSON) -> (renderer: JSON, editable: Bool) {
         let tab = response["contents", "twoColumnBrowseResultsRenderer", "tabs"][0]["tabRenderer", "content", "sectionListRenderer", "contents"][0]
         for wrapper in [tab, response["header"]] {
@@ -18,7 +13,6 @@ extension Renderers {
         return (.missing, false)
     }
 
-    /// The shelf of an album or playlist page's tracks.
     static func trackShelf(in response: JSON) -> JSON {
         sectionList(in: response)["contents"].array.lazy
             .map { $0.first("musicShelfRenderer", "musicPlaylistShelfRenderer") }
@@ -34,7 +28,6 @@ extension Renderers {
         return Formatting.number(first)
     }
 
-    /// A header's description, plain or in a description shelf.
     static func description(_ header: JSON) -> String? {
         let description = header["description"]
         let shelf = description["musicDescriptionShelfRenderer", "description"]

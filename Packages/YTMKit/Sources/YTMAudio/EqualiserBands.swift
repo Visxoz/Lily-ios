@@ -1,10 +1,9 @@
 import Foundation
 
-/// The equaliser's six peaking bands and starting points, as ytm-native's `eq.rs`.
 public struct EqualiserBands {
     /// Each band's centre in Hz.
     public static let frequencies: [Float] = [60, 150, 400, 1_000, 2_400, 15_000]
-    /// The furthest a band goes either way, in dB.
+    /// Either way, in dB.
     public static let maxGain: Float = 12
     /// Each band's gain in dB, from low to high.
     public static let presets: [(name: String, gains: [Float])] = [
@@ -17,20 +16,18 @@ public struct EqualiserBands {
         ("Acoustic", [3, 2, 1, 1, 2, 2]),
     ]
 
-    /// How wide the peaks are: Q 0.9, about an octave and a half.
+    /// About an octave and a half.
     static let q = 0.9
     /// The same width as `AVAudioUnitEQ` takes it, in octaves.
     static let bandwidth = Float(2 / log(2.0) * asinh(1 / (2 * q)))
 
-    /// Every band's gain within range, one per band.
+    /// Exactly one gain per band; missing ones are 0.
     static func clamped(_ gains: [Float]) -> [Float] {
         frequencies.indices.map { gains.indices.contains($0) ? min(max(gains[$0], -maxGain), maxGain) : 0 }
     }
 
-    /// How far the bands together lift the loudest frequency, in dB, so the
-    /// whole signal can be lowered by as much and never clip. Neighbouring
-    /// bands overlap and their boosts add, so the peak is found on a
-    /// sixth-octave grid from 20 Hz to below Nyquist, as `eq.rs` does.
+    /// In dB. Neighbouring bands overlap and their boosts add, so the peak is found on a sixth-octave
+    /// grid from 20 Hz to below Nyquist.
     static func headroom(for gains: [Float], sampleRate: Double) -> Float {
         let filters = clamped(gains).enumerated().map { Peak(band: $0.offset, gain: $0.element, rate: sampleRate) }
         let top = sampleRate * 0.45
@@ -41,8 +38,8 @@ public struct EqualiserBands {
         return Float(max(peak, 0))
     }
 
-    /// One band's peaking filter, from RBJ's Audio EQ Cookbook, kept only to
-    /// work out the bands' combined response. A peaking filter's b1 equals its a1.
+    /// RBJ's Audio EQ Cookbook peaking filter, only to work out the bands' combined response.
+    /// A peaking filter's b1 equals its a1.
     struct Peak {
         var b0 = 1.0, b2 = 0.0, a1 = 0.0, a2 = 0.0
 
@@ -60,7 +57,7 @@ public struct EqualiserBands {
             a2 = (1 - alpha / a) / a0
         }
 
-        /// The filter's gain in dB at `hz`, from its transfer function.
+        /// In dB.
         func response(at hz: Double, rate: Double) -> Double {
             let w = 2 * Double.pi * hz / rate
             func magnitude(_ c0: Double, _ c1: Double, _ c2: Double) -> Double {

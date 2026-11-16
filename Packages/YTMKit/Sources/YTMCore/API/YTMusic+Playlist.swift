@@ -1,18 +1,14 @@
 import Foundation
 
 extension YTMusic {
-    /// The longest playlist loaded, as ytm-native's `PLAYLIST_LIMIT`.
     static let playlistLimit = 500
 
-    /// A playlist's header and first batch of tracks; `loadMore` adds the
-    /// rest a batch at a time, up to `playlistLimit`.
+    /// The first batch; `loadMore` adds the rest, up to `playlistLimit`.
     func playlistPage(_ id: String) async throws -> Page {
         try Renderers.playlistPage(try await playlistResponse(id, asOwner: true), id: id)
     }
 
-    /// A playlist's tracks up to `limit`, following its continuations. A
-    /// batch that fails ends the list with what arrived, as rustypipe's
-    /// `extend_limit` does for ytm-native.
+    /// A batch that fails ends the list with what arrived.
     func playlistTracks(_ id: String, limit: Int, asOwner: Bool) async throws -> [Track] {
         let shelf = Renderers.trackShelf(in: try await playlistResponse(id, asOwner: asOwner))
         var tracks = Renderers.tracks(shelf["contents"].array)
@@ -25,8 +21,7 @@ extension YTMusic {
         return tracks
     }
 
-    /// The tracks after `token` and the token after them, or nil when the
-    /// batch failed for any reason but cancellation.
+    /// Nil when the batch failed for any reason but cancellation.
     func playlistBatch(after token: String, asOwner: Bool) async throws -> (tracks: [Track], next: String?)? {
         do {
             let response = try await asAccount(asOwner) { try await self.innerTube.continuation(token, authenticated: $0) }
@@ -42,11 +37,9 @@ extension YTMusic {
         try await asAccount(asOwner) { try await self.innerTube.browse("VL" + id, authenticated: $0) }
     }
 
-    /// Runs `request` as the account when `asOwner`, as ytm-native's
-    /// `fetch_playlist`: private playlists, Liked music and the radios made
-    /// from them exist only for their owner. Should the cookie have gone
-    /// stale, public playlists still open signed out; the first failure is
-    /// the one reported.
+    /// Private playlists, Liked music and their radios exist only for their
+    /// owner; with a stale cookie, public ones still open signed out. The
+    /// first failure is the one reported.
     private func asAccount(_ asOwner: Bool, _ request: (Bool) async throws -> JSON) async throws -> JSON {
         guard asOwner else { return try await request(false) }
         do {
@@ -60,8 +53,6 @@ extension YTMusic {
 }
 
 extension Renderers {
-    /// A playlist page as ytm-native's `playlist` builds it: the header and
-    /// the first batch of tracks, with the rest to follow.
     static func playlistPage(_ response: JSON, id: String) throws -> Page {
         let (header, editable) = detailHeader(in: response)
         let shelf = trackShelf(in: response)
@@ -91,9 +82,8 @@ extension Renderers {
         )
     }
 
-    /// Who made a playlist: the channel its facepile links to, else the
-    /// channel linked in the strapline or subtitle. YouTube Music's own
-    /// playlists name none.
+    /// The channel the facepile links to, else the one in the strapline or
+    /// subtitle. YouTube Music's own playlists name none.
     private static func playlistOwner(_ header: JSON) -> String? {
         let facepile = header["facepile", "avatarStackViewModel"]
         guard facepile.exists else {

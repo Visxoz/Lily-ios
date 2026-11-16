@@ -5,8 +5,6 @@ import YTMAudio
 @testable import YTMCore
 @testable import YTMPlayback
 
-/// The player's logic against fake YouTube, engine and Last.fm: what it asks
-/// for, what it hands the engine, and what it records, in ytm-native's terms.
 @MainActor
 struct PlayerControllerTests {
     @Test func playsAnAlbumGaplesslyRecordingEachPlayOnce() async throws {
@@ -245,7 +243,7 @@ struct PlayerControllerTests {
         rig.player.rate(.dislike)
         await rig.settle()
         #expect(rig.player.current?.id == "b")
-        // Each rating is sent on its own task, as ytm-native's spawn, so taps this close may arrive in any order.
+        // Each rating is sent on its own task, so taps this close may arrive in any order.
         #expect(rig.music.calls.filter { $0.hasPrefix("rate") }.sorted() == ["rate a DISLIKE", "rate a INDIFFERENT", "rate a LIKE"])
     }
 
@@ -400,7 +398,6 @@ struct PlayerControllerTests {
     }
 }
 
-/// Premium versus free, as ytm-native's `resolve.rs` chooses.
 struct StreamChooserTests {
     @Test func takesTheAccountAsWithoutPremiumAfterThreeSongsWithout() async throws {
         let music = FakeMusic()

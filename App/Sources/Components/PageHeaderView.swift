@@ -1,12 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's `PageHeader` (`page/header.slint`): an artist's banner with
-/// the name over it, or an album's or playlist's artwork above its label,
-/// title and details; then Play, Shuffle and Radio.
-///
-/// On a portrait screen the artwork sits above the text rather than beside
-/// it, and the title is set smaller to fit.
 struct PageHeaderView: View {
     let header: PageHeader
     let canPlay: Bool
@@ -18,9 +12,7 @@ struct PageHeaderView: View {
 
     @Environment(\.theme) private var theme
 
-    /// The shorter side of the header's artwork as drawn, which the page
-    /// samples for its tint at the same size, so the decode is shared: a
-    /// banner's height reaching up under the bar, or the square's edge.
+    /// The page samples its tint at this size too, so the decode is shared.
     static func artEdge(_ header: PageHeader, topInset: CGFloat) -> CGFloat {
         header.banner ? Metrics.bannerHeight + topInset : Metrics.headerArt
     }
@@ -82,7 +74,6 @@ struct PageHeaderView: View {
     }
 }
 
-/// The label, title and "subtitle • meta" line.
 private struct HeaderText: View {
     let header: PageHeader
     let foreground: Color
@@ -118,8 +109,6 @@ private struct HeaderText: View {
         }
     }
 
-    /// Shorter titles set larger, as ytm-native steps them, scaled for the
-    /// phone (desktop 76, 60, 44 and 34).
     private var titleSize: CGFloat {
         switch header.title.count {
         case ...12: 44

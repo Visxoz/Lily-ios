@@ -1,17 +1,9 @@
 import Foundation
 import JavaScriptCore
 
-/// Runs a trimmed player's unscrambling functions in JavaScriptCore.
-///
-/// Each solve gets a throwaway virtual machine, as ytm-native gives each
-/// one a fresh QuickJS runtime, so nothing of YouTube's code stays in memory
-/// between songs. Its limits stand in for QuickJS's: the solve is stopped
-/// after two seconds, or once the app's memory has grown by 64 MB while it
-/// runs, so a broken player fails instead of hanging or bloating. Unlike
-/// QuickJS's cap, which its allocator enforces, both are checked only
-/// between JavaScript steps, so one native call (a huge `repeat` or `fill`)
-/// can overshoot them before it is stopped: JavaScriptCore has no heap
-/// limit, and iOS gives an app no separate process to contain it.
+/// Each solve gets a throwaway context, so nothing of YouTube's code stays in memory between songs.
+/// The limits are checked only between JavaScript steps, so one native call (a huge `repeat` or `fill`)
+/// can overshoot them: JavaScriptCore has no heap limit, and iOS gives an app no separate process.
 enum Solver {
     struct Solution: Sendable, Equatable {
         let n: String?
@@ -28,7 +20,6 @@ enum Solver {
     /// Solves one at a time, off the cooperative pool, as a solve blocks.
     private static let queue = DispatchQueue(label: "YTMusic.Solver", qos: .userInitiated)
 
-    /// Unscrambles `n` and `signature` with `code`, from `PlayerTrimmer`.
     static func solve(_ code: String, n: String?, signature: String?) async throws -> Solution {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
@@ -69,13 +60,8 @@ enum Solver {
     }
 }
 
-/// The time and memory a solve may take, checked by JavaScriptCore's
-/// watchdog every `checkInterval` of JavaScript execution, never inside a
-/// native builtin.
-///
-/// The watchdog's C API is public only in JavaScriptCore's private header,
-/// so it is looked up at run time; without it nothing is solved, as a
-/// runaway player could never be stopped.
+/// The watchdog's C API is only in JavaScriptCore's private header, so it is looked up at run time;
+/// without it nothing is solved, as a runaway player could never be stopped.
 private final class Limits {
     private typealias ShouldTerminate = @convention(c) (JSContextRef?, UnsafeMutableRawPointer?) -> Bool
     private typealias SetLimit = @convention(c) (JSContextGroupRef?, Double, ShouldTerminate?, UnsafeMutableRawPointer?) -> Void
@@ -94,10 +80,8 @@ private final class Limits {
         setLimit = unsafeBitCast(symbol, to: SetLimit.self)
     }
 
-    /// Has the watchdog call back after another `checkInterval` of the
-    /// script running. It calls back once per limit set, so each check that
-    /// lets the script carry on sets the next. Unretained: `self` outlives
-    /// every script the context runs, and the callback runs only within one.
+    /// The watchdog calls back once per limit set, so each check that lets the script carry on sets the
+    /// next. Unretained: `self` outlives every script the context runs, and the callback runs only within one.
     func arm(_ group: JSContextGroupRef?) {
         setLimit(group, Solver.checkInterval, { context, info in
             guard let context, let info else { return true }

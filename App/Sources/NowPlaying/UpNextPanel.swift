@@ -2,29 +2,19 @@ import SwiftUI
 import YTMCore
 import YTMPlayback
 
-/// The queue under "Up next", as `side-panel.slint` and `queue.slint` with
-/// `queue_panel.rs` behind them: tap a row to play it, hold and drag it into
-/// a new order, swipe it away, or pick several with Select (the desktop's
-/// Ctrl-click) to remove them or play them next together. The header saves
-/// the queue as a playlist or clears what is still to come.
-///
-/// A native `List` keeps the rows lazy and recycled and does the dragging,
-/// so a long queue costs only the rows on screen. The list redraws when the
-/// queue changes, never as the song plays. Rows, the selection and each
-/// row's actions follow queue entries by ID, not place, so an edit animates
-/// the rows it touched while the rest keep their state, and an open swipe or
-/// menu acts on its own song however the queue has moved meanwhile.
+/// Rows, the selection and each row's actions follow queue entries by ID,
+/// not place, so an open swipe or menu acts on its own song however the
+/// queue moves.
 struct UpNextPanel: View {
-    /// Whether the panel is on screen; off it, the list keeps the song
-    /// playing at its top, ready for the swipe up.
+    /// Off screen, the list keeps the song playing at its top, ready for the
+    /// swipe up.
     let isShown: Bool
-    /// Closes the panel, for a pull down past the top of the list.
+    /// For a pull down past the top of the list.
     let close: () -> Void
 
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var editMode = EditMode.inactive
-    /// Queue entries picked while selecting.
     @State private var selection = Set<Queue<Track>.Entry.ID>()
 
     var body: some View {
@@ -33,9 +23,8 @@ struct UpNextPanel: View {
             header(count: queue.count)
             list(queue)
         }
-        // Picks stay with their entries through an edit, such as Smart
-        // Shuffle's inserts; a new queue, whose entries are all new, lets
-        // them go, as ytm-native's `forget_selection`.
+        // Picks stay with their entries through an edit; a new queue, whose
+        // entries are all new, lets them go.
         .onChange(of: queue.revision) {
             guard !selection.isEmpty else { return }
             selection.formIntersection(app.player.queue.entries.lazy.map(\.id))
@@ -140,7 +129,6 @@ struct UpNextPanel: View {
     }
 }
 
-/// `queue.slint`'s `PanelAction`: a text button in the panel's header.
 private struct PanelAction: View {
     let title: String
     let action: () -> Void

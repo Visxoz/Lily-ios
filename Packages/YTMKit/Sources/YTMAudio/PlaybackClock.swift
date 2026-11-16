@@ -1,12 +1,8 @@
 import AVFoundation
 import Synchronization
 
-/// The play position, and the length and download of the item heard, kept
-/// where the main actor can read them at any time without waiting on the
-/// engine. The engine pins it to the player node's
-/// render timeline as buffers play; between times it runs on with the host
-/// clock, which the render timeline follows, and it never runs past the
-/// sound scheduled, so a stall holds it still.
+/// Readable from the main actor at any time without waiting on the engine. Between pins it runs on with
+/// the host clock, never past the sound scheduled, so a stall holds it still.
 final class PlaybackClock: Sendable {
     private struct State {
         /// The position at `since`, or for good while it is not running.
@@ -32,13 +28,12 @@ final class PlaybackClock: Sendable {
         state.withLock(\.duration)
     }
 
-    /// How much of the item heard has downloaded, from 0 to 1.
+    /// From 0 to 1.
     var buffered: Double {
         state.withLock(\.buffered)
     }
 
-    /// Pins the position: `seconds` at host time `since`, running on from
-    /// there up to `limit`, or held at `seconds` when `since` is nil.
+    /// Runs on from host time `since` up to `limit`, or holds at `seconds` when `since` is nil.
     func pin(_ seconds: Double, since: UInt64?, limit: Double = .infinity) {
         state.withLock { state in
             state.seconds = seconds
@@ -47,13 +42,11 @@ final class PlaybackClock: Sendable {
         }
     }
 
-    /// Holds the position where it has got to.
     func hold() {
         let seconds = position()
         pin(seconds, since: nil)
     }
 
-    /// Runs on from where it is held.
     func run() {
         let now = mach_absolute_time()
         state.withLock { state in

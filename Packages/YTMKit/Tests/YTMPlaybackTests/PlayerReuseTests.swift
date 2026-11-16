@@ -4,9 +4,6 @@ import YTMAudio
 @testable import YTMCore
 @testable import YTMPlayback
 
-/// What the player fetches once and reuses, or starts without waiting for:
-/// streams kept for songs played again, a playlist's later batches, a radio
-/// and lyrics already on their way.
 @MainActor
 struct PlayerReuseTests {
     @Test func aPlaylistCardStartsOnItsFirstBatchAndQueuesTheRest() async {

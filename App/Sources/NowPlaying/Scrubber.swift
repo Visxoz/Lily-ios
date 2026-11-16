@@ -1,19 +1,15 @@
 import SwiftUI
 import YTMCore
 
-/// The seek bar with the time played and the song's length, as the player
-/// bar's. The position is pulled four times a second, as the player ticks,
-/// while the song plays, never while paused or while the bar is being
-/// dragged; the drag shows where it would seek to and seeks once let go. A
-/// seek made while paused shows the place sought.
+/// The position is pulled four times a second, as the player ticks, never
+/// while paused or dragged; a drag seeks once let go.
 struct Scrubber: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     /// Where the bar is being dragged to, as a fraction of the song.
     @State private var scrubbing: Double?
-    /// The place last sought, shown while paused until the song plays or
-    /// changes, as the engine's clock may not have reached it and a paused
-    /// bar is never pulled again.
+    /// The place last sought, shown while paused as the engine's clock may not
+    /// have reached it and a paused bar is never pulled again.
     @State private var sought: Double?
 
     var body: some View {

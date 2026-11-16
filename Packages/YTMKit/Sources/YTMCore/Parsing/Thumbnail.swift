@@ -1,18 +1,14 @@
 import Foundation
 
-/// Artwork URLs at the size they are shown.
-///
 /// googleusercontent artwork renders at any size named in its URL, so one
 /// stored URL serves a row, a card and Now Playing alike.
 enum Thumbnail {
-    /// Edges in pixels that parsers store thumbnails at, as ytm-native's
-    /// `convert.rs`: list rows, cards and page headers.
+    /// Edges in pixels that parsers store thumbnails at.
     static let row = 120
     static let card = 240
     static let header = 544
 
-    /// `url` resized for a square `edge` pixels wide, if it is on a host the
-    /// app may fetch from.
+    /// `url` resized to `edge`, or nil if its host isn't on the allowlist.
     static func url(_ url: String?, edge: Int) -> URL? {
         guard let url, let resized = URL(string: resized(url, edge: edge)), HTTP.isAllowed(resized) else { return nil }
         return resized
@@ -42,8 +38,6 @@ enum Thumbnail {
         return (smallestFitting ?? largest).map { resized($0.url, edge: edge) }
     }
 
-    /// The thumbnails of a renderer's `thumbnail` or `thumbnailRenderer`,
-    /// whichever wrapper YouTube used.
     static func list(in renderer: JSON) -> JSON {
         let wrapper = renderer.first("thumbnailRenderer", "thumbnail")
         return wrapper.first("musicThumbnailRenderer", "croppedSquareThumbnailRenderer")["thumbnail", "thumbnails"]

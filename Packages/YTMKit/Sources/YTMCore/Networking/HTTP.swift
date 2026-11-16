@@ -1,14 +1,9 @@
 import Foundation
 
-/// The app's own HTTP sessions, limited to the hosts YouTube Music and
-/// Last.fm need.
-///
-/// Every URL taken from a response (artwork, streams, the player script) is
-/// checked with `isAllowed` before it is requested, and every redirect is too,
-/// so a hostile or broken response can never send the app elsewhere.
+/// Every URL taken from a response, and every redirect, is checked with
+/// `isAllowed`, so a hostile or broken response can never send the app elsewhere.
 enum HTTP {
-    /// Domains requested with their subdomains: YouTube's API and player, the
-    /// audio streams and artwork, as ytm-native's `ALLOWED_DOMAINS`.
+    /// Allowed with their subdomains.
     private static let domains = [
         "youtube.com",
         "googlevideo.com",
@@ -21,7 +16,7 @@ enum HTTP {
     /// Last.fm's API and its sign-in page, on these hosts only.
     private static let hosts: Set<String> = ["ws.audioscrobbler.com", "www.last.fm"]
 
-    /// Whether the app may request `url`: HTTPS on an allowed host.
+    /// HTTPS on an allowed host.
     static func isAllowed(_ url: URL) -> Bool {
         guard url.scheme?.lowercased() == "https", let host = url.host()?.lowercased(), !host.isEmpty else {
             return false
@@ -29,9 +24,8 @@ enum HTTP {
         return hosts.contains(host) || domains.contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
-    /// InnerTube and Last.fm calls. Nothing is cached and no cookie is kept:
-    /// the signed-in Cookie header is set per request from the Keychain.
-    /// URLSession decompresses gzip and Brotli on its own.
+    /// Nothing is cached and no cookie is kept: the signed-in Cookie header is
+    /// set per request from the Keychain.
     static let api: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.urlCache = nil
@@ -39,18 +33,15 @@ enum HTTP {
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false
         config.httpCookieAcceptPolicy = .never
-        // As ytm-native's client: a request that has not answered in 15 s is
-        // not going to.
+        // A request that has not answered in 15 s is not going to.
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 60
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
     }()
 
-    /// Artwork: a disk cache that outlives launches, so rows scroll in from
-    /// disk rather than the network, and more connections per host, as a
-    /// screen of cards asks for many images at once. Pages prefetch all their
-    /// art, so a long playlist's thumbnails (about 10 KB each) must not push
-    /// Home's out.
+    /// Artwork, cached on disk across launches. Pages prefetch all their art,
+    /// so the cache must fit a long playlist's thumbnails (about 10 KB each)
+    /// without pushing Home's out.
     static let media: URLSession = {
         let config = URLSessionConfiguration.default
         config.urlCache = URLCache(
@@ -59,8 +50,7 @@ enum HTTP {
             directory: URL.cachesDirectory.appending(path: "artwork", directoryHint: .isDirectory)
         )
         // Artwork URLs name their image and size, so a stored copy is always
-        // right, offline too; asking the server again once its short max-age
-        // lapses would only hold a placeholder on screen.
+        // right; revalidating after the short max-age only delays the image.
         config.requestCachePolicy = .returnCacheDataElseLoad
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false
@@ -70,13 +60,8 @@ enum HTTP {
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
     }()
 
-    /// Performs `request` after checking its host, and fails on any status
-    /// outside 2xx. Errors say what went wrong without the URL, which may
-    /// carry stream signatures.
-    ///
-    /// With `retries`, a server error, a 429 or a timeout is asked again up
-    /// to that many times, after about 1 s, then 3 s, as rustypipe's
-    /// `http_request` rides them out.
+    /// Checks the host and fails outside 2xx. Errors omit the URL, which may
+    /// carry stream signatures. `retries` re-asks a 5xx, 429 or timeout.
     static func data(
         for request: URLRequest, session: URLSession = api, retries: Int = 0
     ) async throws -> (Data, HTTPURLResponse) {
@@ -103,24 +88,19 @@ enum HTTP {
         }
     }
 
-    /// A status worth asking again for: the server's own trouble, or its
-    /// asking the app to slow down.
     static func isTransient(status: Int) -> Bool {
         status == 429 || (500..<600).contains(status)
     }
 
-    /// rustypipe's `retry_delay(n, 1000, 60000, 3)`: 3^n seconds with a
-    /// jitter of 0.8 to 1.5, so callers refused together don't ask again
-    /// together, kept within 1 s to 60 s.
+    /// 3^n seconds, jittered so callers refused together don't retry together.
     static func retryDelay(after attempt: Int) -> Duration {
         let milliseconds = pow(3, Double(attempt)) * Double.random(in: 800..<1500)
         return .milliseconds(Int(min(max(milliseconds, 1000), 60_000)))
     }
 }
 
-/// The host allowlist, for the modules that request URLs YTMCore handed
-/// them: the audio engine's stream downloads can't import YTMCore, so the
-/// player checks each stream URL, refreshed ones too, before passing it on.
+/// The audio engine can't import YTMCore, so the player checks each stream URL,
+/// refreshed ones too, here before passing it on.
 public enum HostAllowlist {
     public static func allows(_ url: URL) -> Bool { HTTP.isAllowed(url) }
 }
@@ -139,7 +119,6 @@ private final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
 }
 
 extension YTMError {
-    /// A transport failure, in words fit to show.
     init(_ error: URLError) {
         let message = switch error.code {
         case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:
@@ -157,8 +136,7 @@ extension YTMError {
         self.init(.network, message)
     }
 
-    /// A status outside 2xx. A redirect only gets here when `RedirectGuard`
-    /// refused to follow it.
+    /// A redirect only gets here when `RedirectGuard` refused to follow it.
     init(status: Int) {
         let message = switch status {
         case 300..<400: "The server sent the app to a site it doesn't use."

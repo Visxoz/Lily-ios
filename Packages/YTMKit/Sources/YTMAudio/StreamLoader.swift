@@ -1,11 +1,8 @@
 import Foundation
 import os
 
-/// Fetches an item's file into the audio cache, handing each piece on as it
-/// arrives, or reads back a file cached before. As ytm-native's `source.rs`,
-/// it asks in ranges, as googlevideo throttles large ones, retries what the
-/// network breaks, and on a refusal carries on from the same byte at a fresh
-/// URL for the same file.
+/// Asks in ranges, as googlevideo throttles large ones, and on a refusal carries on from
+/// the same byte at a fresh URL for the same file.
 final class StreamLoader {
     static let rangeLength: Int64 = 1 << 20
     private static let maxRetries = 4
@@ -13,11 +10,9 @@ final class StreamLoader {
     /// Fresh URLs asked for in a row without a whole range arriving from them.
     private static let maxRefreshes = 2
     private static let replayLength: Int64 = 256 << 10
-    /// What `warm` fetches, as ytm-native's warm-up.
     static let warmLength: Int64 = 64 << 10
 
-    /// Reads the file for the decoder. Its descriptor follows the file as a
-    /// finished part becomes the cached file.
+    /// Its descriptor follows the file as a finished part becomes the cached file.
     let reader: FileHandle
     /// The file's length, or 0 until a download of unknown length ends.
     private(set) var total: Int64
@@ -64,8 +59,7 @@ final class StreamLoader {
         }
     }
 
-    /// Delivers the whole file to `onBytes` in order, from the network or
-    /// the cache. Returns why it failed, or nil once complete or cancelled.
+    /// Returns why it failed, or nil once complete or cancelled.
     func run(
         isolation: isolated (any Actor)? = #isolation,
         source: any ByteSource,
@@ -143,8 +137,7 @@ final class StreamLoader {
         return nil
     }
 
-    /// Fetches the file's first `warmLength` bytes ahead of `run`, which
-    /// carries on from what arrives. Only a head start, so it never retries.
+    /// Only a head start for `run`, so it never retries.
     func warm(isolation: isolated (any Actor)? = #isolation, source: any ByteSource) async {
         guard available == 0, total > 0 else { return }
         do {
@@ -169,8 +162,7 @@ final class StreamLoader {
         available += Int64(data.count)
     }
 
-    /// Reads the file's first `end` bytes back from disk in pieces, letting
-    /// commands in between.
+    /// Yields between pieces so commands can run.
     private func replay(isolation: isolated (any Actor)? = #isolation, upTo end: Int64, _ onBytes: (Data) -> Void) async -> AudioFailure? {
         // A loader kept from a download cut short left its reader where that
         // replay stopped: the decoder reads with pread, which never moves it.
@@ -188,8 +180,7 @@ final class StreamLoader {
         return nil
     }
 
-    /// A fresh URL for the file being fetched, taken only if it serves the
-    /// same encode, as the bytes already held must line up with the rest.
+    /// Taken only if it serves the same encode, as the bytes already held must line up.
     private func refreshed(isolation: isolated (any Actor)? = #isolation) async -> (url: URL, headers: [String: String])? {
         do {
             let fresh = try await item.refresh()
@@ -204,8 +195,7 @@ final class StreamLoader {
         }
     }
 
-    /// Whether two googlevideo URLs serve the same file: the same format, of
-    /// the same length, from the same encode.
+    /// The same format, of the same length, from the same encode.
     static func sameFile(_ a: URL, _ b: URL) -> Bool {
         let first = parameters(a)
         let second = parameters(b)

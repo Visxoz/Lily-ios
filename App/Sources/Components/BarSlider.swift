@@ -1,18 +1,13 @@
 import SwiftUI
 
-/// ytm-native's `Slider` (`widgets/slider.slint`): a thin rounded bar filled
-/// to `value` over any `buffered` fill, turning the accent with a knob while dragged. It is driven
-/// from outside: `changed` follows the finger and `committed` takes where it
-/// was let go, and the owner passes the value back. The touch area is taller
-/// than the bar, for a finger.
+/// Driven from outside: `changed` follows the finger, `committed` takes where it was let go, and
+/// the owner passes the value back.
 struct BarSlider: View {
     /// From 0 to 1.
     let value: Double
-    /// How much is ready, from 0 to 1, drawn lighter behind `value`, as the
-    /// seek bar's buffered fill. Zero for none.
+    /// From 0 to 1, drawn lighter behind `value`.
     var buffered = 0.0
-    /// What VoiceOver reads as the value in place of the percentage, as the
-    /// seek bar's time.
+    /// Read by VoiceOver in place of the percentage.
     var valueText: String?
     let changed: (Double) -> Void
     let committed: (Double) -> Void
@@ -28,8 +23,7 @@ struct BarSlider: View {
     private static let touchHeight: CGFloat = 32
     private static let barHeight: CGFloat = 4
     private static let knob: CGFloat = 12
-    /// How far one swipe of VoiceOver's adjust moves it, as the slint
-    /// slider's scroll wheel step.
+    /// One swipe of VoiceOver's adjust.
     private static let step = 0.05
 
     var body: some View {

@@ -1,8 +1,6 @@
 import Foundation
 @testable import YTMCore
 
-/// Home, Explore and the pages Explore leads to, search and its
-/// suggestions: every section ytm-native shows signed out, in its order.
 enum PageChecks {
     static func run(_ report: Report) async {
         await report.check("page home") { findings in
@@ -96,7 +94,6 @@ enum PageChecks {
 }
 
 extension Findings {
-    /// The page has every section titled in `titles`.
     mutating func titles(_ page: Page, _ titles: [String]) {
         let missing = titles.filter { page.section($0) == nil }
         expect(missing.isEmpty, "missing sections \(missing); has \(page.sections.map(\.title))")

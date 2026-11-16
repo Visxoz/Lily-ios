@@ -1,9 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// The player bar's right side: the volume with its mute button,
-/// then the quality badge and the buttons that open the panel on Lyrics or
-/// Up next.
 struct PlayerOptions: View {
     let open: (PanelTab) -> Void
 
@@ -29,8 +26,6 @@ struct PlayerOptions: View {
     }
 }
 
-/// Mute and the phone's own volume, which the slider shows and sets and
-/// which follows the side buttons.
 private struct VolumeControl: View {
     @Environment(AppModel.self) private var app
     @State private var volume = SystemVolume()

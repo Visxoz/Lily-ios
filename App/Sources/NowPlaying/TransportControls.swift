@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// The player bar's transport: shuffle (off, on, then Smart Shuffle as
-/// sparkles), previous, play, next and repeat (off, all, one).
 struct TransportControls: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme

@@ -2,12 +2,9 @@ import Foundation
 @testable import YTMAudio
 @testable import YTMCore
 
-/// Real songs streamed through the engine from googlevideo and rendered
-/// offline: two Opus songs back to back, which must join with no gap, and
-/// an AAC one, each played for exactly as long as it decodes to and as long
-/// as YouTube says it is.
+/// Real songs streamed through the engine and rendered offline.
 enum AudioChecks {
-    /// How far YouTube's stated length may be from the decoded one.
+    /// Seconds YouTube's stated length may be from the decoded one.
     static let statedTolerance = 0.25
     /// The most a run may take, downloads and all.
     static let timeLimit: Duration = .seconds(240)
@@ -34,9 +31,7 @@ enum AudioChecks {
         }
     }
 
-    /// An entry for the engine as the player controller makes one: gain by
-    /// YouTube's loudness, and a refresh that only takes the same file from
-    /// an allowed host.
+    /// Built as the player controller builds one, so the check covers the same path.
     private static func item(_ song: Song, stream: ResolvedStream) -> Entry {
         let itag = stream.itag
         let item = AudioItem(
@@ -50,10 +45,8 @@ enum AudioChecks {
         return Entry(song: song, stream: stream, item: item)
     }
 
-    /// Plays the first item with the rest queued after it and renders to
-    /// the end. Each item's buffers must cover it exactly, frame for frame,
-    /// as long as it decodes to and as long as YouTube says it is, and each
-    /// must follow the one before on the same player timeline, with no gap.
+    /// Each item's buffers must cover it exactly, frame for frame, and follow
+    /// the one before on the same player timeline, with no gap.
     private static func play(_ entries: [Entry], _ findings: inout Findings) async throws {
         let playback = OfflineEngine(cache: Live.directory.appending(path: "audio", directoryHint: .isDirectory))
         let items = entries.map(\.item)
@@ -110,7 +103,6 @@ enum AudioChecks {
     }
 }
 
-/// A song, its stream and the engine's item for it.
 private struct Entry {
     let song: Song
     let stream: ResolvedStream
@@ -118,7 +110,6 @@ private struct Entry {
 }
 
 private extension AudioEvent {
-    /// The run is over: the last item finished, or one failed.
     var ends: Bool {
         switch self {
         case .finished, .failed: true

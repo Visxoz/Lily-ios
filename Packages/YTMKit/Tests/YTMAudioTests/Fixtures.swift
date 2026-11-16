@@ -2,9 +2,7 @@ import AVFoundation
 import Testing
 @testable import YTMAudio
 
-/// Containers built in code, so the tests need no audio files: a few
-/// seconds of a test signal encoded with AudioToolbox, wrapped as YouTube
-/// wraps its Opus and AAC.
+/// Containers built in code, wrapped as YouTube wraps its Opus and AAC.
 enum Fixtures {
     static let rate = 48_000.0
 
@@ -26,7 +24,6 @@ enum Fixtures {
         var cookie: Data?
     }
 
-    /// `samples` (mono, duplicated to stereo) encoded with AudioToolbox.
     static func encode(_ samples: [Float], format id: AudioFormatID, rate: Double = rate) throws -> Encoded {
         let pcm = try #require(AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 2, interleaved: false))
         var description = AudioStreamBasicDescription(
@@ -94,9 +91,8 @@ enum Fixtures {
 
     // MARK: AAC in fragmented MP4
 
-    /// The signal as AAC in fragmented MP4, two fragments. YouTube's DASH
-    /// files have no edit list; with `edited`, one gives the priming and
-    /// length, or starts at `editStart` in place of the priming.
+    /// YouTube's DASH files have no edit list; `edited` adds one giving the
+    /// length and the priming, or `editStart` in its place.
     static func aacMP4(_ samples: [Float], rate: Double = 44_100, edited: Bool = false, editStart: UInt64? = nil) throws -> Data {
         let encoded = try encode(samples, format: kAudioFormatMPEG4AAC, rate: rate)
         let cookie = try #require(encoded.cookie)
@@ -177,8 +173,7 @@ enum MP4Writer {
         [UInt8(value >> 8), UInt8(value & 0xFF)]
     }
 
-    /// A movie fragment and its media data, sizes listed in the track run,
-    /// its data offset counted from the fragment's start as YouTube's are.
+    /// The data offset counts from the fragment's start, as YouTube's do.
     static func fragment(_ packets: [[UInt8]]) -> [UInt8] {
         func fragmentBox(dataOffset: UInt32) -> [UInt8] {
             let header = box("tfhd", [0x00, 0x02, 0x00, 0x08] + u32(1) + u32(1_024))

@@ -133,7 +133,6 @@ private final class FlakyServer: URLProtocol {
 }
 
 @Suite struct VisitorDataTests {
-    /// Hands out "v1", "v2", … one per fetch.
     private actor Issuer {
         private(set) var fetches = 0
         func issue() -> String {
@@ -187,7 +186,7 @@ private final class FlakyServer: URLProtocol {
     @Test func buildsSAPISIDAuthorization() {
         let cookie = "SID=a; SAPISID=abc; __Secure-3PAPISID=def"
         let auth = GoogleAuth.authorization(cookie: cookie, origin: "https://music.youtube.com", time: 1_700_000_000)
-        // sha1("1700000000 abc https://music.youtube.com"), as ytm-native's test.
+        // sha1("1700000000 abc https://music.youtube.com").
         #expect(auth == "SAPISIDHASH 1700000000_2f3ec011e870f3fbd0238c090c2062c208cead32 "
             + "SAPISID3PHASH 1700000000_b38b56d67b7362e62fd452ce74b55b7cce306020")
         #expect(GoogleAuth.authorization(cookie: "SID=a", origin: "https://x", time: 0) == nil)

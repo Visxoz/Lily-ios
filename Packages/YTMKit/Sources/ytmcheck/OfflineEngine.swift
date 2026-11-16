@@ -2,28 +2,23 @@ import AVFoundation
 import Synchronization
 @testable import YTMAudio
 
-/// The app's audio engine, downloading from googlevideo as on the phone but
-/// rendering offline, as fast as it decodes, into memory rather than to the
-/// speakers, as YTMAudio's own tests drive it.
+/// The app's audio engine rendering offline into memory, as fast as it decodes.
 ///
-/// Rendering offline outruns the player's completion callbacks, so the
-/// engine sometimes runs dry and restarts its player where a device in real
-/// time never would. What it scheduled is exact regardless, so that is what
-/// the checks measure: every buffer, on the player's timeline.
+/// Rendering offline outruns the player's completion callbacks, so the engine
+/// sometimes restarts its player where a real device never would; the checks
+/// measure what it scheduled, which is exact regardless.
 final class OfflineEngine: Sendable {
-    /// The output rate, as a phone's speaker runs.
+    /// As a phone's speaker runs.
     static let rate = 48_000.0
-    /// Frames rendered per step: the most the offline graph takes at once.
+    /// The most the offline graph takes at once.
     static let chunk: AVAudioFrameCount = 4_096
-    /// How long a step waits for the download before rendering anyway, as
-    /// a device would play the stall as silence.
+    /// How long a step waits on the download before rendering anyway, as a
+    /// device plays a stall as silence.
     static let stallLimit: Duration = .seconds(10)
 
-    /// A buffer the engine scheduled: a run of an item's frames, at the
-    /// item's rate, placed on one player timeline.
     struct Buffer: Hashable, Sendable {
         let item: String
-        /// The player timeline: a new one starts each time the player does.
+        /// A new one starts each time the player does.
         let timeline: Int
         /// Its first frame on the timeline.
         let start: Int64
@@ -32,10 +27,8 @@ final class OfflineEngine: Sendable {
         let frames: Int
     }
 
-    /// One rendered chunk and what the engine was doing.
     struct Step: Sendable {
-        /// The item heard after the chunk, if any, and its exact length,
-        /// in frames at its own rate, once its file is complete.
+        /// The item heard after the chunk; `length` once its file is complete.
         let heard: String?
         let length: (frames: Int64, rate: Double)?
         let frames: Int
@@ -98,8 +91,6 @@ final class OfflineEngine: Sendable {
         }
     }
 
-    /// Sound is scheduled ahead, the item has decoded to its end, or there
-    /// is nothing to wait for.
     private static func ready(_ engine: isolated PlaybackEngine) -> Bool {
         guard let producing = engine.producing, !engine.paused, !engine.awaitingNext else { return true }
         return engine.playerRunning && (engine.aheadFrames >= Int(chunk) || producing.finished || engine.fade != nil)

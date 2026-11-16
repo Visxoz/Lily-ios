@@ -2,20 +2,14 @@ import Foundation
 import os
 import Synchronization
 
-/// The JSON files the app keeps between launches.
 public enum StoreFile: String, Sendable {
     case settings, session, history, searches, home, scrobbles, visitor
     /// The Premium path's trimmed player script.
     case player
 }
 
-/// Saves and loads the app's state as JSON files in
-/// Application Support/YTMusic/.
-///
-/// Writes run on one serial queue, so they never hold up the caller and run
-/// in the order they were asked for. Each replaces its file atomically, so a
-/// crash midway leaves the old one whole, and a save overtaken by a newer
-/// one of the same file is skipped rather than written.
+/// JSON files in Application Support/YTMusic/. Writes run in order on one
+/// serial queue, atomically, and one overtaken by a newer save is skipped.
 public final class FileStore: Sendable {
     public static let shared = FileStore(
         directory: URL.applicationSupportDirectory.appending(path: "YTMusic", directoryHint: .isDirectory)
@@ -23,8 +17,7 @@ public final class FileStore: Sendable {
 
     private let directory: URL
     private let queue = DispatchQueue(label: "YTMusic.FileStore", qos: .utility)
-    /// The newest save asked for, per file, so older ones queued behind it
-    /// are skipped.
+    /// The newest save ticket per file, so older ones queued behind it are skipped.
     private let latest = Mutex<[StoreFile: UInt64]>([:])
     private static let log = Logger(subsystem: "YTMusic", category: "FileStore")
 
@@ -37,9 +30,7 @@ public final class FileStore: Sendable {
         directory.appending(path: file.rawValue + ".json", directoryHint: .notDirectory)
     }
 
-    /// The file's contents, or nil when it is missing or can't be read. Waits
-    /// for saves already queued, so it always reads the latest; call it off
-    /// the main actor.
+    /// Waits for saves already queued, so it reads the latest; call it off the main actor.
     public func load<T: Decodable>(_ type: T.Type, from file: StoreFile) -> T? {
         let url = url(file)
         guard let data = queue.sync(execute: { try? Data(contentsOf: url) }) else { return nil }
@@ -51,8 +42,7 @@ public final class FileStore: Sendable {
         }
     }
 
-    /// Writes `value` off the caller's thread; of several saves of one file,
-    /// the last asked for is the one that stays.
+    /// Writes off the caller's thread; of several saves of one file, the last asked for wins.
     public func save<T: Encodable & Sendable>(_ value: T, to file: StoreFile) {
         let ticket = nextTicket(for: file)
         let url = url(file)

@@ -1,9 +1,8 @@
 import Foundation
 
 extension YTMusic {
-    /// An artist page as ytm-native's `artist` builds it, asked signed out.
-    /// The full discography is asked alongside the page rather than after
-    /// it, and stands in for the page's own releases when it has more.
+    /// The full discography is asked alongside the page, and stands in for the page's own
+    /// releases when it has more.
     func artistPage(_ id: String) async throws -> Page {
         async let page = artist(id)
         async let discography = try? releases(of: id)
@@ -18,16 +17,13 @@ extension YTMusic {
         return artist.page
     }
 
-    /// The artist page, asked again by the artist's own ID when `id` is an
-    /// alias, as rustypipe's `music_artist` does.
+    /// Asked again by the artist's own ID when `id` is an alias.
     func artist(_ id: String) async throws -> ArtistDetails {
         let artist = try Renderers.artist(try await innerTube.browse(id, authenticated: false), id: id)
         guard artist.id != id else { return artist }
         return try Renderers.artist(try await innerTube.browse(artist.id, authenticated: false), id: artist.id)
     }
 
-    /// Every release of the artist, newest first, from the discography's
-    /// grid and the batches after it.
     private func releases(of artistId: String) async throws -> [ArtistRelease] {
         let response = try await innerTube.browse("MPAD" + artistId, params: Self.newestFirst, authenticated: false)
         let name = response["header", "musicHeaderRenderer", "title"].text ?? ""
@@ -47,16 +43,13 @@ extension YTMusic {
     private static let newestFirst = "ggMIegYQARoCAQI%3D"
 }
 
-/// An album, EP or single on an artist page.
 struct ArtistRelease {
     var card: Card
     var type: AlbumType
 }
 
-/// An artist page as read, before it becomes a `Page`.
 struct ArtistDetails {
-    /// The artist's own ID, which differs from the one asked for when that
-    /// was an alias.
+    /// Differs from the one asked for when that was an alias.
     var id: String
     var header: PageHeader
     var songs: [Track] = []
@@ -82,8 +75,6 @@ struct ArtistDetails {
 }
 
 extension Renderers {
-    /// An artist page's header and shelves, grouped by kind as rustypipe's
-    /// `map_artist_page` groups them.
     static func artist(_ response: JSON, id: String) throws -> ArtistDetails {
         let header = response["header"].first("musicImmersiveHeaderRenderer", "musicVisualHeaderRenderer")
         guard let name = header["title"].text, !name.isEmpty else {
@@ -138,8 +129,7 @@ extension Renderers {
                             artist.albumsMore = artist.albumsMore ?? more
                         }
                     case .song:
-                        // Music videos follow the top songs in one list, as
-                        // rustypipe maps their tiles to tracks.
+                        // Music videos follow the top songs in one list.
                         if let track = card.track { artist.songs.append(track) }
                     case .playlist: artist.playlists.append(card)
                     case .artist: artist.related.append(card)
@@ -153,20 +143,16 @@ extension Renderers {
         return artist
     }
 
-    /// A discography grid's album tile, typed by its subtitle.
     static func release(_ wrapped: JSON, context: ItemContext) -> ArtistRelease? {
         guard case .card(let card)? = item(wrapped, context: context), card.kind == .album else { return nil }
         return ArtistRelease(card: card, type: releaseType(wrapped["musicTwoRowItemRenderer"]) ?? context.albumType)
     }
 
-    /// The release kind a tile's subtitle names ("Single • 2021"), if any.
     private static func releaseType(_ tile: JSON) -> AlbumType? {
         segments(tile["subtitle"].runs).lazy.compactMap { AlbumType(label: text($0)) }.first
     }
 
-    /// The channel a serialised share entity names: field 3 of the
-    /// base64 protobuf, which is the artist's own ID when the page was asked
-    /// for by an alias.
+    /// Field 3 of the base64 protobuf: the artist's own ID when the page was asked for by an alias.
     static func sharedChannelId(_ serialized: String) -> String? {
         guard var base64 = serialized.removingPercentEncoding else { return nil }
         base64 = base64.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
@@ -194,7 +180,6 @@ extension Renderers {
         return nil
     }
 
-    /// Reads one protobuf varint off the front of `bytes`.
     private static func varint(_ bytes: inout Data.SubSequence) -> UInt64? {
         var value: UInt64 = 0
         var shift: UInt64 = 0

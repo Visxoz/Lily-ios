@@ -2,8 +2,7 @@ import CryptoKit
 import Foundation
 
 extension LastFM {
-    /// The app's API account, built in as ytm-native's from the
-    /// `LASTFM_API_KEY` and `LASTFM_API_SECRET` build settings.
+    /// From the `LASTFM_API_KEY` and `LASTFM_API_SECRET` build settings.
     struct Keys: Sendable {
         var apiKey: String
         var apiSecret: String
@@ -25,7 +24,6 @@ extension LastFM {
         var key: String
     }
 
-    /// One play, as Last.fm records it.
     struct Play: Codable, Hashable, Sendable {
         var artist: String
         var track: String
@@ -39,7 +37,6 @@ extension LastFM {
     enum Failure: Error, Equatable {
         /// The account's access was revoked; it has to connect again.
         case signedOut
-        /// The user has not yet allowed access in the browser.
         case notYetAllowed
         /// Last.fm will never take the request as it is: invalid parameters,
         /// or a token that expired.
@@ -67,16 +64,14 @@ extension LastFM.Play {
     }
 }
 
-/// Last.fm's signed web-service calls, as ytm-native's `lastfm.rs`.
 enum LastFMAPI {
     typealias Params = [(name: String, value: String)]
 
     private static let endpoint = URL(string: "https://ws.audioscrobbler.com/2.0/")
     private static let authPage = "https://www.last.fm/api/auth/"
 
-    /// Adds `api_sig`: the MD5 of every parameter's name and value in name
+    /// Adds `api_sig`: the MD5 of every name and value in byte-wise name
     /// order, then the secret, as Last.fm requires of every signed call.
-    /// Names are compared byte by byte, as Last.fm sorts them.
     static func sign(_ params: inout Params, secret: String) {
         params.sort { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) }
         var md5 = Insecure.MD5()
@@ -89,8 +84,8 @@ enum LastFMAPI {
         params.append(("api_sig", hex))
     }
 
-    /// `application/x-www-form-urlencoded`, as browsers and ytm-native send
-    /// it: unreserved bytes as they are, spaces as `+`, the rest escaped.
+    /// `application/x-www-form-urlencoded`: unreserved bytes as they are,
+    /// spaces as `+`, the rest escaped.
     static func form(_ params: Params) -> Data {
         var body = [UInt8]()
         for (index, (name, value)) in params.enumerated() {
@@ -118,13 +113,9 @@ enum LastFMAPI {
         }
     }
 
-    /// Calls `method`, signed with `keys`, and returns Last.fm's answer.
-    ///
-    /// This does not go through `HTTP.data`, which fails on the status
-    /// alone: Last.fm sends its errors as `{"error": code, "message": …}`,
-    /// usually with a 4xx status, and the code says whether to retry, so the
-    /// body is read before the status. The host check and the guarded
-    /// session are the same.
+    /// Not through `HTTP.data`, which fails on the status alone: Last.fm's 4xx
+    /// errors carry a code saying whether to retry. The host check and the
+    /// guarded `HTTP.api` session still apply.
     @concurrent
     static func call(_ method: String, _ params: Params = [], keys: LastFM.Keys) async throws -> JSON {
         var params = params
@@ -162,7 +153,6 @@ enum LastFMAPI {
         return json
     }
 
-    /// What an error code means for the request, as ytm-native reads them.
     static func failure(code: Int, message: String, method: String) -> LastFM.Failure {
         let message = "Last.fm error \(code): \(message)"
         switch code {
@@ -201,7 +191,6 @@ enum LastFMAPI {
         return LastFM.Session(name: name, key: key)
     }
 
-    /// Shows `play` as what the account is listening to now.
     static func nowPlaying(_ play: LastFM.Play, session: LastFM.Session, keys: LastFM.Keys) async throws {
         var params: Params = [("sk", session.key)]
         append(play, suffix: "", to: &params)
@@ -220,8 +209,7 @@ enum LastFMAPI {
         return ignored(try await call("track.scrobble", params, keys: keys))
     }
 
-    /// The parameters describing `play`, with `suffix` after each name, as
-    /// `[0]` in a batch.
+    /// Each name followed by `suffix`, as `[0]` in a batch.
     private static func append(_ play: LastFM.Play, suffix: String, to params: inout Params) {
         params.append(("artist" + suffix, play.artist))
         params.append(("track" + suffix, play.track))
@@ -229,10 +217,8 @@ enum LastFMAPI {
         if let duration = play.duration { params.append(("duration" + suffix, String(duration))) }
     }
 
-    /// Why Last.fm ignored each play of a `track.scrobble` reply: an artist
-    /// or track it filters, a timestamp too old or new, the daily limit. One
-    /// play comes back as an object and more as a list, with the codes as
-    /// strings.
+    /// Why Last.fm ignored each play of a `track.scrobble` reply. One play
+    /// comes back as an object and more as a list, with the codes as strings.
     static func ignored(_ reply: JSON) -> [String] {
         let plays = reply["scrobbles", "scrobble"]
         return (plays.isObject ? [plays] : plays.array).compactMap { play in

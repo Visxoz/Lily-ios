@@ -1,8 +1,7 @@
 import Foundation
 import Security
 
-/// Secrets (the sign-in cookies and the Last.fm session) as generic
-/// passwords that stay on this device.
+/// Secrets (sign-in cookies, the Last.fm session) as device-only generic passwords.
 enum Keychain {
     private static let service = "YTMusic"
 
@@ -26,9 +25,8 @@ enum Keychain {
             SecItemDelete(query as CFDictionary)
             return
         }
-        // Readable once the phone has been unlocked after a restart, so songs
-        // still resolve on the lock screen, and never restored to another
-        // device from a backup.
+        // Readable after first unlock, so songs resolve on the lock screen, and
+        // never restored to another device from a backup.
         let update: [CFString: Any] = [kSecValueData: data, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
         if SecItemUpdate(query as CFDictionary, update as CFDictionary) == errSecItemNotFound {
             SecItemAdd(query.merging(update) { $1 } as CFDictionary, nil)

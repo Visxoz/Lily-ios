@@ -1,9 +1,5 @@
 import SwiftUI
 
-// The controls of ytm-native's `widgets/buttons.slint`. Hover states have no
-// place on a touch screen; the press feedback stays.
-
-/// `Icon`: a Material Symbol filled in one colour.
 struct IconView: View {
     let icon: Icon
     var size: CGFloat = 24
@@ -16,14 +12,12 @@ struct IconView: View {
     }
 }
 
-/// `IconButton`: a round icon button that shrinks slightly while pressed,
-/// in the accent with a dot beneath when `active`.
 struct IconButton: View {
     let icon: Icon
     var size: CGFloat = 32
     var iconSize: CGFloat = 18
     var active = false
-    /// The icon's colour; the theme's secondary text when nil.
+    /// The theme's secondary text when nil.
     var colour: Color?
     let action: () -> Void
 
@@ -54,7 +48,6 @@ struct IconButton: View {
     }
 }
 
-/// `PlayButton`: the circular play button, in the accent unless told.
 struct PlayButton: View {
     var size: CGFloat = 56
     var playing = false
@@ -79,8 +72,6 @@ struct PlayButton: View {
     }
 }
 
-/// `PillButton`: a rounded text button, filled with the text colour when
-/// primary, outlined otherwise.
 struct PillButton: View {
     let title: String
     var primary = false
@@ -95,8 +86,7 @@ struct PillButton: View {
     }
 }
 
-/// A `PillButton`'s look, for the labels of links and menus that open
-/// something rather than act.
+/// A `PillButton`'s look, for links and menus that open something rather than act.
 struct PillLabel: View {
     let title: String
     var primary = false
@@ -109,8 +99,7 @@ struct PillLabel: View {
         Text(title)
             .font(.system(size: small ? 13 : 14, weight: .bold))
             .foregroundStyle(primary ? theme.textInverse : theme.text)
-            // A pill is one line, as ytm-native's: a row squeezes its
-            // description instead.
+            // A pill is one line: a row squeezes its description instead.
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, small ? 16 : 24)
@@ -127,7 +116,6 @@ struct PillLabel: View {
     }
 }
 
-/// `Pill`: one choice of a `PillGroup`.
 struct Pill: View {
     let title: String
     let active: Bool
@@ -151,7 +139,6 @@ struct Pill: View {
     }
 }
 
-/// `PillGroup`: a row of pills, one of them picked.
 struct PillGroup: View {
     let titles: [String]
     @Binding var selection: Int
@@ -165,7 +152,6 @@ struct PillGroup: View {
     }
 }
 
-/// Shrinks a control while it is pressed, as ytm-native's buttons do.
 struct PressScale: ButtonStyle {
     var scale: CGFloat
     var animation = Theme.fast
@@ -177,8 +163,6 @@ struct PressScale: ButtonStyle {
     }
 }
 
-/// A list row's press: the row washes over, as it does under the pointer in
-/// ytm-native.
 struct RowPress: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         RowPressBody(configuration: configuration)

@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import YTMCore
 
-/// ytm-native's `api/lyrics.rs` tests, and the web client's plain lyrics.
 @Suite struct LyricsTests {
     private func timed(_ lines: String) throws -> JSON {
         try JSON(data: Data(#"""

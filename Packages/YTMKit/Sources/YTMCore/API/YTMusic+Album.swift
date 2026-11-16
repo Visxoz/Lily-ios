@@ -1,13 +1,10 @@
 import Foundation
 
 extension YTMusic {
-    /// An album page, asked signed out as ytm-native does: its numbered
-    /// tracks and other versions.
     func albumPage(_ id: String) async throws -> Page {
         var album = try Renderers.album(try await innerTube.browse(id, authenticated: false), id: id)
         // YouTube Music lists some album tracks by their music videos and
-        // cuts long albums short; the album's playlist has the songs and
-        // the rest, as rustypipe's `music_album` finds them.
+        // cuts long albums short; the album's playlist has the songs and the rest.
         if let playlistId = album.playlistId, album.needsPlaylist,
            let songs = try? await playlistTracks(playlistId, limit: album.trackCount, asOwner: false) {
             album.adopt(songs)
@@ -17,7 +14,6 @@ extension YTMusic {
     }
 }
 
-/// An album page as read, before it becomes a `Page`.
 struct AlbumDetails {
     var ref: AlbumRef
     var type: AlbumType
@@ -25,21 +21,18 @@ struct AlbumDetails {
     var year: Int?
     var description: String?
     var cover: JSON
-    /// The album's own playlist, which plays it, radios from it and saves it.
     var playlistId: String?
     /// How many tracks the header says the album has.
     var trackCount: Int
     var tracks: [Track]
     var versions: Section?
 
-    /// Some tracks are music videos, or fewer arrived than the album has.
     var needsPlaylist: Bool {
         tracks.contains(where: \.isVideo) || (tracks.last?.trackNumber ?? 0) < trackCount
     }
 
-    /// Swaps each music video for the song of the same title in the
-    /// album's playlist, and adds the playlist's tracks beyond the album's,
-    /// numbered on, as rustypipe's `music_album`.
+    /// Swaps each music video for the playlist's song of the same title, and adds the
+    /// playlist's tracks beyond the album's, numbered on.
     mutating func adopt(_ playlist: [Track]) {
         for index in tracks.indices where tracks[index].isVideo {
             guard let song = playlist.first(where: { !$0.isVideo && $0.title == tracks[index].title }) else { continue }
@@ -56,8 +49,7 @@ struct AlbumDetails {
         }
     }
 
-    /// The page as ytm-native's `album` builds it. Album tracks come
-    /// without artwork, so they show the cover.
+    /// Album tracks come without artwork, so they show the cover.
     var page: Page {
         let rowCover = Thumbnail.pick(cover, edge: Thumbnail.row)
         let tracks = tracks.map { track in
@@ -83,8 +75,6 @@ struct AlbumDetails {
 }
 
 extension Renderers {
-    /// An album page's header, tracks and other versions, read as
-    /// rustypipe's `music_album` reads them.
     static func album(_ response: JSON, id: String) throws -> AlbumDetails {
         let (header, _) = detailHeader(in: response)
         guard let title = header["title"].text, !title.isEmpty else {
@@ -145,8 +135,6 @@ extension Renderers {
         )
     }
 
-    /// The album's playlist: from the page's canonical URL, else from the
-    /// header menu's play buttons.
     private static func albumPlaylistId(_ response: JSON, header: JSON) -> String? {
         let prefix = "https://music.youtube.com/playlist?list="
         if let url = response["microformat", "microformatDataRenderer", "urlCanonical"].string, url.hasPrefix(prefix) {

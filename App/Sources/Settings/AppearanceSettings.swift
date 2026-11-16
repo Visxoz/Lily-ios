@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// Settings' Appearance tab: the look, and the accent, one of seven colours
-/// or the artwork's. The theme follows at once.
 struct AppearanceSettings: View {
     @Environment(AppModel.self) private var app
 
@@ -26,8 +24,6 @@ struct AppearanceSettings: View {
     }
 }
 
-/// `settings.slint`'s `Swatch`: a round colour to pick, ringed while picked.
-/// The artwork's is a sweep of three of the others.
 private struct Swatch: View {
     let accent: Accent
     let active: Bool

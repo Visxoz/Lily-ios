@@ -1,13 +1,10 @@
 import Foundation
 import YTMCore
 
-/// A page header's buttons.
 enum HeaderAction {
     case play, shuffle, radio
 }
 
-/// Starting playback and the menus' actions from pages, as ytm-native's
-/// `actions.rs` and `library.rs`.
 extension AppModel {
     /// A card opens its page; a song card plays, with a radio after it.
     func activate(_ card: Card, displayScale: CGFloat) {
@@ -30,13 +27,11 @@ extension AppModel {
         Task { await player.play(card) }
     }
 
-    /// A card's "Start radio": a playlist's own radio, else one from its
-    /// first song.
+    /// A playlist's own radio, else one from its first song.
     func startRadio(from card: Card) {
         Task { await player.startRadio(from: card) }
     }
 
-    /// The header's Play, Shuffle and Radio.
     func perform(_ action: HeaderAction, on page: Page) {
         Task {
             switch action {
@@ -57,15 +52,14 @@ extension AppModel {
         isPlaying(track) ? player.rating : .none
     }
 
-    /// Likes or dislikes a song, or takes that back if it had it; `.none`
-    /// removes either. The player does the toggling and says how it went,
-    /// and skips a disliked song that is playing.
+    /// Toggles the rating; `.none` removes either. The player says how it went and skips a
+    /// disliked song that is playing.
     func rate(_ track: Track, _ requested: Rating) {
         player.rate(requested, videoId: track.id)
     }
 
     func addToPlaylist(_ track: Track) {
-        // From Now Playing the picker stacks on it, as ytm-native's dialog sits over its player bar and panel.
+        // From Now Playing the picker stacks on it.
         if sheet == .nowPlaying { nowPlayingPicker = track } else { sheet = .addToPlaylist(track) }
     }
 

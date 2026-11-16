@@ -77,7 +77,6 @@ struct StreamLoaderTests {
     }
 }
 
-/// Notes the User-Agent of each request it passes on.
 private final class AgentRecording: ByteSource {
     private let served: any ByteSource
     private let asked = Mutex<[String]>([])

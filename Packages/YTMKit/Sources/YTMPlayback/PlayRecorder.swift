@@ -2,10 +2,7 @@ import Foundation
 import os
 import YTMCore
 
-/// Records plays, as ytm-native's `record_play`, run as a song's sound
-/// starts: the local history, Last.fm (now playing, then a scrobble once
-/// enough has been heard), and the YouTube account's history. Only
-/// `PlayerController.recordPlay` calls it, so a play is recorded in one place.
+/// Only `PlayerController.recordPlay` calls it, so a play is recorded in one place.
 @MainActor final class PlayRecorder {
     private let history: LocalHistory
     private let music: any MusicService
@@ -18,8 +15,7 @@ import YTMCore
         self.lastFM = lastFM
     }
 
-    /// `reportToYouTube`, signed in with the YouTube history setting on, adds
-    /// the song to the account's history, as YouTube Music does, so its
+    /// `reportToYouTube` adds the song to the account's history, so its
     /// recommendations and Listen again follow what plays here too.
     func record(_ track: Track, reportToYouTube: Bool) {
         history.record(track)
@@ -38,8 +34,7 @@ import YTMCore
         }
     }
 
-    /// Counts the song heard up to `position` of `length` seconds, and
-    /// scrobbles it once that counts.
+    /// Scrobbles the song once enough of its `length` seconds has been heard.
     func heard(position: Double, length: Double) {
         guard let play = scrobbler.heard(position: position, length: length) else { return }
         let lastFM = lastFM

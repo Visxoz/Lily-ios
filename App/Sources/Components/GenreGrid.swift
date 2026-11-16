@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's `GenreGrid`: the moods and genres as large colour tiles, as
-/// many a row as fit `width`.
 struct GenreGrid: View {
     let cards: [Card]
     let width: CGFloat
@@ -21,8 +19,6 @@ struct GenreGrid: View {
     }
 }
 
-/// ytm-native's `GenreTile`: YouTube's colour for the genre, darkening
-/// across the tile, its name, and a tilted square in the corner.
 struct GenreTile: View {
     let card: Card
 

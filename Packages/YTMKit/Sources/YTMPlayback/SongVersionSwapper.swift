@@ -2,10 +2,8 @@ import Foundation
 import os
 import YTMCore
 
-/// Plays music videos as their song versions, which are audio only and have
-/// Premium formats, as ytm-native's `song_version.rs`. The next song is
-/// looked up in the background while its stream is prefetched, and the song
-/// is swapped in only once its own stream is ready, so nothing ever waits.
+/// Swaps music videos for their song versions, which are audio only and have
+/// Premium formats, only once the song's own stream is ready, so nothing waits.
 struct SongVersionSwapper {
     /// Most videos remembered; past it the cache starts over.
     static let limit = 256
@@ -15,16 +13,13 @@ struct SongVersionSwapper {
         case known(Track?)
     }
 
-    /// Music videos looked up for a song version, by video ID.
     private var lookups: [String: Lookup] = [:]
 
-    /// The song version found for `videoId`, if one was.
     func knownSong(for videoId: String) -> Track? {
         if case .known(let song?) = lookups[videoId] { song } else { nil }
     }
 
-    /// Claims a lookup of `videoId` when it was never asked for; false when
-    /// it is under way or done.
+    /// False when the lookup is already under way or done.
     mutating func beginLookup(_ videoId: String) -> Bool {
         guard lookups[videoId] == nil else { return false }
         if lookups.count >= Self.limit {
@@ -41,8 +36,7 @@ struct SongVersionSwapper {
 }
 
 extension PlayerController {
-    /// Starts swapping `next`, a music video, for its song version if it has
-    /// one. Returns at once; the queue changes later.
+    /// Returns at once; the queue changes later.
     func swapInSongVersion(_ next: Track) {
         if let song = songVersions.knownSong(for: next.id) {
             prefetchSongVersion(of: next.id, song)
@@ -62,23 +56,18 @@ extension PlayerController {
         }
     }
 
-    /// Resolves the song's stream, then swaps the song in. Until then the
-    /// queue keeps the video and its prefetched stream.
     private func prefetchSongVersion(of videoId: String, _ song: Track) {
         guard !prefetcher.isPending(song.id) else { return }
         if prefetcher.has(song.id) {
             putSongVersion(song, for: videoId)
             return
         }
-        // Kept only once the song is in the queue, which the video may have
-        // left, or started playing, meanwhile. A failure is tried again at the
-        // next song start; until then the video resolves as it is queued or starts.
+        // Kept only if the swap succeeds: the video may have left the queue,
+        // or started playing, meanwhile.
         resolveAhead(song) { $0.putSongVersion(song, for: videoId) }
     }
 
-    /// Puts `song` in place of the video `videoId` in the queue, unless the
-    /// video is playing, and drops the video's prefetched stream. Returns
-    /// whether it did.
+    /// Never swaps the video while it is playing; drops its prefetched stream.
     @discardableResult
     private func putSongVersion(_ song: Track, for videoId: String) -> Bool {
         guard current?.id != videoId, !queue.replace(where: { $0.id == videoId }, with: song).isEmpty else { return false }

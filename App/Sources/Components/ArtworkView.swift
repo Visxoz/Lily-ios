@@ -1,19 +1,15 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's `Art` (`widgets/art.slint`): square artwork with rounded
-/// corners, or round for artists, over a placeholder note until it loads.
 struct ArtworkView: View {
     let url: String?
     let size: CGFloat
     var round = false
     var radius: CGFloat = 4
-    /// The decode's edge in pixels, for artwork sharing a decode made for
-    /// elsewhere rather than one at the size drawn.
+    /// For sharing a decode made elsewhere rather than one at the size drawn.
     var pixelEdge: Int?
-    /// A drop shadow, cast by a shape behind the opaque artwork rather than
-    /// by the image, so the blur comes from a path once instead of being
-    /// rendered off screen each frame the image fades in or the artwork resizes.
+    /// Cast by a shape behind the opaque artwork, so the blur comes from a path once instead of
+    /// being rendered off screen each frame the image fades in or resizes.
     var shadow: (colour: Color, radius: CGFloat, y: CGFloat)?
 
     @Environment(\.theme) private var theme
@@ -32,20 +28,13 @@ struct ArtworkView: View {
     }
 }
 
-/// Artwork filling its frame, decoded by `ImagePipeline` at the pixels shown,
-/// except that small artwork shares one size, `ImagePipeline.smallEdge`, so a
-/// song's rows, mini player and queue entry reuse one decode. An image already
-/// in memory shows on the first frame, so scrolling back never flickers, as
-/// does the song's copy at a shared size while its own loads. Only artwork
-/// slow enough to have come from the network fades in; a disk-cache hit
-/// appears at once. The fetch is cancelled when the view goes.
+/// Small artwork shares one decode, `ImagePipeline.smallEdge`, so a song's rows and mini player reuse
+/// it. An image already in memory shows on the first frame, so scrolling back never flickers.
 struct ArtworkImage: View {
     let url: String?
     /// The shorter side drawn, in points: what the decode is sized to.
     let edge: CGFloat
-    /// Shows the note while there is no image, as square artwork does.
     var placeholder = true
-    /// The decode's edge in pixels, in place of the edge drawn.
     var pixelEdge: Int?
 
     @Environment(\.displayScale) private var displayScale
@@ -78,27 +67,22 @@ struct ArtworkImage: View {
         .task(id: key) { await load(key) }
     }
 
-    /// The decode's edge: as asked, else what is drawn, or the shared small size.
     private var pixels: Int {
         pixelEdge ?? Self.pixels(edge: edge, scale: displayScale)
     }
 
-    /// The pixels artwork drawn `edge` points wide is decoded at, so a
-    /// prefetch asks for the very URL the view will.
+    /// Shared so a prefetch asks for the very decode the view will.
     static func pixels(edge: CGFloat, scale: CGFloat) -> Int {
         max(Int((edge * scale).rounded(.up)), ImagePipeline.smallEdge)
     }
 
-    /// The loaded image, or until the load has run, one already in memory at
-    /// any size, scaled until this size comes.
+    /// Until the load has run, a copy already in memory at any size stands in.
     private func image(for key: Key) -> CGImage? {
         if let loaded, loaded.key == key { return loaded.image }
         return Self.cachedAnySize(key.url, preferring: key.pixels, scale: displayScale)
     }
 
-    /// A copy of `url`'s artwork already in memory at any size the app draws,
-    /// `pixels` first: then the largest, the page header's and the cards',
-    /// and the shared small one, so opening a card's page or playing it never
+    /// `pixels` first, then every size the app draws, so opening a card's page or playing it never
     /// waits on a download for art already decoded at another size.
     static func cachedAnySize(_ url: String, preferring pixels: Int? = nil, scale: CGFloat) -> CGImage? {
         let edges = [

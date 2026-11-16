@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// `dialog.slint`'s `SettingRow`: a label over a line of detail, with the
-/// row's control beside them, or under them where a phone is too narrow
-/// for both.
 struct SettingRow<Control: View>: View {
     let label: String
     var detail = ""
@@ -33,7 +30,6 @@ struct SettingRow<Control: View>: View {
     }
 }
 
-/// `dialog.slint`'s `ToggleRow`: a setting row with a switch in the accent.
 struct ToggleRow: View {
     let label: String
     let detail: String
@@ -47,7 +43,6 @@ struct ToggleRow: View {
     }
 }
 
-/// A `PillGroup` picking one of a few values, such as the audio quality.
 struct ChoicePills<Value: Hashable>: View {
     let choices: [(value: Value, title: String)]
     @Binding var selection: Value

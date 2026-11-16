@@ -1,14 +1,8 @@
 import Foundation
 
-/// A read-only view into a parsed InnerTube response.
-///
-/// InnerTube nests what matters dozens of levels deep, in shapes that drift.
-/// Rather than decode whole responses into types, parsers walk to the few
-/// fields they use: every step is optional, so an item in an odd shape
-/// reads as missing and is skipped rather than failing the page. It wraps
-/// `JSONSerialization`'s Foundation objects without copying them: lookups
-/// stay on `NSDictionary` and `NSArray`, as a cast to a Swift dictionary or
-/// array would copy the whole container at every step.
+/// A read-only view into a parsed InnerTube response. Every step is optional,
+/// so an item in an odd shape reads as missing rather than failing the page.
+/// Lookups stay on `NSDictionary`/`NSArray`, as a Swift cast copies each step.
 struct JSON: @unchecked Sendable {
     // `@unchecked`: the wrapped Foundation containers are immutable once
     // parsed and never handed out mutably.
@@ -37,7 +31,6 @@ struct JSON: @unchecked Sendable {
         return JSON(list.object(at: index))
     }
 
-    /// Walks several keys at once: `json["a", "b", "c"]`.
     subscript(path: String...) -> JSON {
         path.reduce(self) { $0[$1] }
     }
@@ -95,6 +88,5 @@ extension JSON {
         return out
     }
 
-    /// The runs of a text object, each with its words and where it leads.
     var runs: [JSON] { self["runs"].array }
 }

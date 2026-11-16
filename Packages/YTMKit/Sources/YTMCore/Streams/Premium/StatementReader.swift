@@ -1,21 +1,15 @@
 import Foundation
 
-/// Steps through JavaScript a statement at a time with `JSTokenizer`,
-/// knowing just enough of the grammar to tell where each statement ends
-/// and what a top-level one declares or assigns.
+/// Just enough of the grammar to tell where each statement ends and what a top-level one declares or assigns.
 struct StatementReader {
-    /// What a statement at the player's top level defines.
     struct Statement {
         var range: Range<Int>
-        /// Top-level names it declares with `var`, `let`, `const`,
-        /// `function` or `class`.
         var declares: [String] = []
         /// Declared names and `g.X` properties it gives a value to.
         var defines: [PlayerTrimmer.Key] = []
         /// The source naming the URL scrambler, when this defines it.
         var scrambler: Range<Int>?
-        /// Ends in `;`, or is a declaration ending in `}`, so another
-        /// statement can follow it directly.
+        /// Ends in `;`, or is a declaration ending in `}`, so another statement can follow directly.
         var isTerminated = true
         /// A `var`, `let` or `const` list, whose declared names are not uses.
         var isDeclarationList = false
@@ -41,9 +35,8 @@ struct StatementReader {
 
     // MARK: Top level
 
-    /// A statement directly in the player's function, with what it defines
-    /// as yt-dlp's solver counts it: declarations, and expression statements
-    /// that are a single assignment. Other statements define nothing.
+    /// What it defines, as yt-dlp's solver counts it: declarations, and expression
+    /// statements that are a single assignment. Other statements define nothing.
     mutating func topLevelStatement(namespace: String) throws -> Statement {
         let start = token.start
         var statement = Statement(range: start..<start)
@@ -75,8 +68,7 @@ struct StatementReader {
             try skipStatement()
         }
         statement.defines += statement.declares.map(PlayerTrimmer.Key.symbol)
-        // A stray closer is read as a statement that consumes nothing, which
-        // would leave the range inverted; nor could the trimmer move on.
+        // A stray closer consumes nothing, which would invert the range and stall the trimmer.
         guard let last, last.end > start else { throw JSTokenizer.malformed }
         statement.range = start..<last.end
         statement.isTerminated = isPunct(last, ";") || isDeclaration && isPunct(last, "}")
@@ -111,8 +103,7 @@ struct StatementReader {
         try endStatement()
     }
 
-    /// `a = …`, `a.b[c] = …` or `g.X = …`: an expression statement that is
-    /// one assignment defines its target's root name, or `g.X` for the
+    /// `a = …`, `a.b[c] = …` or `g.X = …` defines its target's root name, or `g.X` for the
     /// namespace. A sequence or any other expression defines nothing.
     private mutating func assignment(into statement: inout Statement, namespace: String) throws {
         let root = token
@@ -160,7 +151,6 @@ struct StatementReader {
 
     // MARK: Statements
 
-    /// Steps over one statement of any kind.
     mutating func skipStatement() throws {
         if isPunct(token, "{") { return try skipBalanced() }
         if isPunct(token, ";") { return try advance() }
@@ -220,8 +210,7 @@ struct StatementReader {
     }
 
     /// `function [*] [name] (…) {…}`: its name, and whether its body calls
-    /// `X.y("alr", "yes")` as a statement of its own, which marks yt-dlp's
-    /// URL scrambler.
+    /// `X.y("alr", "yes")` as a statement of its own, which marks the URL scrambler.
     private mutating func function() throws -> (name: JSToken?, marked: Bool) {
         try advance()
         if isPunct(token, "*") { try advance() }
@@ -288,9 +277,8 @@ struct StatementReader {
         return name
     }
 
-    /// Reads to the end of an expression: a `;`, a `,` with `stopAtComma`,
-    /// the bracket around it closing, or a line break where JavaScript
-    /// inserts a semicolon. `continuing` when its start has been read.
+    /// Up to a `;`, a `,` with `stopAtComma`, the enclosing bracket closing, or a line break where
+    /// JavaScript inserts a semicolon. `continuing` when its start has been read.
     private mutating func expression(stopAtComma: Bool, continuing: Bool) throws {
         var depth = 0
         var previous = continuing ? last : nil
@@ -386,9 +374,7 @@ struct StatementReader {
     }
 }
 
-/// The last nine tokens read, each with its bracket depth, enough to
-/// recognise `X.y("alr","yes")` and what comes before it. A ring, as it
-/// takes every token of every top-level function.
+/// The last nine tokens with their bracket depth, enough to recognise `X.y("alr","yes")` and what precedes it.
 struct RecentTokens {
     private var ring = Array(repeating: (token: JSToken(kind: .end, start: 0, end: 0, newlineBefore: false), level: -1), count: 9)
     private var oldest = 0

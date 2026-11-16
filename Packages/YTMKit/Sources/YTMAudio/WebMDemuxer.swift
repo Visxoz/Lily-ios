@@ -1,10 +1,8 @@
 import AudioToolbox
 import Foundation
 
-/// Reads Opus from WebM, as YouTube's 249, 250, 251 and Premium 774 come:
-/// the track's OpusHead, and every block's packets, laced or not, with the
-/// DiscardPadding that trims the last one. Elements of unknown size, as a
-/// live encoder writes, are stepped into like any other.
+/// Opus in WebM, as YouTube's 249, 250, 251 and Premium 774 come. Elements of unknown size,
+/// as a live encoder writes, are stepped into like any other.
 final class WebMDemuxer: PacketSource {
     private(set) var format: SourceFormat?
     private(set) var packets = PacketIndex()
@@ -15,8 +13,7 @@ final class WebMDemuxer: PacketSource {
     private var durationTicks: Double?
     /// Frames the block ending at `packetCount` packets asks to drop from its end.
     private var discard: (packetCount: Int, frames: Int64)?
-    /// The sizes of a block's packets, kept from block to block so listing
-    /// them allocates nothing: there is a block every 20 ms.
+    /// Kept from block to block so listing allocates nothing: there is a block every 20 ms.
     private var laceSizes: [Int] = []
 
     var trailingFrames: Int64 {
@@ -94,7 +91,6 @@ final class WebMDemuxer: PacketSource {
         }
     }
 
-    /// Lists a block's packets: one, or several when laced.
     private func readBlock(_ body: UnsafeRawBufferPointer, at offset: Int64) throws {
         var reader = ByteReader(body)
         guard let trackNumber, try EBML.vint(&reader) == trackNumber else { return }
@@ -177,7 +173,6 @@ final class WebMDemuxer: PacketSource {
     }
 }
 
-/// EBML's variable-length numbers and the Matroska elements read here.
 enum EBML {
     static let segment: UInt32 = 0x1853_8067
     static let info: UInt32 = 0x1549_A966

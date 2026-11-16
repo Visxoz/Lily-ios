@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// ytm-native's account button (`shell/top-bar.slint`): the account's
-/// picture on the accent signed in, the account icon otherwise. It opens
-/// Settings, which holds signing in and out too.
 struct AccountButton: View {
     @Environment(AppModel.self) private var app
 
@@ -14,8 +11,6 @@ struct AccountButton: View {
     }
 }
 
-/// The account's picture over the accent, or the account icon on a grey
-/// circle signed out, as the top bar and Settings show it.
 struct AccountPhoto: View {
     let size: CGFloat
 

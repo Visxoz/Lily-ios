@@ -5,7 +5,6 @@ import Testing
 import UniformTypeIdentifiers
 @testable import YTMCore
 
-/// An sRGB image `width` × `height` coloured pixel by pixel.
 private func image(_ width: Int = 8, _ height: Int = 8, _ colour: (Int, Int) -> (UInt8, UInt8, UInt8)) throws -> CGImage {
     var bytes = [UInt8](repeating: 255, count: width * height * 4)
     for y in 0..<height {
@@ -23,7 +22,6 @@ private func image(_ width: Int = 8, _ height: Int = 8, _ colour: (Int, Int) -> 
     ))
 }
 
-/// What the downloads under test did, in order.
 private actor DownloadLog {
     private(set) var events: [String] = []
 

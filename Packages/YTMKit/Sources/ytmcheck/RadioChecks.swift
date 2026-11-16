@@ -1,7 +1,6 @@
 import Foundation
 import YTMCore
 
-/// The radios a song, an artist and an album start.
 enum RadioChecks {
     static func run(_ report: Report) async {
         await report.check("radio from songs") { findings in

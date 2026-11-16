@@ -301,7 +301,6 @@ struct PlaybackEngineTests {
     }
 }
 
-/// Serves files from memory as `MemoryByteSource` does, noting each range asked for.
 private final class RecordingByteSource: ByteSource {
     private let served: MemoryByteSource
     private let asked = Mutex<[Range<Int64>]>([])
@@ -318,9 +317,8 @@ private final class RecordingByteSource: ByteSource {
     }
 }
 
-/// Serves files as `MemoryByteSource` does, but holds the first request for
-/// `stalling` open after `after` bytes, as a slow network does, noting each
-/// range asked of that file.
+/// Holds the first request for `stalling` open after `after` bytes, as a
+/// slow network does.
 private final class StallingByteSource: ByteSource {
     private let served: MemoryByteSource
     private let stalling: String

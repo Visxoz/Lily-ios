@@ -1,9 +1,5 @@
 import SwiftUI
 
-/// ytm-native's Settings dialog (`dialogs/settings.slint`) as a sheet, in its
-/// tabs: playback, appearance and the account. The Windows-only rows,
-/// Discord and updates, have no place here; the audio cache, which ytm-native
-/// keeps in memory, gets a row of its own.
 struct SettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -32,7 +28,6 @@ struct SettingsScreen: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    // Neutral, as ytm-native's dialog close, not the accent.
                     Button(role: .close) { dismiss() }
                         .tint(theme.text)
                 }
@@ -41,7 +36,6 @@ struct SettingsScreen: View {
     }
 }
 
-/// The pages Settings leads on to.
 enum SettingsPage: Hashable {
     case equaliser
 }

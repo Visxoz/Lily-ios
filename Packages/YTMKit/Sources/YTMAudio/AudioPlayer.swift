@@ -1,16 +1,12 @@
 import Foundation
 
-/// Plays `AudioItem`s gaplessly or crossfading, through the equaliser, from
-/// a disk cache. The main actor's face of the engine: every call returns at
-/// once, and the work happens on the engine's own queue, in the order called.
+/// Every call returns at once; the work happens on the engine's own queue, in the order called.
 @MainActor public final class AudioPlayer {
-    /// The most silence cut from either side of a crossfade, so a quiet
-    /// passage or a hidden track is not mistaken for the end. A crossfade's
-    /// next item is queued this much earlier, with the fade's own length.
+    /// The most silence cut from either side of a crossfade, so a quiet passage or a hidden track is not
+    /// mistaken for the end. A crossfade's next item must be queued this much earlier than the fade.
     nonisolated public static let silenceTrimSeconds = 4.0
 
-    /// What the engine reports, for one consumer. Events of an item replaced
-    /// by `play` or `stop` never arrive after the call.
+    /// For one consumer. Events of an item replaced by `play` or `stop` never arrive after the call.
     public let events: AsyncStream<AudioEvent>
     public private(set) var isPlaying = false
 
@@ -29,12 +25,9 @@ import Foundation
         }
     }
 
-    /// How long a crossfade lasts, for `setNext(_:crossfade:)`.
     public var crossfadeSeconds = 6.0
 
-    /// Whether each item's loudness is corrected, by its `loudnessDB`. A
-    /// change reaches the item playing too, once the few seconds of sound
-    /// already scheduled have played, gliding to the new level.
+    /// A change reaches the item playing once the few seconds already scheduled have played.
     public var normalise = true {
         didSet {
             let normalise = normalise
@@ -70,7 +63,7 @@ import Foundation
         engine.send { $0.shutDown() }
     }
 
-    /// Plays `item` in place of anything playing, skipping without a fade.
+    /// Replaces anything playing without a fade.
     public func play(_ item: AudioItem, from seconds: Double = 0, paused: Bool = false) {
         session += 1
         currentID = item.id
@@ -79,19 +72,16 @@ import Foundation
         engine.send { $0.play(item, from: seconds, paused: paused, session: session) }
     }
 
-    /// Queues the item to follow the current one without a gap, or fading
-    /// into it, replacing any queued before; nil clears it. Its download
-    /// starts now. Pass `crossfade` false for tracks of one album in order.
+    /// Replaces any item queued before; nil clears it. Its download starts now.
+    /// Pass `crossfade` false for tracks of one album in order.
     public func setNext(_ item: AudioItem?, crossfade: Bool) {
         let fade = crossfade ? crossfadeSeconds : 0
         let session = session
         engine.send { $0.setNext(item, fade: fade, session: session) }
     }
 
-    /// Fetches the start of an item likely to play next, so a skip to it
-    /// starts sooner; its download, by `play` or `setNext`, carries on from
-    /// there. One item is warmed at a time, the last asked for, or a next
-    /// item let go, which keeps what it had downloaded.
+    /// Fetches the start of an item likely to play next, so a skip to it starts sooner.
+    /// Only one item is warmed at a time: the last asked for.
     public func warm(_ item: AudioItem) {
         engine.send { $0.warm(item) }
     }
@@ -107,9 +97,8 @@ import Foundation
         engine.send { $0.resume() }
     }
 
-    /// Stops the sound; the output stops after a while, so the device can
-    /// sleep, unless `keepingOutput`, for a change of song: a running output
-    /// keeps the app awake in the background until the next one plays.
+    /// Pass `keepingOutput` for a change of song: a running output keeps the app awake in the background
+    /// until the next one plays. Otherwise the output stops after a while, so the device can sleep.
     public func stop(keepingOutput: Bool = false) {
         session += 1
         currentID = nil
@@ -118,9 +107,7 @@ import Foundation
         engine.send { $0.stop(session: session, keepingOutput: keepingOutput) }
     }
 
-    /// Stops, and makes the engine's audio graph afresh, as the system's
-    /// media services reset takes the old one with it. The mute and
-    /// equaliser carry over.
+    /// For a media services reset, which takes the old graph with it. Mute and equaliser carry over.
     public func rebuild() {
         stop()
         engine.send { $0.rebuildGraph() }
@@ -131,14 +118,13 @@ import Foundation
         engine.send { $0.seek(to: seconds, session: session) }
     }
 
-    /// Where the sound heard has got to, in seconds; cheap enough to read every frame.
+    /// Of the sound heard; cheap enough to read every frame.
     public var currentTime: Double { engine.clock.position() }
 
-    /// The item heard's length: exact once its file is complete, before that as its container states.
+    /// Exact once the file is complete; before that, as its container states.
     public var duration: Double? { engine.clock.duration }
 
-    /// How much of the item heard has downloaded, from 0 to 1, for the seek
-    /// bar; cheap enough to read every frame.
+    /// From 0 to 1; cheap enough to read every frame.
     public var bufferedFraction: Double { engine.clock.buffered }
 
     public var cacheSizeBytes: Int64 {

@@ -1,13 +1,10 @@
 import SwiftUI
 import YTMCore
 
-/// The song's title, which leads to its album, over its artists, which lead
-/// to the first of them, with the like and dislike buttons beside them, as
-/// the player bar's left side. Compact, beside play and next, it leaves the
-/// buttons to the artwork page, so the title has room.
 struct TrackTitle: View {
     let track: Track
-    /// Small in the row above the panel; large under the artwork.
+    /// Small and without the rating buttons, so the title has room beside play
+    /// and next; large under the artwork.
     let compact: Bool
 
     @Environment(AppModel.self) private var app
@@ -41,7 +38,6 @@ struct TrackTitle: View {
     }
 }
 
-/// Dislike and like, signed in with the setting on, as the player bar has.
 private struct RatingButtons: View {
     let track: Track
 

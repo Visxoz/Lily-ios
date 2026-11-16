@@ -1,8 +1,7 @@
 import Foundation
 
 extension Renderers {
-    /// A `musicTwoRowItemRenderer`'s body: an album, artist or playlist tile,
-    /// or a song tile that plays (Listen again, New music videos).
+    /// A `musicTwoRowItemRenderer`'s body: a page tile, or a song tile that plays.
     static func twoRowCard(_ renderer: JSON, context: ItemContext = ItemContext()) -> Card? {
         guard let title = renderer["title"].text, !title.isEmpty else { return nil }
         let subtitle = renderer["subtitle"].runs
@@ -34,10 +33,7 @@ extension Renderers {
         return pageCard(endpoint, title: title, subtitle: subtitle, thumbnails: thumbnails, context: context)
     }
 
-    /// A `musicResponsiveListItemRenderer`'s body used for an album, artist
-    /// or playlist, as search results and library lists show them. The
-    /// built-in Liked music, Episodes for later and "Shuffle all" rows are
-    /// skipped, as rustypipe skips them.
+    /// A `musicResponsiveListItemRenderer`'s body as an album, artist or playlist card.
     static func listCard(_ renderer: JSON, context: ItemContext = ItemContext()) -> Card? {
         let columns = renderer["flexColumns"].array.map(columnText)
         guard let title = columns.first?.text, !title.isEmpty else { return nil }
@@ -47,8 +43,7 @@ extension Renderers {
         return pageCard(endpoint, title: title, subtitle: subtitle, thumbnails: Thumbnail.list(in: renderer), context: context)
     }
 
-    /// A `musicCardShelfRenderer`'s main item: the top search result, when
-    /// it is an artist, album or playlist, as ytm-native shows it.
+    /// A `musicCardShelfRenderer`'s top search result, when it is an artist, album or playlist.
     static func topResultCard(_ renderer: JSON) -> Card? {
         guard let title = renderer["title"].text, !title.isEmpty else { return nil }
         return pageCard(
@@ -57,9 +52,8 @@ extension Renderers {
         )
     }
 
-    /// A mood or genre chip from a `musicNavigationButtonRenderer`'s body,
-    /// with YouTube's colour for it. Other navigation buttons (Explore's New
-    /// releases, Charts) are not genres.
+    /// A mood or genre chip from a `musicNavigationButtonRenderer`'s body;
+    /// other navigation buttons (New releases, Charts) are not genres.
     static func genreCard(_ renderer: JSON) -> Card? {
         let browse = renderer["clickCommand", "browseEndpoint"]
         guard browse["browseId"].string == "FEmusic_moods_and_genres_category",
@@ -71,8 +65,6 @@ extension Renderers {
         return Card(kind: .genre, id: params, title: title, color: color)
     }
 
-    /// An album, artist or playlist card for a browse endpoint, or nil for
-    /// pages the app doesn't open as cards (podcasts, unknown kinds).
     private static func pageCard(
         _ endpoint: JSON, title: String, subtitle: [JSON], thumbnails: JSON, context: ItemContext
     ) -> Card? {
@@ -88,8 +80,6 @@ extension Renderers {
         )
     }
 
-    /// A card's subtitle, composed as ytm-native's `album_card`,
-    /// `artist_card` and `playlist_card` word it, or as YouTube did.
     private static func subtitleText(_ kind: CardKind, _ runs: [JSON], context: ItemContext) -> String {
         guard context.subtitles == .composed else { return text(runs) }
         let segments = segments(runs).map { (runs: $0, text: text($0)) }
@@ -111,8 +101,7 @@ extension Renderers {
             let count = segments.lazy.compactMap { Formatting.count($0.text) }.first
             return count.map { "\(Formatting.compact($0)) subscribers" } ?? "Artist"
         case .playlist:
-            // "Playlist • Channel • 12 songs": the count only for YouTube
-            // Music's own playlists, as rustypipe reads it.
+            // "Playlist • Channel • 12 songs": the count only for YouTube Music's own playlists.
             let channel = linkedArtists(runs).first?.name
             let byYouTube = segments.contains { $0.text.hasPrefix("YouTube") }
             let songs = byYouTube

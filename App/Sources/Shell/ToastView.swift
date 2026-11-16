@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// ytm-native's toast (`app.slint`): a short message in the text colour,
-/// rising into view above the player and fading after a few seconds.
 struct ToastView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme

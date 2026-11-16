@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import YTMAudio
 
-/// Two channels of samples, for the fade functions to read and write.
 private final class Stereo {
     let count: Int
     private let left: UnsafeMutablePointer<Float>
@@ -32,7 +31,6 @@ private final class Stereo {
     }
 }
 
-/// The fade arithmetic, as ytm-native's `engine.rs` tests it.
 struct CrossfadeTests {
     private func mix(_ incoming: [Float]?, _ outgoing: [Float]?, gains: (Float, Float) = (1, 1), from start: Int64 = 0, length: Int64) -> [Float] {
         let count = incoming?.count ?? outgoing?.count ?? 0

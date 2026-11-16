@@ -1,7 +1,6 @@
 import Foundation
 
-/// The last few searches, newest first, offered when the search field opens
-/// until the user types.
+/// The last few searches, newest first.
 public struct RecentSearches: Codable, Sendable {
     static let limit = 5
 
@@ -19,8 +18,7 @@ public struct RecentSearches: Codable, Sendable {
         self.init(queries: try file.decode([String].self, forKey: .queries))
     }
 
-    /// Puts `query`, trimmed, first, dropping an earlier search for it
-    /// whatever its capitals. Blank searches are not kept.
+    /// Puts `query` first, dropping an earlier search for it whatever its capitals.
     public mutating func record(_ query: String) {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty, queries.first != query else { return }

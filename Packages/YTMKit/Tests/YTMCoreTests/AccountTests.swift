@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import YTMCore
 
-/// ytm-native's `api/account.rs` and `api/history.rs` tests.
 @Suite struct AccountTests {
     private let menu = #"""
         {"actions":[{"openPopupAction":{"popup":{"multiPageMenuRenderer":{"header":

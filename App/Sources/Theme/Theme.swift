@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's `Theme` global (`ui/theme.slint`): every colour of the
-/// dark, light and pure black looks, derived from the look and the accent.
 /// Views take their colours from here, never literals.
 nonisolated struct Theme: Equatable, Sendable {
     /// YouTube Music's red, the accent when nothing else gives one.
@@ -18,7 +16,6 @@ nonisolated struct Theme: Equatable, Sendable {
     /// The accent, already made readable in the look.
     let accent: Color
 
-    // Surfaces, from the page outwards.
     let panel: Color
     let elevated: Color
     let highlight: Color
@@ -33,11 +30,9 @@ nonisolated struct Theme: Equatable, Sendable {
     let textDim: Color
     /// Text on a fill of `text`'s colour, such as a primary button.
     let textInverse: Color
-    /// Text and icons on the accent, artwork and other strong colours, which
-    /// stay white in every look.
+    /// Text and icons on the accent, artwork and other strong colours: white in every look.
     let onColour = Color(rgb: .white)
 
-    /// Shadows under artwork and raised buttons, as ytm-native's drop shadows.
     let shadowSoft = Color(rgb: .black).opacity(0.376)
     let shadow = Color(rgb: .black).opacity(0.5)
     let shadowDeep = Color(rgb: .black).opacity(0.565)
@@ -69,9 +64,7 @@ nonisolated struct Theme: Equatable, Sendable {
         homeTint = accent.mixed(with: .black, weight: 0.36)
     }
 
-    /// The theme for the settings, with the playing artwork's vivid colour
-    /// for the accent that follows it, made readable in the look as
-    /// ytm-native's `apply_accent`.
+    /// `artworkAccent` is the playing artwork's vivid colour, for the accent that follows it.
     init(settings: Settings, artworkAccent: RGB?) {
         let accent = settings.accent.rgb.map(RGB.init(hex:)) ?? artworkAccent ?? Self.youtubeRed
         self.init(look: settings.look, accent: ArtworkPalette.readable(accent, look: settings.look))
@@ -86,13 +79,11 @@ nonisolated struct Theme: Equatable, Sendable {
         Color(rgb: isLight ? colour.mixed(with: .white, weight: 0.3) : colour)
     }
 
-    /// The tint behind the top of a page: its own colour, or Home's.
     func pageTint(_ colour: RGB?) -> Color {
         tint(colour ?? homeTint)
     }
 
-    /// The tint of a page without artwork, as ytm-native's `route_tint`;
-    /// nil for Home, whose tint follows the accent.
+    /// The tint of a page without artwork; nil for Home, whose tint follows the accent.
     static func routeTint(_ route: Route) -> RGB? {
         switch route {
         case .home: nil
@@ -112,13 +103,12 @@ nonisolated extension RGB {
     static let white = RGB(r: 1, g: 1, b: 1)
     static let black = RGB(r: 0, g: 0, b: 0)
 
-    /// Slint's `mix`: `weight` of this colour, the rest of `other`.
+    /// `weight` of this colour, the rest of `other`.
     func mixed(with other: RGB, weight: Double) -> RGB {
         RGB(r: r * weight + other.r * (1 - weight), g: g * weight + other.g * (1 - weight), b: b * weight + other.b * (1 - weight))
     }
 
-    /// Slint's `darker`: the HSV value divided by 1 + `factor`, which for
-    /// sRGB channels is scaling them all alike.
+    /// The HSV value divided by 1 + `factor`, which scales every sRGB channel alike.
     func darker(_ factor: Double) -> RGB {
         RGB(r: r / (1 + factor), g: g / (1 + factor), b: b / (1 + factor))
     }

@@ -1,9 +1,7 @@
 import Foundation
 
-/// Where a stream's bytes come from: the network, or a local file in tests.
 protocol ByteSource: Sendable {
-    /// The bytes of `range` of the file at `url`, as they arrive. An upper
-    /// bound of `Int64.max` asks for the rest of a file of unknown length.
+    /// An upper bound of `Int64.max` asks for the rest of a file of unknown length.
     func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error>
 }
 
@@ -13,11 +11,9 @@ enum ByteSourceError: Error, Equatable {
     case status(Int)
     /// The answer starts at the file's first byte, which must not follow the bytes already held.
     case notPartial
-    /// The answer ended without a byte.
     case empty
 }
 
-/// Fetches ranges over HTTP, handing each piece on as it arrives.
 struct HTTPByteSource: ByteSource {
     /// The audio cache keeps the files, so nothing is cached or remembered here.
     static let session: URLSession = {
@@ -51,8 +47,7 @@ struct HTTPByteSource: ByteSource {
     }
 }
 
-/// Passes one request's answer into its stream, refusing statuses the
-/// download cannot use and redirects to another domain.
+/// Refuses statuses the download cannot use and redirects to another domain.
 private final class RangeDelegate: NSObject, URLSessionDataDelegate, Sendable {
     let continuation: AsyncThrowingStream<Data, any Error>.Continuation
     let partial: Bool

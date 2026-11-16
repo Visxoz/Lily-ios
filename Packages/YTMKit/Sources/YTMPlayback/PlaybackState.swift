@@ -1,6 +1,5 @@
 import Foundation
 
-/// What the player knows of the song playing, as ytm-native's `Playback`.
 struct PlaybackState {
     /// Bumped as each song starts, so results for an earlier one are dropped.
     var generation: UInt64 = 0
@@ -14,7 +13,6 @@ struct PlaybackState {
     var failures = 0
     /// When the song was asked for, to time the first sound.
     var requestedAt: ContinuousClock.Instant?
-    /// The song's stream came from the Premium path.
     var currentPremium = false
     /// A song whose Premium stream failed and plays the free one instead.
     var forceFree: String?

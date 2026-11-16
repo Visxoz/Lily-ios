@@ -2,14 +2,10 @@ import Foundation
 import os
 import YTMCore
 
-/// Starting playback from pages, cards and menus, as ytm-native's
-/// `actions.rs`, and the radios that carry a queue on.
+/// Starting playback from pages, cards and menus, and the radios that carry a queue on.
 extension PlayerController {
-    /// Replaces the queue with `tracks` and plays it from `index`, or with
-    /// nil from a random track when shuffling and the first when not. With
-    /// shuffle on, the tracks after the first are shuffled. `shuffle`, as a
-    /// Shuffle button, turns shuffle on first; Play leaves it, and Smart
-    /// Shuffle, as they are.
+    /// Plays from `index`, or with nil from a random track when shuffling and the
+    /// first when not. `shuffle`, as a Shuffle button, turns shuffle on first.
     public func play(_ tracks: [Track], startAt index: Int? = nil, shuffle: Bool = false) {
         guard !tracks.isEmpty else {
             say("Nothing to play here")
@@ -26,9 +22,7 @@ extension PlayerController {
         startCurrent()
     }
 
-    /// One track of a page's section tapped: the whole section from it, or
-    /// for a section of separate songs (`QueueMode.radio`) the song with a
-    /// radio after it.
+    /// The whole section from `index`, or for a `.radio` section the song with a radio after it.
     public func play(_ section: TrackSection, at index: Int) {
         guard section.tracks.indices.contains(index) else { return }
         switch section.mode {
@@ -37,12 +31,8 @@ extension PlayerController {
         }
     }
 
-    /// A card played: an album's, playlist's or artist's songs from the
-    /// start, or a song card's song with a radio after it. Returns once the
-    /// songs have loaded and started, or failed to; a long playlist's later
-    /// batches are added as they arrive. With shuffle on, the whole playlist
-    /// loads first, as ytm-native's `card_tracks`, so the first song can be
-    /// any of it.
+    /// Returns once the songs have started, or failed to. With shuffle on, the
+    /// whole playlist loads first, so the first song can be any of it.
     public func play(_ card: Card) async {
         switch card.kind {
         case .song:
@@ -61,8 +51,6 @@ extension PlayerController {
         }
     }
 
-    /// A card's Start radio: a playlist's own radio, otherwise a radio of
-    /// its first song.
     public func startRadio(from card: Card) async {
         switch card.kind {
         case .playlist:
@@ -83,12 +71,8 @@ extension PlayerController {
         }
     }
 
-    /// A page header's Play or Shuffle: the page's track list, or the whole
-    /// playlist behind a page that shows only part of it. Shuffle on an
-    /// artist's songs, or on a long playlist whose further tracks have yet to
-    /// load, waits for the whole list, as does Play with shuffle on; Play
-    /// otherwise starts the page's tracks at once and adds the rest of the
-    /// playlist as it arrives.
+    /// Unshuffled Play starts the page's tracks at once and adds the rest of the
+    /// playlist as it arrives; Shuffle, or Play with shuffle on, first loads the whole playlist.
     public func play(_ page: Page, shuffle: Bool = false) async {
         let tracks = page.headerTracks
         let unfinished: String? = if case .tracks? = page.more { page.header?.playlistId } else { nil }
@@ -104,20 +88,19 @@ extension PlayerController {
             return
         }
         let music = music
-        // Failing that, the page's own tracks play, as ytm-native's do.
+        // Failing that, the page's own tracks play.
         await load({ (try? await music.playlistTracks(playlist)) ?? [] }, failure: "Couldn't load") { player, found in
             player.play(found.isEmpty ? tracks : found, shuffle: shuffle)
         }
     }
 
-    /// Plays a radio by its playlist ID: an artist page's radio, or a
-    /// playlist's (`YTMusic.radioId(forPlaylist:)`).
+    /// An artist page's radio, or a playlist's from `YTMusic.radioId(forPlaylist:)`.
     public func startRadio(playlistId: String) async {
         let music = music
         await load({ try await music.radio(playlistId: playlistId) }, failure: "Couldn't start the radio") { $0.play($1) }
     }
 
-    /// Plays `track` now and queues a radio based on it, as YouTube Music does.
+    /// Plays `track` now and queues a radio based on it.
     public func startRadio(from track: Track) {
         replaceQueue(with: [track], start: 0, shuffle: false)
         // Autoplay would otherwise ask for the same radio once this starts.
@@ -138,14 +121,12 @@ extension PlayerController {
         }
     }
 
-    /// Puts `tracks` right after the song playing, in their order; into an
-    /// empty queue, they start playing.
+    /// Into an empty queue, they start playing.
     public func playNext(_ tracks: [Track]) {
         insert(tracks, next: true)
     }
 
-    /// Adds `tracks` to the end of the queue; into an empty queue, they
-    /// start playing.
+    /// Into an empty queue, they start playing.
     public func addToQueue(_ tracks: [Track]) {
         insert(tracks, next: false)
     }
@@ -180,8 +161,7 @@ extension PlayerController {
             playback.extending = false
             switch result {
             // Both changing means another queue was started, which the radio
-            // is not for; should that one end, `next` asks again. One alone
-            // is an edit, or a skip, in the same queue.
+            // is not for; one alone is an edit, or a skip, in the same queue.
             case .success where queue.revision != revision && playback.generation != generation:
                 break
             case .success(let tracks):
@@ -192,16 +172,12 @@ extension PlayerController {
         }
     }
 
-    /// Adds the tracks the queue lacks, once each, as ytm-native's
-    /// `append_unique`: a song's radio leaves out the song itself, but may
-    /// repeat others.
+    /// Once each: a song's radio leaves out the song itself, but may repeat others.
     func appendUnique(_ tracks: [Track]) {
         var known = Set(queue.items.map(\.id))
         appendKeepingShuffle(tracks.filter { known.insert($0.id).inserted })
     }
 
-    /// Adds `tracks` to the end of the queue as they are, keeping them in
-    /// the shuffle, and gets the next song ready.
     private func appendKeepingShuffle(_ tracks: [Track]) {
         queue.append(contentsOf: tracks)
         // Recommendations are taken out first, as they are placed again
@@ -214,9 +190,8 @@ extension PlayerController {
         prefetchNext()
     }
 
-    /// Adds the rest of a long playlist, after the first batch `page` shows
-    /// and plays, as each further batch arrives, so the first song starts at
-    /// once. Every track is kept, as a playlist may hold a song twice.
+    /// Adds the rest of a long playlist as each batch arrives. Every track is
+    /// kept, as a playlist may hold a song twice.
     func continuePlaylist(_ page: Page) {
         guard case .tracks? = page.more, !page.headerTracks.isEmpty else { return }
         let music = music
@@ -245,8 +220,7 @@ extension PlayerController {
         }
     }
 
-    /// Loads what to play off the main actor, then plays it, unless something
-    /// else was asked for meanwhile; says `failure` and why when it can't.
+    /// Loads off the main actor, then plays unless something else was asked for meanwhile.
     private func load<T: Sendable>(
         _ work: @escaping @Sendable () async throws -> T, failure: String,
         then play: @escaping @MainActor (PlayerController, T) -> Void

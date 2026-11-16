@@ -1,8 +1,7 @@
 import Foundation
 import YTMCore
 
-/// Lyrics, timed where the Android client is given them, else the web
-/// client's text.
+/// Timed lyrics come from the Android client, else the web client's text.
 enum LyricsChecks {
     static func run(_ report: Report) async {
         await report.check("lyrics") { findings in

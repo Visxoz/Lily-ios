@@ -4,7 +4,6 @@ import Testing
 @testable import YTMAudio
 
 struct ContainerTests {
-    /// Parses `data` in pieces of `piece` bytes, as a download delivers it.
     private func parse(_ data: Data, piece: Int) throws -> any PacketSource {
         let source = try data.withUnsafeBytes { try PacketSources.make(sniffing: $0) }
         var offset = 0
@@ -77,7 +76,6 @@ struct ContainerTests {
 
     // MARK: Damaged files fail cleanly
 
-    /// An Opus WebM with `block` as its one SimpleBlock.
     private func webM(block: [UInt8]) -> Data {
         let head = Array("OpusHead".utf8) + [1, 2, 0x38, 0x01, 0x80, 0xBB, 0, 0, 0, 0, 0]
         let entry = EBMLWriter.uint(EBML.trackNumber, 1) + EBMLWriter.element(EBML.codecID, Array("A_OPUS".utf8))
@@ -94,7 +92,6 @@ struct ContainerTests {
         #expect(throws: AudioFailure.damaged) { try parse(file, piece: file.count) }
     }
 
-    /// A fragmented MP4 with `moof` after its fragments.
     private func mp4(then moof: [UInt8]) throws -> Data {
         try Fixtures.aacMP4(Fixtures.signal(frames: 4_096)) + MP4Writer.box("moof", MP4Writer.box("traf", moof))
     }

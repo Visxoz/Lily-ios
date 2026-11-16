@@ -1,13 +1,8 @@
 import Foundation
 import os
 
-/// Premium audio (256 kbps) for signed-in YouTube Premium accounts, as
-/// ytm-native's `streams/premium/mod.rs`.
-///
-/// YouTube offers Premium formats only to signed-in web clients, whose URLs
-/// are scrambled by its player script. The web clients are asked in turn,
-/// with the player's signature timestamp, and the chosen format's URL is
-/// unscrambled with the trimmed player.
+/// YouTube offers Premium formats (256 kbps) only to signed-in web clients,
+/// whose URLs are scrambled by its player script.
 struct PremiumResolver: Sendable {
     let innerTube: InnerTube
     let player: PlayerScript
@@ -17,20 +12,15 @@ struct PremiumResolver: Sendable {
     /// Web clients that skip PO tokens for Premium accounts, in order of trial.
     static let clients: [ClientProfile] = [.webRemix, .webCreator]
 
-    /// What to play from a web client's answer.
     enum Choice: Equatable {
         case play(Format)
-        /// No format plays at all.
         case noAudio
         /// Signed in without `anyFormat`, and no Premium format plays.
         case notPremium
     }
 
-    /// Resolves a Premium stream. With `anyFormat`, a song without a Premium
-    /// stream takes the best the web client has within `maxKbps`: for an
-    /// account known to have Premium, as its free formats play without a
-    /// second request, and as the last resort when no client hands out
-    /// plain URLs. Signed out, it takes whatever there is.
+    /// With `anyFormat` (a known Premium account, or the last resort when no client gives plain URLs), a song
+    /// without a Premium stream takes the web client's best within `maxKbps`. Signed out, it takes whatever there is.
     func resolve(videoId: String, signedIn: Bool, anyFormat: Bool, maxKbps: Int?) async throws -> PremiumOutcome {
         let clock = ContinuousClock()
         let started = clock.now
@@ -70,11 +60,9 @@ struct PremiumResolver: Sendable {
         throw lastError
     }
 
-    /// The signed-in player request YouTube's web player makes, quoting the
-    /// player's signature timestamp so the URLs match its scrambling.
+    /// Quotes the player's signature timestamp so the URLs match its scrambling.
     func request(videoId: String, as client: ClientProfile) async throws -> JSON {
-        // Not retried, as ytm-native's player_request: the next client is the
-        // retry, so a broken one costs a request rather than the song.
+        // Not retried: the next client is the retry, so a broken one costs a request rather than the song.
         try await innerTube.post("player", body: [
             "playbackContext": [
                 "contentPlaybackContext": [
@@ -88,9 +76,8 @@ struct PremiumResolver: Sendable {
         ], client: client, retries: 0)
     }
 
-    /// Premium formats come first, so a song with AAC 141 but no Opus 774
-    /// doesn't fall to the free Opus beside them; a bitrate cap, which they
-    /// never fit, goes to the rest.
+    /// Premium formats come first, so a song with AAC 141 but no Opus 774 doesn't fall to the
+    /// free Opus beside them; a bitrate cap, which they never fit, goes to the rest.
     static func choose(_ formats: [Format], signedIn: Bool, anyFormat: Bool, maxKbps: Int?) -> Choice {
         let premium = formats.filter { premiumItags.contains($0.itag) }
         if signedIn, maxKbps == nil, let format = bestAudio(premium, maxKbps: nil) { return .play(format) }
@@ -98,7 +85,6 @@ struct PremiumResolver: Sendable {
         return bestAudio(formats, maxKbps: maxKbps).map(Choice.play) ?? .noAudio
     }
 
-    /// The format's URL with its `n` and signature unscrambled by `player`.
     static func unscramble(_ format: Format, with player: PlayerScript) async throws -> URL {
         var signature: (value: String, parameter: String)?
         let address: String?
@@ -147,8 +133,7 @@ struct PremiumResolver: Sendable {
         return fields
     }
 
-    /// Percent-encodes everything but unreserved characters, so a value is
-    /// safe anywhere in a query.
+    /// Percent-encodes all but unreserved characters, so a value is safe anywhere in a query.
     private static func encoded(_ value: String) -> String {
         value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? value
     }

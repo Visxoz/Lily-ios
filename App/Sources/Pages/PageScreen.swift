@@ -1,9 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// Any page reached by a route, as ytm-native's `PageView`: Home, Explore,
-/// genres, albums, playlists, artists, search results and the library all
-/// load through the page cache and draw the same way.
 struct PageScreen: View {
     let route: Route
 
@@ -14,9 +11,8 @@ struct PageScreen: View {
     /// visit is a return to the app rather than to the page.
     @State private var backgrounded = false
 
-    /// What the page loads afresh for: a new account, or the app coming back
-    /// from the background, as Home may have aged meanwhile. Control Centre
-    /// and the like leave the app in the foreground, so don't count.
+    /// A new account or a return from the background, as Home may have aged;
+    /// Control Centre and the like leave the app in the foreground.
     private struct Visit: Hashable {
         let account: Int
         let foreground: Bool
@@ -37,13 +33,11 @@ struct PageScreen: View {
                     Task { await model.retry(in: app) }
                 }, tint: Theme.routeTint(route))
             case .loaded(let page):
-                // Rises into place as it fades in, as ytm-native's page does.
                 PageContent(page: page, route: route, model: model)
                     .transition(.opacity.combined(with: .offset(y: 16)))
             }
         }
         .animation(.easeOut(duration: 0.3), value: model.page != nil)
-        // A new account loads the page afresh, and so may a return to the app.
         .task(id: Visit(account: app.accountGeneration, foreground: scenePhase != .background)) {
             guard scenePhase != .background else {
                 backgrounded = true
@@ -53,8 +47,7 @@ struct PageScreen: View {
             backgrounded = false
             await model.appear(in: app, returning: returning)
         }
-        // Completes the page while it is on screen, as ytm-native's
-        // `complete_page`, so Home is saved whole.
+        // Completes the page while it is on screen, so Home is saved whole.
         .task(id: model.step) { await model.loadMore(in: app) }
     }
 }

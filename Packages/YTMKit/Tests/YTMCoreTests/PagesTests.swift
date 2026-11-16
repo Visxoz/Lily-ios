@@ -10,7 +10,6 @@ private func track(_ id: String, _ title: String, _ artists: [(id: String, name:
     Track(id: id, title: title, artists: artists.map { ArtistRef(id: $0.id.isEmpty ? nil : $0.id, name: $0.name) })
 }
 
-/// ytm-native's `api/mod.rs` tests.
 @Suite struct SongVersionTests {
     @Test func matchesAMusicVideoToItsSong() {
         let video = track("mqEZcXdtAUA", "Fever", [("UCbuck", "Buckshot"), ("UCfake", "fakemink")])

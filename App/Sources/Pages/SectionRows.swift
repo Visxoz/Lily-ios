@@ -1,9 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// One section's rows, as ytm-native's `Built::section` lays them out: its
-/// title, then column labels over an untitled track list (an album's or a
-/// playlist's), then a row per track, or the cards in the section's layout.
 /// The views are siblings in the page's lazy stack, so a long track list is
 /// built only as it scrolls in.
 struct SectionRows: View {
@@ -47,8 +44,6 @@ struct SectionRows: View {
     }
 }
 
-/// A track of a section, which plays the section from it as its queue mode
-/// says, numbered by the album's own numbers where it has them.
 private struct SectionTrack: View {
     let section: TrackSection
     let index: Int

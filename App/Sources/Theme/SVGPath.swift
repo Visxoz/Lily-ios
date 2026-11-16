@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// SVG path data, as Material Symbols write it, turned into a SwiftUI `Path`.
-/// Covers the commands those paths use: moves, lines, cubic curves (with the
-/// smooth form) and closing, absolute and relative.
+/// Covers only the commands Material Symbols use: moves, lines, cubic curves
+/// (with the smooth form) and closing, absolute and relative.
 nonisolated enum SVGPath {
     static func parse(_ data: String) -> Path {
         var scanner = Scanner(bytes: Array(data.utf8))

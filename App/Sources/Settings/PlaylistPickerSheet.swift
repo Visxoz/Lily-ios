@@ -1,10 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's playlist picker (`dialogs/playlist-picker.slint` and
-/// `library.rs`): the account's own playlists, ticked where they already
-/// have the song, to save it to one, or to a new playlist. Signed out, it
-/// offers signing in.
 struct PlaylistPickerSheet: View {
     let track: Track
 
@@ -26,7 +22,6 @@ struct PlaylistPickerSheet: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        // Neutral, as ytm-native's dialog close, not the accent.
                         Button(role: .close) { dismiss() }
                             .tint(theme.text)
                     }
@@ -74,8 +69,6 @@ struct PlaylistPickerSheet: View {
         }
     }
 
-    /// A playlist's row: its title, and the tick if it has the song; or the
-    /// new playlist's, led by its icon.
     private func row(_ title: String, new: Bool = false, ticked: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
@@ -99,8 +92,6 @@ struct PlaylistPickerSheet: View {
         .buttonStyle(RowPress())
     }
 
-    /// The playlists, marked by whether they hold the song. On failure the
-    /// picker closes with a toast, as ytm-native's does.
     private func load() async {
         guard app.isSignedIn else { return }
         do {

@@ -1,12 +1,8 @@
 import Foundation
 
 extension YTMusic {
-    /// Pings the signed-in player response's stats URL so the play shows in the account's history.
-    ///
-    /// As ytm-native's `api/history.rs` and YouTube Music's website: the
-    /// account's player response for the song carries a stats URL, which is
-    /// requested with the account's cookie, so the song shapes its
-    /// recommendations too.
+    /// Pings the account's player response's stats URL with its cookie, so the
+    /// play shows in its history and shapes its recommendations.
     @concurrent
     public func reportPlay(videoId: String) async throws {
         let client = ClientProfile.webRemix
@@ -23,11 +19,9 @@ extension YTMusic {
     }
 }
 
-/// The stats ping the web player sends as a song starts.
 enum PlayReport {
-    /// The response's playback stats URL with the parameters the web player
-    /// adds. Nil without one, or when it is anywhere but youtube.com: it is
-    /// sent the account's cookie.
+    /// Nil without one, or when it is anywhere but youtube.com: it is sent
+    /// the account's cookie.
     static func pingURL(in player: JSON, client: String) -> URL? {
         guard let base = player["playbackTracking", "videostatsPlaybackUrl", "baseUrl"].string,
               var parts = URLComponents(string: base),
@@ -41,8 +35,7 @@ enum PlayReport {
         return parts.url.flatMap { HTTP.isAllowed($0) ? $0 : nil }
     }
 
-    /// A client playback nonce: 16 random characters from the alphabet the
-    /// web player draws them from.
+    /// A client playback nonce, from the web player's alphabet.
     static func cpn() -> String {
         let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
         return String((0..<16).map { _ in alphabet[Int.random(in: 0..<alphabet.count)] })

@@ -1,10 +1,8 @@
 import Foundation
 
 extension YTMusic {
-    /// Search results as ytm-native's `search` shows them: the top result,
-    /// then each kind of result from its own filtered search, all asked at
-    /// once and signed out. Only the songs must arrive; any other kind that
-    /// fails is left out.
+    /// Each kind from its own filtered search, all at once. Only the songs
+    /// must arrive; any other kind that fails is left out.
     func searchPage(_ query: String) async throws -> Page {
         async let top = try? topResult(query)
         async let songs = search(query, .songs)
@@ -19,15 +17,14 @@ extension YTMusic {
         return Page(sections: sections)
     }
 
-    /// One kind of result for `query`, titled as ytm-native titles it.
     func search(_ query: String, _ kind: SearchKind) async throws -> Section? {
         let response = try await innerTube.post("search", body: ["query": query, "params": kind.params], authenticated: false)
         return Renderers.sections(Renderers.sectionList(in: response), mode: .radio, layout: .carousel).first?
             .retitled(kind.title)
     }
 
-    /// The best match, when YouTube Music leads with an artist, album or
-    /// playlist; a song or video in the lead shows among the others.
+    /// Only when YouTube Music leads with an artist, album or playlist; a
+    /// song or video in the lead shows among the others.
     private func topResult(_ query: String) async throws -> Section? {
         let response = try await innerTube.post("search", body: ["query": query], authenticated: false)
         guard let lead = Renderers.section(Renderers.sectionList(in: response)["contents"][0]),
@@ -37,7 +34,6 @@ extension YTMusic {
     }
 }
 
-/// A filtered search, with rustypipe's `MusicSearchFilter` params.
 enum SearchKind {
     case songs, videos, artists, albums, playlists
 
@@ -47,7 +43,7 @@ enum SearchKind {
         case .videos: "EgWKAQIQAWoQEAMQBBAJEAoQBRAREBAQFQ%3D%3D"
         case .albums: "EgWKAQIYAWoQEAMQBBAJEAoQBRAREBAQFQ%3D%3D"
         case .artists: "EgWKAQIgAWoQEAMQBBAJEAoQBRAREBAQFQ%3D%3D"
-        // YouTube Music's own playlists, as ytm-native searches them.
+        // YouTube Music's own playlists.
         case .playlists: "EgeKAQQoADgBahIQAxAEEAkQDhAKEAUQERAQEBU%3D"
         }
     }
@@ -64,8 +60,7 @@ enum SearchKind {
 }
 
 extension Section {
-    /// The section under `title`, without the "Show all" a search shelf
-    /// links to.
+    /// Drops the "Show all" a search shelf links to.
     func retitled(_ title: String) -> Section {
         switch self {
         case .tracks(var section):

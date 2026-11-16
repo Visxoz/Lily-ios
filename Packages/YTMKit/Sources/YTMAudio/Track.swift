@@ -1,12 +1,9 @@
 import AVFoundation
 
-/// One item the engine plays: its download, its container and its decoder,
-/// and what the engine has done with it so far.
 final class Track {
     let item: AudioItem
     let loudnessGain: Float
-    /// The normalisation gain its last buffer ended on, so a change of the
-    /// setting ramps from there.
+    /// The normalisation gain its last buffer ended on, so a setting change ramps from there.
     var gain: Float?
     let loader: StreamLoader
     /// `play` started it, so its first sound is announced as `started`.
@@ -15,16 +12,14 @@ final class Track {
     private(set) var isCancelled = false
     private(set) var source: (any PacketSource)?
     private(set) var decoder: PacketDecoder?
-    /// Every buffer it schedules: stereo, at its own rate.
+    /// Stereo, at its own rate.
     private(set) var bufferFormat: AVAudioFormat?
     private(set) var failure: AudioFailure?
     /// Its last frame has been decoded, or it failed.
     private(set) var finished = false
     /// A buffer of its sound has been scheduled.
     var hasSounded = false
-    /// Its leading silence has been cut, for a crossfade into it.
     private(set) var leadTrimmed = false
-    /// Where to start once the decoder opens.
     private var startAt: Double
     /// The file's first bytes, until there are enough to tell its container.
     private var head = Data()
@@ -50,7 +45,6 @@ final class Track {
         return Double(length) / rate
     }
 
-    /// How much of its file is on disk, from 0 to 1, as ytm-native's `progress`.
     var bufferedFraction: Double {
         loader.isComplete ? 1 : loader.total > 0 ? Double(loader.available) / Double(loader.total) : 0
     }
@@ -61,8 +55,7 @@ final class Track {
         download = nil
     }
 
-    /// Records why it failed. With no decoder yet there is nothing more to
-    /// play; with one, it plays what it has and then ends.
+    /// With no decoder yet nothing more can play; with one, it plays what it has and ends.
     func fail(_ failure: AudioFailure) {
         if self.failure == nil {
             self.failure = failure
@@ -72,8 +65,6 @@ final class Track {
         }
     }
 
-    /// Takes the next bytes of the file, opening the container and the
-    /// decoder as soon as they say enough.
     func receive(_ data: Data) {
         guard failure == nil else { return }
         do {
@@ -108,8 +99,7 @@ final class Track {
         decoder.seek(to: Int64((seconds * decoder.sampleRate).rounded()))
     }
 
-    /// The frames ready to take. A failed download ends the item where its
-    /// bytes ran out.
+    /// A failed download ends the item where its bytes ran out.
     func supply() -> PacketDecoder.Supply {
         guard let decoder, !finished else { return .ended }
         do {
@@ -130,8 +120,7 @@ final class Track {
         decoder.map { ($0.samples(0), $0.samples(1)) }
     }
 
-    /// Cuts up to `limit` frames of silence from its start, so a crossfade
-    /// brings in music rather than silence. False while waiting on the file.
+    /// Cut so a crossfade brings in music rather than silence. False while waiting on the file.
     func trimLeadingSilence(limit: Int64) -> Bool {
         guard !leadTrimmed else { return true }
         guard let decoder else { return false }
@@ -155,9 +144,8 @@ final class Track {
         return true
     }
 
-    /// Where the music ends before its trailing silence, cutting at most
-    /// `limit` frames of it, so a long quiet passage or a hidden track is not
-    /// mistaken for the end. Nil until the file is complete.
+    /// Cuts at most `limit` frames, so a long quiet passage or hidden track is not mistaken
+    /// for the end. Nil until the file is complete.
     func soundEnd(limit: Int64) -> Int64? {
         guard let length, let format = source?.format else { return nil }
         let from = max(length - limit, 0)
@@ -174,8 +162,7 @@ final class Track {
         return end
     }
 
-    /// What the decoder needs to know of the file so far. It is complete
-    /// once every byte has been both downloaded and read by the container.
+    /// Complete once every byte has been both downloaded and read by the container.
     private var state: PacketDecoder.SourceState {
         PacketDecoder.SourceState(
             packets: source?.packets ?? PacketIndex(),

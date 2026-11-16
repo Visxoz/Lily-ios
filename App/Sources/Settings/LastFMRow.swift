@@ -1,10 +1,8 @@
 import SwiftUI
 import YTMCore
 
-/// Settings' Last.fm row, as `settings.slint` and `scrobble.rs`: Connect opens
-/// Last.fm's page to allow access, and the app waits while it is allowed,
-/// whatever Settings does, with Cancel here; connected, it names the account,
-/// with Disconnect. A build without the API keys has no button.
+/// The app, not this row, waits while access is allowed on Last.fm's page, so
+/// leaving Settings doesn't stop it. A build without the API keys has no button.
 struct LastFMRow: View {
     private enum Phase: Equatable {
         /// Reading the Keychain.

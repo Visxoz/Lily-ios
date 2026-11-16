@@ -1,19 +1,14 @@
 import AVFoundation
 
-/// The audio engine, as ytm-native's `engine.rs`: decodes the item heard into
-/// buffers a few seconds ahead of the player node, follows it with the next
-/// item without a gap or fading into it, and says when the sound crosses
-/// over. It runs on its own serial queue, never the main actor, and keeps
-/// only a few seconds of sound in memory, refilled as buffers play.
+/// Runs on its own serial queue, never the main actor, and keeps only a few seconds of
+/// sound in memory, refilled as buffers play.
 actor PlaybackEngine {
-    /// An event, with the `play` or `stop` it follows, so the player can drop
-    /// those of an item it has already replaced.
+    /// Stamped with the `play` or `stop` it follows, so the player can drop stale events.
     struct Stamped: Sendable {
         let session: UInt64
         let event: AudioEvent
     }
 
-    /// Where the sound goes: the device, or rendered on demand in tests.
     enum Output: Sendable {
         case device
         case offline(sampleRate: Double)
@@ -23,16 +18,13 @@ actor PlaybackEngine {
     nonisolated let queue = DispatchSerialQueue(label: "YTMusic.audio", qos: .userInitiated)
     nonisolated var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
 
-    /// Seconds of sound in each buffer scheduled.
     static let bufferSeconds = 0.5
-    /// Seconds of sound kept scheduled ahead of the player.
     static let aheadSeconds = 3.5
     /// Long enough for the mixer's volume ramp to reach silence.
     static let pauseRamp = DispatchTimeInterval.milliseconds(60)
     /// After this long paused or stopped, the output stops so the device can sleep.
     static let idleAfter = DispatchTimeInterval.seconds(30)
-    /// The fade-in after a start, seek or stall: about one device callback,
-    /// as ytm-native ramps over.
+    /// The fade-in after a start, seek or stall: about one device callback.
     static let fadeInSeconds = 0.01
 
     /// Made on the engine's queue at first use, as both reach for the system.
@@ -45,17 +37,11 @@ actor PlaybackEngine {
     private var observer: (any NSObjectProtocol)?
 
     var session: UInt64 = 0
-    /// The item whose sound is heard, or about to be.
     var heard: Track?
-    /// The item whose buffers are being made: the one heard, or the next
-    /// once it follows on the same player.
+    /// The one heard, or the next once it follows on the same player.
     var producing: Track?
-    /// The item queued by `setNext`, until it follows on.
     var next: Track?
-    /// The start of the item likely to play next, fetched by `warm` until
-    /// the item opens.
     var warmed: Warmed?
-    /// Whether each item's loudness is corrected.
     var normalise = true
     /// The crossfade into `next`, in seconds, or 0 to follow without a gap.
     var nextFade = 0.0
@@ -64,7 +50,7 @@ actor PlaybackEngine {
     /// The item heard has ended, and the next is still opening.
     var awaitingNext = false
 
-    /// The buffers scheduled on the player, oldest first.
+    /// Oldest first.
     var scheduled: [Scheduled] = []
     var aheadFrames = 0
     /// Frames scheduled since the player last started, its timeline.
@@ -180,9 +166,8 @@ actor PlaybackEngine {
         pauseToken += 1
         graph.setSilenced(false)
         if heard != nil, !graph.engine.isRunning {
-            // The output stopped while paused, idle or interrupted, and took
-            // the player's schedule with it, so it is made again from where
-            // the sound stopped.
+            // The output stopped while paused, idle or interrupted and took the
+            // player's schedule with it, so it is remade from where the sound stopped.
             seek(to: clock.position(), session: session)
         } else if !scheduled.isEmpty, !playerRunning {
             startPlayer()
@@ -190,9 +175,8 @@ actor PlaybackEngine {
         updateBuffering()
     }
 
-    /// Stops the sound. `keepingOutput` for a change of song: the output
-    /// runs on, silent, until the next one plays, as a stopped output lets
-    /// iOS suspend the app in the background while it fetches that song.
+    /// `keepingOutput` for a change of song: a stopped output lets iOS suspend the app in
+    /// the background while it fetches that song.
     func stop(session: UInt64, keepingOutput: Bool = false) {
         self.session = session
         clear()
@@ -218,10 +202,8 @@ actor PlaybackEngine {
         cache.clear()
     }
 
-    /// Makes the graph afresh, as after the system's media services reset,
-    /// when the old one no longer reaches the device. Drops anything playing;
-    /// the mute and equaliser carry over, and the next `play` follows the
-    /// new graph's output changes.
+    /// For after a media services reset, when the old graph no longer reaches the device.
+    /// Drops anything playing; the mute and equaliser carry over.
     func rebuildGraph() {
         clear()
         if let observer {
@@ -247,8 +229,7 @@ actor PlaybackEngine {
 
     // MARK: Items
 
-    /// Opens an item and starts its download, carrying on from any start
-    /// `warm` fetched, or reports why it cannot.
+    /// Carries on from any warm-up; nil once the failure is reported.
     func open(_ item: AudioItem, at seconds: Double, announcingStart: Bool) -> Track? {
         let warmUp = takeWarmed(item)
         guard let loader = warmUp?.loader ?? makeLoader(item) else { return nil }
@@ -272,7 +253,7 @@ actor PlaybackEngine {
         return track
     }
 
-    /// A new download of the item, or nil once why it cannot start is reported.
+    /// Nil once the failure is reported.
     private func makeLoader(_ item: AudioItem) -> StreamLoader? {
         do {
             return try StreamLoader(item: item, cache: cache)
@@ -282,7 +263,6 @@ actor PlaybackEngine {
         }
     }
 
-    /// Acts on more of an item's file having arrived, or its download ending.
     func progressed(_ track: Track) {
         if track === next {
             prepareNext()
@@ -294,14 +274,11 @@ actor PlaybackEngine {
         }
     }
 
-    /// Tells the clock the length of the item heard and how much of it has downloaded.
     func describeHeard() {
         clock.describe(duration: heard?.duration, buffered: heard?.bufferedFraction ?? 0)
     }
 
-    /// Readies the next item to follow on: open, its leading silence cut for
-    /// a crossfade. A next that fails is dropped and reported, and the item
-    /// heard then simply ends.
+    /// A next that fails is dropped and reported, and the item heard then simply ends.
     func prepareNext() {
         guard let next else { return }
         if let failure = next.failure {
@@ -326,9 +303,7 @@ actor PlaybackEngine {
         return nextFade <= 0 || track.trimLeadingSilence(limit: Int64(AudioPlayer.silenceTrimSeconds * rate))
     }
 
-    /// Drops the next item, taking back any of its buffers that follow the
-    /// item heard, and keeping what it downloaded. Reports nothing: the
-    /// controller asked for it.
+    /// Keeps what it downloaded. Reports nothing: the controller asked for it.
     func dropNext() {
         if let switched = producing, let heard, switched !== heard {
             keepWarm(switched)
@@ -342,8 +317,7 @@ actor PlaybackEngine {
         plan = nil
     }
 
-    /// Ends everything, for a new item or a stop. A next item keeps what it
-    /// downloaded, as the song skipped to is often that one.
+    /// A next item keeps what it downloaded, as the song skipped to is often that one.
     func clear() {
         for track in [heard, fade?.from].compactMap(\.self) {
             track.cancel()
@@ -361,8 +335,7 @@ actor PlaybackEngine {
 
     // MARK: Output
 
-    /// Follows the output device as it changes: the engine has stopped, so
-    /// it reconnects at the new format and carries on from where the sound got to.
+    /// A device change stops the engine, so it reconnects at the new format and carries on.
     private func observeOutputChanges() {
         guard observer == nil else { return }
         observer = NotificationCenter.default.addObserver(
@@ -378,8 +351,6 @@ actor PlaybackEngine {
         seek(to: clock.position(), session: session)
     }
 
-    /// Stops the output after a while with nothing to play, so the device
-    /// can sleep; the next sound starts it again.
     func stopOutputWhenIdle() {
         let token = pauseToken
         let generation = generation

@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// Settings' Account tab: signing in and out, then, signed in, the YouTube
-/// history and rating button settings, and Last.fm.
 struct AccountSettings: View {
     @Environment(AppModel.self) private var app
 
@@ -25,8 +23,6 @@ struct AccountSettings: View {
     }
 }
 
-/// Who is signed in, with their picture and name once YouTube has said, and
-/// the button to sign out, or in, which makes way for Google's page.
 private struct AccountRow: View {
     @Environment(AppModel.self) private var app
 

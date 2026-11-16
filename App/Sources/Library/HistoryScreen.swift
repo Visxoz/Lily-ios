@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// The History tab, as ytm-native's: signed in with plays sent to YouTube,
-/// the account's own history, fetched each visit so plays elsewhere show;
-/// otherwise the songs played here, without any fetching.
 struct HistoryScreen: View {
     @Environment(AppModel.self) private var app
 
@@ -15,7 +12,6 @@ struct HistoryScreen: View {
     }
 }
 
-/// The songs played on this device, as ytm-native's `history_page`.
 private struct LocalHistoryScreen: View {
     @Environment(AppModel.self) private var app
 

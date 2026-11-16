@@ -1,7 +1,6 @@
 import Foundation
 
-/// Counts, durations and running times as the app words them (ytm-native's
-/// `api/format.rs`), and the reverse for YouTube's English text.
+/// The parsers read YouTube's English text only.
 public enum Formatting {
     /// 225 → "3:45", 3725 → "1:02:05".
     public static func duration(_ seconds: Int) -> String {
@@ -20,7 +19,6 @@ public enum Formatting {
         }
     }
 
-    /// "1 song", "12 songs".
     public static func songs(_ n: Int) -> String {
         n == 1 ? "1 song" : "\(n) songs"
     }
@@ -52,10 +50,7 @@ public enum Formatting {
         return total
     }
 
-    /// A count as YouTube words it in English: "1.66K subscribers" → 1660,
-    /// "3.2M plays" → 3200000, "12,345 views" → 12345. Nil without digits.
-    /// As rustypipe's `parse_large_numstr`: the digits, less one power of ten
-    /// per decimal, times the K, M or B among the words.
+    /// "1.66K subscribers" → 1660, "12,345 views" → 12345; nil without digits.
     static func count(_ text: String) -> Int? {
         var digits = "", words = "", exponent = 0
         var afterPoint = false, inNumber = false

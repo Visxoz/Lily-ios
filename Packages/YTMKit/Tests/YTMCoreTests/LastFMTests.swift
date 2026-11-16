@@ -6,7 +6,7 @@ import Testing
     @Test func signsParametersInNameOrder() {
         var params: LastFMAPI.Params = [("token", "tok\u{e9}"), ("method", "auth.getSession"), ("api_key", "key")]
         LastFMAPI.sign(&params, secret: "secret")
-        // md5 of "api_keykeymethodauth.getSessiontokentoké" + "secret", ytm-native's vector.
+        // md5 of "api_keykeymethodauth.getSessiontokentoké" + "secret".
         #expect(params.map(\.name) == ["api_key", "method", "token", "api_sig"])
         #expect(params.last?.value == "d918bc2b2785863c1487e7a79435acb2")
     }

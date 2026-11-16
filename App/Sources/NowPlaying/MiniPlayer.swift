@@ -1,18 +1,14 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's player bar on a phone: the song playing, play and next, and
-/// a thin line of how far it has got, in a glass capsule above the tab bar
-/// as tall as the tab bar, so its controls are easy to reach. Tapping it
-/// opens Now Playing, which grows out of it.
+/// As tall as the tab bar it sits above, so its controls are easy to reach.
 struct MiniPlayer: View {
     private static let height: CGFloat = 64
     private static let art: CGFloat = 44
     /// The tab bar's own margins, so the two line up.
     private static let margin: CGFloat = 20
 
-    /// The tab it sits in, which names it as the source Now Playing grows
-    /// out of.
+    /// Names it as the source Now Playing's zoom grows out of.
     let tab: AppTab
     let transition: Namespace.ID
 
@@ -60,15 +56,13 @@ struct MiniPlayer: View {
     }
 }
 
-/// How far the song has got, pulled twice a second while it plays and left
-/// alone while paused, apart from showing a seek made then. A 2-point line
-/// moves too little to need more. Also under Now Playing's folded controls.
+/// Pulled only twice a second while playing, as a 2-point line moves too
+/// little to need more.
 struct MiniProgress: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
-    /// The place last sought, shown while paused until the song plays or
-    /// changes, as the engine's clock may not have reached it and a paused
-    /// line is never pulled again.
+    /// The place last sought, shown while paused as the engine's clock may not
+    /// have reached it and a paused line is never pulled again.
     @State private var sought: Double?
 
     var body: some View {

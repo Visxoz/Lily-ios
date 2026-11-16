@@ -2,14 +2,10 @@ import SwiftUI
 import YTMAudio
 import YTMCore
 
-/// ytm-native's equaliser (`dialogs/equaliser.slint`): the preset menu and
-/// the on/off switch, then a slider for each of the six bands, ±12 dB in
-/// whole steps, heard as they move since the player follows the settings.
 struct EqualiserScreen: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
-    /// Settings' line about the equaliser: off, its preset, or custom.
     static func summary(_ settings: Settings) -> String {
         settings.equaliserEnabled ? preset(matching: settings.equaliserGains) ?? "Custom" : "Off"
     }
@@ -58,8 +54,7 @@ struct EqualiserScreen: View {
         app.settings.value = value
     }
 
-    /// A slider position from 0 to 1 as a whole number of dB. A drag reports
-    /// every move, most within the same dB, which change nothing.
+    /// A drag reports every move, most within the same dB, which change nothing.
     private func set(_ band: Int, to fraction: Double) {
         // Adding 0 turns the -0 just left of centre into 0.
         let gain = ((Float(fraction) * 2 - 1) * EqualiserBands.maxGain).rounded() + 0
@@ -68,13 +63,11 @@ struct EqualiserScreen: View {
         app.settings.value.equaliserGains[band] = gain
     }
 
-    /// "60 Hz", "2.4 kHz".
     private static func label(_ hz: Float) -> String {
         hz >= 1_000 ? "\((hz / 1_000).formatted()) kHz" : "\(hz.formatted()) Hz"
     }
 }
 
-/// One band: its frequency, its slider and its gain.
 private struct BandRow: View {
     let label: String
     let gain: Float

@@ -1,10 +1,7 @@
 import Foundation
 @testable import YTMCore
 
-/// What every page, track and card must hold, whichever page it is on: an
-/// ID, a title, and artwork the app may fetch, asked at the size it shows.
 extension Findings {
-    /// Every section of `page`, after at least `minimumSections` of them.
     mutating func audit(_ page: Page, _ label: String, minimumSections: Int = 1) {
         expect(page.sections.count >= minimumSections, "\(label): \(page.sections.count) sections, wanted \(minimumSections)+")
         if let header = page.header {
@@ -72,14 +69,12 @@ extension Findings {
         }
     }
 
-    /// Album tracks count up from 1, one by one.
     mutating func numbering(_ tracks: [Track], _ label: String) {
         let numbers = tracks.map(\.trackNumber)
         expect(numbers == tracks.indices.map { $0 + 1 }, "\(label): track numbers \(numbers.map { $0.map(String.init) ?? "-" })")
     }
 
-    /// Artwork on an allowed host; googleusercontent's asked at `edge`
-    /// pixels, as the parsers store it (nil for banners, taken as they are).
+    /// `edge` is the pixel size googleusercontent art is asked at; nil for banners.
     mutating func artwork(_ url: String, edge: Int?, _ label: String) {
         guard let parsed = URL(string: url), HTTP.isAllowed(parsed) else {
             fail("\(label): artwork on a host the app refuses")
@@ -96,7 +91,7 @@ extension Findings {
         expect(repeated.isEmpty, "\(label): repeated \(Set(repeated).sorted().prefix(5))")
     }
 
-    /// YouTube's video IDs: eleven characters of base64url.
+    /// Eleven characters of base64url.
     static func isVideoId(_ id: String) -> Bool {
         id.utf8.count == 11 && id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
     }
@@ -107,7 +102,6 @@ private extension String {
 }
 
 extension Page {
-    /// The section titled `title`, if the page has one.
     func section(_ title: String) -> Section? {
         sections.first { $0.title == title }
     }
@@ -122,7 +116,6 @@ extension Page {
         return s.cards
     }
 
-    /// "Albums (11), Singles & EPs (27)", for notes.
     var summary: String {
         sections.map { section in
             let count = switch section {

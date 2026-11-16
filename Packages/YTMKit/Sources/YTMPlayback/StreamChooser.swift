@@ -3,12 +3,9 @@ import os
 import Synchronization
 import YTMCore
 
-/// Whether the signed-in account plays Premium's 256 kbps streams, as the
-/// player has found out so far.
 public enum PremiumStatus: Sendable {
     case unknown, premium, notPremium
 
-    /// Settings' line about Premium audio, in ytm-native's words.
     public var summary: String {
         switch self {
         case .premium: "Active: playing 256 kbps Premium streams."
@@ -18,16 +15,12 @@ public enum PremiumStatus: Sendable {
     }
 }
 
-/// What the Premium path has learnt across songs, as ytm-native's
-/// `PremiumShared`: how many songs in a row had no Premium formats, how many
-/// requests in a row failed, and the cool-offs that follow.
 struct PremiumCounters {
-    /// Songs in a row without Premium formats before an account not yet
-    /// known to have Premium counts as without it, as some songs simply have
-    /// no Premium version.
+    /// Songs in a row without Premium formats before an unknown account counts
+    /// as without it, as some songs simply have no Premium version.
     static let notPremiumAfter = 3
-    /// The same for an account known to have Premium: only a long run of
-    /// uploads reaches it, and a lapsed subscription soon does.
+    /// The same for a known Premium account: only a long run of uploads
+    /// reaches it, and a lapsed subscription soon does.
     static let lapsedAfter = 20
     /// Cool-off after Premium keeps failing, and between background checks
     /// of an account taken as without Premium.
@@ -39,12 +32,9 @@ struct PremiumCounters {
     private var misses = 0
     /// Premium requests in a row that failed outright.
     private var errors = 0
-    /// The Premium path is skipped until then, after repeated errors.
     private var pausedUntil: ContinuousClock.Instant?
-    /// When an account taken as without Premium is next checked, in the
-    /// background. A run of music videos, which never have Premium formats,
-    /// can mistake a Premium account for one. Unset, a remembered "no" is
-    /// checked on the first song.
+    /// A run of music videos, which never have Premium formats, can mistake a
+    /// Premium account for one, hence the recheck. Unset: checked on the first song.
     var recheckAt: ContinuousClock.Instant?
 
     /// `known` says the account has been served Premium formats before, and
@@ -58,8 +48,7 @@ struct PremiumCounters {
         status == .notPremium || pausedUntil.map { now < $0 } == true
     }
 
-    /// Whether an account taken as without Premium is due a background
-    /// check, claiming it so only one runs.
+    /// Claims the background check when due, so only one runs.
     mutating func takeRecheck(at now: ContinuousClock.Instant) -> Bool {
         guard status == .notPremium, recheckAt.map({ now >= $0 }) ?? true else { return false }
         recheckAt = now + Self.backoff
@@ -90,10 +79,8 @@ struct PremiumCounters {
     }
 }
 
-/// Chooses between the Premium and the free stream for a song, as
-/// ytm-native's `resolve.rs`, and keeps the Premium path's counters across
-/// songs. Safe to call from anywhere: the counters sit behind a lock that is
-/// never held across an await.
+/// Chooses between the Premium and the free stream for a song. Safe to call
+/// from anywhere: the counters' lock is never held across an await.
 final class StreamChooser: Sendable {
     private let music: any MusicService
     private let counters = Mutex(PremiumCounters(known: false, none: false))
@@ -104,19 +91,15 @@ final class StreamChooser: Sendable {
 
     var status: PremiumStatus { counters.withLock(\.status) }
 
-    /// Starts from what the settings remember of the account.
     func seed(known: Bool, none: Bool) {
         counters.withLock { $0 = PremiumCounters(known: known, none: none) }
     }
 
-    /// A new sign-in, or signing out, says nothing yet about Premium.
     func reset() {
         seed(known: false, none: false)
     }
 
-    /// Premium when `wantPremium` (signed in, High quality) and the account
-    /// has it, otherwise the first plain-URL client that answers, and signed
-    /// in, the web client as a last resort.
+    /// `wantPremium` means signed in at High quality.
     @concurrent
     func resolve(videoId: String, wantPremium: Bool, signedIn: Bool, quality: AudioQuality) async throws -> ResolvedStream {
         if wantPremium {
@@ -131,9 +114,8 @@ final class StreamChooser: Sendable {
         return try await free(videoId, signedIn: signedIn, quality: quality)
     }
 
-    /// A fresh URL for a stream this resolved, asked for by the path that
-    /// gave it so it comes back as the same file. Counts nothing towards the
-    /// Premium counters, as the song already counted when first resolved.
+    /// Asks the path that gave the stream, so it comes back as the same file.
+    /// Counts nothing, as the song already counted when first resolved.
     @concurrent
     func refresh(videoId: String, wasPremium: Bool, signedIn: Bool, quality: AudioQuality) async throws -> ResolvedStream {
         Logger.playback.info("\(videoId, privacy: .public): stream refused partway; asking for a fresh URL")
@@ -144,10 +126,8 @@ final class StreamChooser: Sendable {
         return stream
     }
 
-    /// The Premium path's answer, counted; nil to play the free stream. An
-    /// account known to have Premium plays a song without a Premium version
-    /// from the same answer, which saves asking the free clients; one not yet
-    /// known counts the song as a miss instead.
+    /// Nil to play the free stream. A known Premium account takes any format
+    /// from the same answer, which saves asking the free clients.
     private func premium(_ videoId: String) async throws -> ResolvedStream? {
         let known = status == .premium
         do {
@@ -161,7 +141,7 @@ final class StreamChooser: Sendable {
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as YTMError where error == .playerUnprepared {
-            // Not the account's fault, so not counted, as ytm-native's `resolve`.
+            // Not the account's fault, so not counted.
             Logger.playback.info("\(videoId, privacy: .public): could not prepare the player; using the free stream")
         } catch {
             Logger.playback.info("\(videoId, privacy: .public): Premium path failed, using the free stream: \(sentence(for: error), privacy: .public)")
@@ -172,7 +152,6 @@ final class StreamChooser: Sendable {
         return nil
     }
 
-    /// Asks whether an account taken as without Premium has it after all.
     private func recheck(_ videoId: String) async {
         do {
             switch try await music.premiumStream(videoId: videoId, anyFormat: false, maxKbps: nil) {
@@ -184,10 +163,8 @@ final class StreamChooser: Sendable {
         }
     }
 
-    /// The first plain-URL client that answers (YTMCore retries a
-    /// bot-checked visitor ID itself), and signed in, the web client's
-    /// scrambled URLs through the Premium path's solver as a last resort,
-    /// whether or not the account has Premium.
+    /// YTMCore retries a bot-checked visitor ID itself. Signed in, falls back to
+    /// the web client's scrambled URLs through the Premium solver, Premium or not.
     private func free(_ videoId: String, signedIn: Bool, quality: AudioQuality) async throws -> ResolvedStream {
         do {
             return try await music.stream(videoId: videoId, quality: quality)

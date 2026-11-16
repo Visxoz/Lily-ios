@@ -1,9 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// The one menu every track has, wherever it shows, as ytm-native's track row
-/// menu: queueing, the radio, rating and saving (signed in), and its artist
-/// and album.
 struct TrackMenu: View {
     let track: Track
 
@@ -22,7 +19,6 @@ struct TrackMenu: View {
     }
 }
 
-/// A track's artist and album, which the player's menu offers too.
 struct TrackLinks: View {
     let track: Track
 
@@ -36,8 +32,6 @@ struct TrackLinks: View {
     }
 }
 
-/// The signed-in part of a track's menu, rating and saving it, which the
-/// queue's rows offer too.
 struct TrackLibraryMenu: View {
     let track: Track
 
@@ -58,7 +52,6 @@ struct TrackLibraryMenu: View {
     }
 }
 
-/// A card's menu, as ytm-native's: play it, or a radio from it.
 struct CardMenu: View {
     let card: Card
 

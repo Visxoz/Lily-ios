@@ -1,9 +1,8 @@
 import CryptoKit
 import Foundation
 
-/// The signed-in Google session: YouTube's cookies, kept in the Keychain as
-/// one `Cookie` header, and the `Authorization` hashes YouTube's web client
-/// derives from them for each request.
+/// YouTube's cookies, kept in the Keychain as one `Cookie` header, and the
+/// `Authorization` hashes derived from them for each request.
 public actor GoogleAuth {
     public static let shared = GoogleAuth()
 
@@ -12,8 +11,7 @@ public actor GoogleAuth {
     /// YouTube's web client sends the schemes.
     private static let sessionCookies = ["SAPISID", "__Secure-1PAPISID", "__Secure-3PAPISID"]
 
-    /// The `Cookie` header, read from the Keychain the first time it is
-    /// needed, on this actor rather than whichever thread made the instance.
+    /// Read lazily, on this actor rather than whichever thread made the instance.
     private lazy var cookie: String? = Keychain.data(for: Self.keychainKey).map { String(decoding: $0, as: UTF8.self) }
 
     public init() {}
@@ -34,8 +32,7 @@ public actor GoogleAuth {
         Keychain.set(nil, for: Self.keychainKey)
     }
 
-    /// What a request as the signed-in account carries to `origin`, such as
-    /// `https://music.youtube.com`, or nil when signed out.
+    /// What a signed-in request to `origin` carries; nil when signed out.
     func headers(origin: String) -> [String: String]? {
         guard let cookie else { return nil }
         var headers = ["Cookie": cookie, "X-Goog-AuthUser": "0", "X-Origin": origin, "Origin": origin]
@@ -43,9 +40,8 @@ public actor GoogleAuth {
         return headers
     }
 
-    /// One `Cookie` header of the unexpired cookies set for youtube.com or
-    /// google.com, each name once, YouTube's own first; nil without a
-    /// session cookie to sign requests with.
+    /// Unexpired youtube.com and google.com cookies, each name once with
+    /// YouTube's first; nil without a session cookie to sign requests with.
     static func cookieHeader(_ cookies: [HTTPCookie]) -> String? {
         let now = Date.now
         func domain(_ cookie: HTTPCookie) -> String? {
@@ -64,10 +60,8 @@ public actor GoogleAuth {
         return pairs.joined(separator: "; ")
     }
 
-    /// The `Authorization` header YouTube's web player sends: for each
-    /// session cookie present, `SCHEME <time>_<sha1("<time> <cookie> <origin>")>`,
-    /// space-separated. SAPISIDHASH falls back to the 3P cookie, as
-    /// ytm-native's `authorization` does.
+    /// Per session cookie, `SCHEME <time>_<sha1("<time> <cookie> <origin>")>`,
+    /// space-separated; SAPISIDHASH falls back to the 3P cookie.
     static func authorization(cookie: String, origin: String, time: Int) -> String? {
         let value = { (name: String) in
             cookie.split(separator: ";").lazy.compactMap { pair -> Substring? in

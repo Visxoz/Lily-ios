@@ -1,19 +1,16 @@
 import AVFoundation
 
-/// Decodes a source's packets, read from the cache file, to Float32 with
-/// the codec's padding cut at both ends, so an item's first frame is the
-/// music's first and its last the music's last, and gapless joins are exact.
-/// One decoder serves every codec AudioToolbox has: Opus and AAC alike.
+/// Cuts the codec's padding at both ends, so gapless joins are exact. One decoder serves every codec
+/// AudioToolbox has, Opus and AAC alike.
 final class PacketDecoder {
     enum Supply: Equatable {
-        /// Frames ready to take, at least one.
+        /// At least one.
         case frames(Int)
         /// More of the file has to arrive first.
         case waiting
         case ended
     }
 
-    /// What the decoder needs to know of the item's file as it arrives.
     struct SourceState {
         var packets: PacketIndex
         /// Bytes of the file on disk.
@@ -27,12 +24,10 @@ final class PacketDecoder {
     /// The item frame of the next frame to take.
     private(set) var position: Int64 = 0
 
-    /// Opus is decoded from 80 ms before a seek's target, as a fresh decoder
-    /// takes this long to settle (RFC 7845's recommended pre-roll).
+    /// 80 ms: a fresh Opus decoder takes this long to settle (RFC 7845's recommended pre-roll).
     private static let opusPreRoll: Int64 = 3_840
-    /// AudioToolbox's Opus decoder drops the 2.5 ms of overlap at its start
-    /// that libopus leaves to the pre-skip, so it runs this far ahead of the
-    /// codec's own timeline. `PacketDecoderTests` holds it to that.
+    /// AudioToolbox's Opus decoder drops the 2.5 ms of overlap that libopus leaves to the pre-skip, so it
+    /// runs this far ahead of the codec's own timeline. `PacketDecoderTests` holds it to that.
     static let opusDecoderDelay: Int64 = 120
     private static let outputCapacity: AVAudioFrameCount = 8_192
     private static let inputPackets: AVAudioPacketCount = 64
@@ -47,14 +42,12 @@ final class PacketDecoder {
     private let output: AVAudioPCMBuffer
     private let channels: UnsafePointer<UnsafeMutablePointer<Float>>
     private let file: FileHandle
-    /// Decoded frames before the item's first: the codec's leading frames,
-    /// less what AudioToolbox drops itself.
+    /// Decoded frames before the item's first: the leading frames, less what AudioToolbox drops itself.
     private let itemOffset: Int64
     private let preRoll: Int64
     private let leadingFrames: Int64
     private var nextPacket = 0
-    /// The decoded frame the converter gives next, counted from the file's
-    /// first packet, less what AudioToolbox drops.
+    /// Counted from the file's first packet, less what AudioToolbox drops.
     private var outputFrame: Int64 = 0
     private var dropBefore: Int64 = 0
     /// A seek to decoded frame `target`, from `from`, waiting for its packet to be listed.
@@ -99,7 +92,6 @@ final class PacketDecoder {
         return converter
     }
 
-    /// Starts the codec afresh at packet `packet`, which starts on decoded frame `start`.
     private func restart(at packet: Int, frame start: Int64) throws {
         if converterUsed {
             guard let fresh = Self.converter(from: inputFormat, to: format, cookie: cookie) else { throw AudioFailure.unsupported }
@@ -113,13 +105,12 @@ final class PacketDecoder {
     var sampleRate: Double { format.sampleRate }
     var channelCount: Int { Int(format.channelCount) }
 
-    /// The item's length in frames, once every packet is listed.
+    /// In frames; nil until every packet is listed.
     func length(of state: SourceState) -> Int64? {
         state.complete ? max(state.packets.frames - leadingFrames - state.trailingFrames, 0) : nil
     }
 
-    /// Starts decoding at item frame `frame`, exactly: from the packet
-    /// before it, with a pre-roll, dropping the frames ahead of it.
+    /// Exact to the item frame: decodes from before it with a pre-roll and drops the frames ahead of it.
     func seek(to frame: Int64) {
         let target = max(frame, 0) + itemOffset
         seeking = (target, max(target - preRoll, 0))
@@ -128,7 +119,7 @@ final class PacketDecoder {
         ended = false
     }
 
-    /// The samples of channel `channel` ready to take, valid until the next call.
+    /// Valid until the next call.
     func samples(_ channel: Int) -> UnsafePointer<Float> {
         UnsafePointer(channels[min(channel, channelCount - 1)] + carry.lowerBound)
     }
@@ -138,7 +129,6 @@ final class PacketDecoder {
         position += Int64(count)
     }
 
-    /// The frames ready to take, decoding more of the file as needed.
     func supply(_ state: SourceState) throws -> Supply {
         if !carry.isEmpty {
             return .frames(carry.count)
@@ -188,15 +178,13 @@ final class PacketDecoder {
         }
     }
 
-    /// Skips a batch the codec could not decode, as one bad packet should
-    /// not end the song; several in a row mean the file is broken.
+    /// One bad packet should not end the song; several in a row mean the file is broken.
     private func recover(_ state: SourceState) throws {
         failures += 1
         guard failures <= 3 else { throw AudioFailure.damaged }
         try restart(at: nextPacket, frame: state.packets.start(of: nextPacket))
     }
 
-    /// The next packets for the converter, read from the file in one go.
     private func nextBuffer(_ source: SourceState, status: UnsafeMutablePointer<AVAudioConverterInputStatus>) -> AVAudioBuffer? {
         let packets = source.packets
         // The last packet listed waits for the next or for the end, as only

@@ -8,13 +8,9 @@ import UIKit
 import AppKit
 #endif
 
-/// The system's Now Playing (lock screen, Control Centre, Dynamic Island)
-/// and its remote commands, as ytm-native's media overlay
-/// (`media_controls.rs`): the song, its artwork and where it has got to, and
-/// play, pause, next, previous, seeking and liking from there.
 @MainActor final class NowPlayingCenter {
-    /// How far the system's own reckoning of the position may drift from the
-    /// sound, as through a stall, before it is told again.
+    /// Seconds the system's reckoning of the position may drift, as through a
+    /// stall, before it is told again.
     private static let allowedDrift = 1.0
 
     private let info = MPNowPlayingInfoCenter.default()
@@ -23,10 +19,8 @@ import AppKit
     /// The song shown, so artwork arriving for an earlier one is dropped.
     private var trackID: String?
     private var artwork: Task<Void, Never>?
-    /// The elapsed time last published, the rate it runs at, and when.
     private var published: (elapsed: Double, rate: Double, at: ContinuousClock.Instant)?
 
-    /// Takes the remote commands, which drive `player` from then on.
     init(player: PlayerController) {
         commands.playCommand.addTarget(on: player) { $0.setPaused(false) }
         commands.pauseCommand.addTarget(on: player) { $0.setPaused(true) }
@@ -41,7 +35,6 @@ import AppKit
         setLike(isLiked: false, enabled: false)
     }
 
-    /// Shows `track` as the song playing.
     func show(_ track: Track, duration: Double) {
         artwork?.cancel()
         trackID = track.id
@@ -79,14 +72,12 @@ import AppKit
         }
     }
 
-    /// A length the song lacked, filled in from its stream.
     func setDuration(_ duration: Double) {
         metadata[MPMediaItemPropertyPlaybackDuration] = duration > 0 ? duration : nil
     }
 
-    /// Says whether the song plays (`playing`, the play button) and where it
-    /// is, and whether its sound is moving on (not loading or stalled), from
-    /// which the system runs the position on by itself.
+    /// `playing` sets the play button; `advancing` (not loading or stalled) lets
+    /// the system run the position on by itself.
     func setPlayback(playing: Bool, advancing: Bool, elapsed: Double) {
         guard trackID != nil else { return }
         let rate = advancing ? 1.0 : 0
@@ -97,8 +88,7 @@ import AppKit
         info.playbackState = playing ? .playing : .paused
     }
 
-    /// Run each tick: tells the system the position again only when its
-    /// reckoning has drifted from the sound's.
+    /// Run each tick: tells the system the position again only when its reckoning has drifted.
     func keep(elapsed: Double, advancing: Bool) {
         guard let published else { return }
         if abs(reckoned(published) - elapsed) > Self.allowedDrift || (published.rate > 0) != advancing {
@@ -106,13 +96,10 @@ import AppKit
         }
     }
 
-    /// Where the system's own reckoning has the song now, from what was
-    /// last published.
     private func reckoned(_ published: (elapsed: Double, rate: Double, at: ContinuousClock.Instant)) -> Double {
         published.elapsed + (ContinuousClock.now - published.at).seconds * published.rate
     }
 
-    /// The like command's state: lit for a liked song, offered when signed in.
     func setLike(isLiked: Bool, enabled: Bool) {
         commands.likeCommand.isEnabled = enabled
         commands.likeCommand.isActive = isLiked
@@ -131,8 +118,7 @@ import AppKit
 }
 
 private extension MPRemoteCommand {
-    /// Runs `action` on `player` with what `read` takes from the event. The
-    /// system calls handlers from its own thread, so they hop to the main
+    /// The system calls handlers from its own thread, so they hop to the main
     /// actor rather than assume it, with the event's values, not the event.
     func addTarget<Value: Sendable>(
         on player: PlayerController, reading read: @escaping @Sendable (MPRemoteCommandEvent) -> Value?,

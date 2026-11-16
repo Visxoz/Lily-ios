@@ -3,29 +3,20 @@ import Foundation
 import ImageIO
 import os
 
-/// Artwork, fetched and decoded off the main actor at the size it is shown,
-/// as ytm-native's `images.rs`.
-///
-/// Three tiers: decoded images in memory, bounded by bytes; the downloads
-/// in `HTTP.media`'s disk URL cache; then the network. Requests for an image
-/// already on its way share its download, which is cancelled once no one
-/// waits for it, as a page's artwork is once the page is left.
+/// Artwork decoded off the main actor at the size shown, from memory, then
+/// `HTTP.media`'s disk URL cache, then the network.
 public final class ImagePipeline: Sendable {
     public static let shared = ImagePipeline()
 
-    /// The playing song's artwork, in pixels: Now Playing's (the phone's
-    /// width less its margins, at 3x) and the lock screen's, so both share
-    /// one decode, fetched ahead with the song.
+    /// Now Playing's artwork in pixels (the phone's width less its margins,
+    /// at 3x), shared with the lock screen so both use one decode.
     public static let playerEdge = 1080
-    /// Any artwork drawn 56 points or smaller (56 at 3x), in pixels. Small
-    /// artwork shares this one size, as ytm-native's fixed buckets, so a row's
-    /// copy, the mini player's and the one fetched ahead are the same decode.
+    /// Any artwork drawn 56 points or smaller (56 at 3x), in pixels, so a
+    /// row's copy, the mini player's and the prefetched one share one decode.
     public static let smallEdge = 168
 
-    /// Decoded artwork kept for reuse, in bytes: ytm-native's 32 MB scaled
-    /// for decodes at 3x rather than a desktop's 1x, so a Home feed's cards
-    /// and the playing song's 1080-pixel copy, fetched ahead, outlast a
-    /// scroll. NSCache still sheds it under memory pressure.
+    /// Decoded artwork kept, in bytes: enough for a Home feed's cards and the
+    /// player's 1080-pixel copy to outlast a scroll.
     private static let memoryLimit = 96 << 20
     /// Prefetches at once: few, so the artwork a view asks for itself never
     /// queues behind a page's worth for the media host's connections.
@@ -54,11 +45,8 @@ public final class ImagePipeline: Sendable {
         memory[Self.key(url, pixelEdge)]
     }
 
-    /// Downloads artwork into the disk URL cache without decoding it, so a
-    /// page's art is on the device before it scrolls in, as ytm-native's
-    /// `load_art`; memory stays bounded as nothing is decoded. Artwork
-    /// already decoded, on its way or downloaded is skipped, and nothing more
-    /// starts once the caller is cancelled.
+    /// Downloads artwork into the disk URL cache without decoding it, so memory
+    /// stays bounded. Nothing more starts once the caller is cancelled.
     public func prefetch(_ urls: [String], pixelEdge: Int) async {
         await withTaskGroup(of: Void.self) { group in
             var seen = Set<String>()
@@ -79,9 +67,8 @@ public final class ImagePipeline: Sendable {
         }
     }
 
-    /// Keyed by what is requested, so artwork stored at different sizes, as
-    /// a row's and an album header's copies are, shares one decode and one
-    /// download.
+    /// Keyed by what is requested, so artwork stored at different sizes
+    /// shares one decode and one download.
     static func key(_ url: String, _ edge: Int) -> String {
         "\(edge):\(isWide(url) ? url : Thumbnail.resized(url, edge: edge))"
     }
@@ -115,10 +102,8 @@ public final class ImagePipeline: Sendable {
         _ = try? await HTTP.data(for: request, session: HTTP.media)
     }
 
-    /// The URL to fetch: googleusercontent renders any size, so it is asked
-    /// for the pixels drawn rather than a larger rendition. A wide one, an
-    /// artist's banner, keeps the rendition it came with, as a square size
-    /// would crop it; ytm-native leaves its banners alone the same way.
+    /// googleusercontent renders any size, so ask for the pixels drawn; a wide
+    /// banner keeps the rendition it came with, as a square size would crop it.
     static func requestURL(_ url: String, edge: Int) -> URL? {
         guard isWide(url) else { return Thumbnail.url(url, edge: edge) }
         return URL(string: url).flatMap { HTTP.isAllowed($0) ? $0 : nil }
@@ -159,8 +144,6 @@ public final class ImagePipeline: Sendable {
     }
 }
 
-/// Decoded images by key, bounded by their bytes, and emptied under memory
-/// pressure.
 private final class MemoryCache: @unchecked Sendable {
     // `@unchecked`: NSCache is thread-safe, and this holds nothing else.
     private let cache = NSCache<NSString, CGImage>()
@@ -190,15 +173,13 @@ actor Downloads {
     }
 
     private var downloads: [String: Download] = [:]
-    /// Prefetches under way: a request for the same image meanwhile waits
-    /// for its download, then reads it from the URL cache, rather than
-    /// fetching it a second time.
+    /// A request for an image being prefetched waits for that download, then
+    /// reads it from the URL cache rather than fetching it twice.
     private var prefetches: [String: Task<Void, Never>] = [:]
     private var nextID: UInt64 = 0
 
-    /// Waits for `key`'s image, starting `load` unless it is already on its
-    /// way. A cancelled caller gets nil at once; the download stops when the
-    /// last of its waiters goes.
+    /// Waits for `key`'s image, starting `load` unless it is on its way. A
+    /// cancelled caller gets nil at once; the download stops with the last.
     func image(for key: String, load: @escaping @Sendable () async -> CGImage?) async -> CGImage? {
         let id = nextID
         nextID += 1
@@ -226,7 +207,7 @@ actor Downloads {
     }
 
     /// Runs `download`, a prefetch of `key`'s image, unless the image is on
-    /// its way already, so it is never fetched twice. It stops with its caller.
+    /// its way already. It stops with its caller.
     func prefetch(_ key: String, download: @escaping @Sendable () async -> Void) async {
         guard downloads[key] == nil, prefetches[key] == nil else { return }
         let task = Task { await download() }

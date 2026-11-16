@@ -1,13 +1,11 @@
 import SwiftUI
 
-/// ytm-native's `Spinner` (`widgets/spinner.slint`): a Material-style arc
-/// over a faint track, sweeping between 30° and 270° as the whole turns.
 struct Spinner: View {
     var size: CGFloat = 32
 
     @Environment(\.theme) private var theme
 
-    /// The circle's share of the spinner: radius 10 on slint's 24-unit grid.
+    /// The circle's share of the spinner: radius 10 on a 24-unit grid.
     private static let circle: CGFloat = 20 / 24
 
     var body: some View {

@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's `TopResult` (`page/header.slint`): the best search match,
-/// shown large, with its play button always in view as nothing hovers here.
 struct TopResultCard: View {
     let card: Card
 

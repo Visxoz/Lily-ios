@@ -1,9 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// YouTube Music's Speed dial, as its phone apps draw it: pages of three by
-/// three square tiles, swiped sideways with dots for the pages, the title
-/// over each tile's foot, and a die among them that plays one at random.
 struct SpeedDial: View {
     let cards: [Card]
     /// The page's width inside its padding.
@@ -14,7 +11,7 @@ struct SpeedDial: View {
     private static let columns = 3
     private static let perPage = 9
 
-    /// A tile: a card, or the die, which ends the first page as YouTube's does.
+    /// The die ends the first page, as YouTube's does.
     private enum Tile {
         case card(Card)
         case die
@@ -77,9 +74,6 @@ struct SpeedDial: View {
     }
 }
 
-/// A card as a Speed dial tile: its artwork filling the square (an artist's
-/// round within it), the title over a shade at its foot, a chevron when it
-/// opens a page, and an outline while it is the song playing.
 private struct SpeedDialTile: View {
     let card: Card
     let size: CGFloat
@@ -132,7 +126,6 @@ private struct SpeedDialTile: View {
     }
 }
 
-/// The die: plays one of the Speed dial's tiles at random.
 private struct SpeedDialDie: View {
     let cards: [Card]
     let size: CGFloat
@@ -163,7 +156,6 @@ private struct SpeedDialDie: View {
     }
 }
 
-/// A dot for each page, the one in view lit.
 private struct PageDots: View {
     let count: Int
     let current: Int

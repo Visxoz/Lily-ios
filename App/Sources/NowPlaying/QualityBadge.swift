@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// The player bar's quality badge, such as "OPUS 165", outlined in the
-/// accent behind a PREMIUM tag for Premium streams.
 struct QualityBadge: View {
     let stream: ResolvedStream
 

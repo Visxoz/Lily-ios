@@ -1,9 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's `Card` (`page/cards.slint`): artwork, round for artists, over
-/// the title and subtitle. Tapping opens it (a song plays); holding offers
-/// Play and Start radio.
 struct CardView: View {
     let card: Card
     let width: CGFloat
@@ -12,9 +9,7 @@ struct CardView: View {
     @Environment(\.theme) private var theme
     @Environment(\.displayScale) private var displayScale
 
-    /// Every card's decode, whatever its layout: carousel and grid cards share
-    /// one, so a grid of art already seen in a carousel draws on its first
-    /// frame, as ytm-native decodes every card at one size.
+    /// Carousel and grid cards share one decode, so art already seen in a carousel draws at once.
     static func artPixels(scale: CGFloat) -> Int {
         ArtworkImage.pixels(edge: Metrics.cardWidth, scale: scale)
     }
@@ -43,8 +38,6 @@ struct CardView: View {
     }
 }
 
-/// ytm-native's `Carousel`: a row of cards. The finger scrolls it in place of
-/// the desktop's arrows, and it settles on whole cards as they do.
 struct CarouselRow: View {
     let cards: [Card]
 
@@ -64,7 +57,6 @@ struct CarouselRow: View {
     }
 }
 
-/// ytm-native's `CardGrid`: as many cards a row as fit `width`.
 struct CardGrid: View {
     let cards: [Card]
     let width: CGFloat

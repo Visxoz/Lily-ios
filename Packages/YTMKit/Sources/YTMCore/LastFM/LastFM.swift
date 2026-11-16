@@ -1,23 +1,16 @@
 import Foundation
 import os
 
-/// Scrobbling to Last.fm, as ytm-native's `lastfm.rs` and `app/scrobble.rs`:
-/// connecting an account through the browser, showing what is playing, and
-/// logging plays, queued on disk until Last.fm takes them.
-///
-/// The API keys are built in, as ytm-native's, and the account's session
-/// lives in the Keychain. When a play counts is the player's to judge; this
-/// sends what it is given.
+/// Scrobbling to Last.fm, with plays queued on disk until it takes them and
+/// the session in the Keychain. When a play counts is the player's to judge.
 public actor LastFM {
     public static let shared = LastFM(store: .shared)
 
-    /// How often to ask whether the user has allowed access, and for how
-    /// long before giving up. The token lasts an hour, and someone who first
-    /// has to sign up or reset a password can take a while.
+    /// How often to ask whether the user has allowed access, and for how long:
+    /// the token lasts an hour, and signing up first can take a while.
     static let pollEvery = Duration.seconds(3)
     static let pollFor = Duration.seconds(20 * 60)
-    /// How long to wait before sending again after Last.fm could not take
-    /// the plays, or refused one.
+    /// The wait before sending again after a failure or a refused play.
     static let retryAfter = Duration.seconds(60)
 
     private static let sessionItem = "lastfm.session"
@@ -29,7 +22,6 @@ public actor LastFM {
     // the disk is touched on the main actor.
     private lazy var session: Session? = Self.read(Session.self, from: Self.sessionItem)
     private lazy var pending = loadPending()
-    /// A batch is on its way to Last.fm.
     private var sending = false
     /// Last.fm refused a batch as invalid, so this many of its plays go one
     /// at a time, to find the one it refuses and drop it alone.
@@ -40,14 +32,12 @@ public actor LastFM {
     private var retry: Task<Void, Never>?
     private let revoked: AsyncStream<Void>.Continuation
 
-    /// Yields when Last.fm stops allowing access to the account, which is
-    /// then signed out with its plays kept for when it connects again. The
-    /// app says so, as ytm-native's toast does. One consumer.
+    /// Yields when Last.fm revokes access; the account is signed out with its
+    /// plays kept for when it connects again. One consumer.
     public nonisolated let accessRevoked: AsyncStream<Void>
 
-    /// Sends the plays left over from a run that couldn't reach Last.fm, as
-    /// ytm-native's `start` does: the player makes the shared instance as
-    /// the app starts.
+    /// Sends the plays left from an earlier run; the player makes the shared
+    /// instance at launch.
     init(store: FileStore) {
         self.store = store
         (accessRevoked, revoked) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -56,13 +46,11 @@ public actor LastFM {
 
     public var username: String? { session?.name }
     /// Whether this build has the API keys, without which Settings offers
-    /// no Connect, as ytm-native's `available`.
+    /// no Connect.
     public static var isAvailable: Bool { Keys.builtIn != nil }
 
-    /// Connects an account: opens the page where the user allows access,
-    /// then asks every few seconds whether they have, through any brief
-    /// failure to reach Last.fm. Ends with the task's cancellation, or with
-    /// another sign-in or a sign-out.
+    /// Opens the page where the user allows access, then polls until they
+    /// have. Ends on cancellation, another sign-in or a sign-out.
     public func signIn(open: @Sendable (URL) async -> Void) async throws {
         guard let keys else {
             throw YTMError(.refused, "Last.fm isn't available in this build.")
@@ -97,9 +85,9 @@ public actor LastFM {
         }
     }
 
-    /// Forgets the account, or stops waiting for one to connect. Plays not
-    /// yet sent are dropped with an account, so none reach the next one;
-    /// stopping a wait keeps those of an account whose access was revoked.
+    /// Forgets the account, or stops waiting for one. A connected account's
+    /// unsent plays are dropped, so none reach the next one; stopping a wait
+    /// keeps those of an account whose access was revoked.
     public func signOut() {
         let connected = session != nil
         end()
@@ -130,7 +118,6 @@ public actor LastFM {
 
     // MARK: - Sending
 
-    /// Starts sending the plays Last.fm has yet to take, unless already.
     private func send() {
         guard !sending, session != nil, !pending.isEmpty else { return }
         sending = true
@@ -139,8 +126,8 @@ public actor LastFM {
         Task { await drain() }
     }
 
-    /// Sends the oldest plays, then the rest, saving them as each answer
-    /// comes, until none are left or Last.fm can't take them for now.
+    /// Sends the oldest plays, then the rest, until none are left or Last.fm
+    /// can't take them for now.
     private func drain() async {
         defer { sending = false }
         while let session, let keys, !pending.isEmpty {
@@ -213,9 +200,8 @@ public actor LastFM {
         Self.write(Session?.none, to: Self.sessionItem)
     }
 
-    /// Forgets an account whose access was revoked, keeping its plays;
-    /// other failures keep the plays for the next attempt. Replies for an
-    /// earlier account change nothing.
+    /// Signs out an account whose access was revoked, keeping its plays.
+    /// Replies for an earlier account change nothing.
     private func failed(_ error: any Error, generation: UInt64) {
         guard generation == self.generation, let failure = error as? Failure else { return }
         switch failure {

@@ -1,6 +1,5 @@
 import Foundation
 
-/// One token of JavaScript source: what it is and where its bytes lie.
 struct JSToken {
     enum Kind: UInt8 {
         case identifier, number, string, regex, punctuator
@@ -18,8 +17,7 @@ struct JSToken {
     let kind: Kind
     let start: Int
     let end: Int
-    /// A line break comes between this token and the one before it, which
-    /// can end a statement that has no semicolon.
+    /// A line break before this token can end a statement that has no semicolon.
     let newlineBefore: Bool
     /// 1 for a bracket that opens (`(`, `[`, `{` and `` `…${ ``), -1 for
     /// one that closes, 0 for the rest.
@@ -40,11 +38,8 @@ extension JSToken {
     }
 }
 
-/// A small, fast JavaScript tokenizer over UTF-8 bytes: enough of the
-/// grammar to step over strings, template literals (nested to any depth),
-/// regular expressions and comments without mistaking what is inside them
-/// for code, which is all the player trimmer needs to find statements and
-/// the names they use.
+/// Just enough JavaScript grammar to step over strings, nested template literals, regular
+/// expressions and comments without mistaking what is inside them for code.
 struct JSTokenizer {
     let source: [UInt8]
     private var offset: Int
@@ -268,8 +263,7 @@ struct JSTokenizer {
         offset += length
     }
 
-    /// Whether a `/` here starts a regular expression rather than dividing:
-    /// it does wherever an expression may begin, so not after a value.
+    /// A `/` starts a regular expression wherever an expression may begin, so not after a value.
     private var regexMayFollow: Bool {
         guard let previous else { return true }
         switch previous.kind {
@@ -314,7 +308,6 @@ struct JSTokenizer {
     static let malformed = YTMError(.parse, "YouTube's player script couldn't be read.")
 }
 
-/// JavaScript keywords the tokenizer and the statement reader look for, as UTF-8.
 struct Word: Sendable {
     let bytes: [UInt8]
 
@@ -329,7 +322,6 @@ struct Word: Sendable {
         finally = Word("finally"), `switch` = Word("switch"), `await` = Word("await"), this = Word("this"),
         `super` = Word("super"), `in` = Word("in"), instanceof = Word("instanceof")
 
-    /// Words that begin a declaration list.
     static let declarations: [Word] = [.var, .let, .const]
 
     /// Words that begin a statement other than an expression.
@@ -338,8 +330,7 @@ struct Word: Sendable {
         Word("continue"), Word("debugger"),
     ]
 
-    /// Words that take an operand after them, so never end an expression
-    /// and may be followed by a regular expression.
+    /// Words that take an operand, so never end an expression and may be followed by a regular expression.
     static let operators: [Word] = [
         .in, .instanceof, Word("of"), Word("typeof"), Word("new"), Word("delete"), Word("void"), Word("return"),
         Word("throw"), Word("case"), .do, .else, Word("yield"), .await,

@@ -1,12 +1,10 @@
 extension LastFM {
-    /// Plays Last.fm has yet to accept, oldest first, kept on disk so none
-    /// are lost while it cannot be reached. As ytm-native's `Pending`.
+    /// Plays Last.fm has yet to accept, oldest first, kept on disk.
     struct Pending: Codable, Sendable {
         /// Most scrobbles Last.fm takes in one request.
         static let batchSize = 50
-        /// Plays kept while Last.fm cannot be reached. Last.fm refuses plays
-        /// more than two weeks old anyway, and this is a fortnight of heavy
-        /// listening.
+        /// A fortnight of heavy listening: Last.fm refuses plays more than two
+        /// weeks old anyway.
         static let limit = 3000
 
         private(set) var plays: [Play] = []
@@ -21,7 +19,6 @@ extension LastFM {
             plays.append(play)
         }
 
-        /// Drops every play, as when the account is disconnected.
         mutating func clear() {
             plays.removeAll()
         }
@@ -38,9 +35,8 @@ extension LastFM {
             Array(plays.prefix(one ? 1 : Self.batchSize))
         }
 
-        /// Drops `sent`, which Last.fm has taken or refused. Matched by value
-        /// rather than position, as the oldest play may have made way for a
-        /// new one while they were on their way.
+        /// Matched by value rather than position, as the oldest play may have
+        /// made way for a new one while they were on their way.
         mutating func remove(_ sent: [Play]) {
             let sent = Set(sent)
             plays.removeAll { sent.contains($0) }

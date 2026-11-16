@@ -2,13 +2,8 @@ import Foundation
 import Observation
 import YTMCore
 
-/// The user's settings, saved as settings.json two seconds after the last
-/// change, so dragging a slider costs one write.
-///
-/// Load it once at launch with `load()` (the player's `start()` does), before
-/// anything changes it. The player follows every change to `value` on its
-/// own: mute, the equaliser, crossfade, normalisation, quality,
-/// shuffle and repeat take effect as they are set.
+/// Saved as settings.json two seconds after the last change. Call `load()`
+/// once at launch, before anything changes it; the player's `start()` does.
 @MainActor @Observable public final class SettingsStore {
     public static let shared = SettingsStore(store: .shared)
 
@@ -30,8 +25,8 @@ import YTMCore
         self.store = store
     }
 
-    /// Reads settings.json off the main actor, once; later calls wait for
-    /// the first. A missing or unreadable file leaves the defaults.
+    /// Reads once; later calls wait for the first. A missing or unreadable
+    /// file leaves the defaults.
     public func load() async {
         if loading == nil {
             let store = store

@@ -1,29 +1,22 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's search box (`shell/top-bar.slint`) as the Search tab: the
-/// recent searches from focusing the field until the user types, YouTube's
-/// suggestions as they type, and the results as a page.
 struct SearchScreen: View {
-    /// What ytm-native waits after a keystroke before asking for suggestions.
     private static let suggestDelay: Duration = .milliseconds(150)
-    /// Fewer characters than this get no suggestions.
     private static let suggestFrom = 2
     private static let suggestionLimit = 8
 
     @Environment(AppModel.self) private var app
     @State private var query = ""
-    /// The user has typed since focusing the field, so suggestions replace
-    /// the recent searches.
+    /// Typed since focusing the field, so suggestions replace the recent searches.
     @State private var typed = false
     @State private var suggestions: [String] = []
-    /// The search whose results show.
     @State private var shown: String?
 
     var body: some View {
         @Bindable var app = app
-        // The results stay in the tree under the dropdown, as in ytm-native, so
-        // cancelling a search shows them again in place, scrolled where they were.
+        // The results stay in the tree under the dropdown, so cancelling a
+        // search shows them again in place, scrolled where they were.
         ZStack {
             if let shown {
                 PageScreen(route: .search(shown), app: app)
@@ -41,8 +34,7 @@ struct SearchScreen: View {
                 )
             }
         }
-        // Always showing, so the query stays in view over its results, as
-        // ytm-native's search box.
+        // Always showing, so the query stays in view over its results.
         .searchable(text: $query, isPresented: $app.isSearching, placement: .navigationBarDrawer(displayMode: .always), prompt: "What do you want to play?")
         .onSubmit(of: .search) { search(query) }
         .onChange(of: app.isSearching) { _, active in
@@ -56,8 +48,6 @@ struct SearchScreen: View {
         .task(id: suggestKey) { await suggest(suggestKey) }
     }
 
-    /// Recent searches show until the user types, and again once they clear
-    /// the field.
     private var showsRecent: Bool {
         query.isEmpty || !typed
     }
@@ -85,7 +75,6 @@ struct SearchScreen: View {
         suggestions = Array(found.prefix(Self.suggestionLimit))
     }
 
-    /// Shows `text`'s results, keeping it among the recent searches.
     private func search(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -97,8 +86,6 @@ struct SearchScreen: View {
     }
 }
 
-/// The search field's dropdown, as a list: the recent searches with their
-/// remove buttons, or the suggestions.
 private struct SearchChoices: View {
     let choices: [String]
     let recent: Bool
@@ -139,7 +126,6 @@ private struct SearchChoices: View {
     }
 }
 
-/// The Search tab before anything has been searched.
 private struct SearchPrompt: View {
     @Environment(\.theme) private var theme
 

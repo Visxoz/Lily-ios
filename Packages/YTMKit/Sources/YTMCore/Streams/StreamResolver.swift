@@ -1,19 +1,12 @@
 import Foundation
 
-/// The free stream path, as ytm-native's `streams/mod.rs`: the `player`
-/// endpoint asked as the clients YouTube hands plain URLs to, so playing
-/// needs no player script.
-///
-/// The clients are tried in order, each only once the one before fails:
-/// YouTube tends to change one at a time, so a song plays on the next while
-/// the first is broken, and the rest cost nothing while it works.
+/// The free path: asks the clients YouTube hands plain URLs to, so playing needs no player script.
+/// Each is tried only once the one before fails, as YouTube tends to break one at a time.
 struct StreamResolver: Sendable {
     let innerTube: InnerTube
 
-    /// The best stream within `maxKbps`, from the first client that gives
-    /// one. YouTube sometimes bot-checks a visitor ID, so when every client
-    /// fails, they are asked once more with a fresh one, which is kept only
-    /// if it works: both failing points at the song, not the ID.
+    /// YouTube sometimes bot-checks a visitor ID, so when every client fails they are asked
+    /// once more with a fresh one, kept only if it works.
     func resolve(videoId: String, maxKbps: Int?) async throws -> ResolvedStream {
         let visitor = try await innerTube.visitorData()
         do {
@@ -28,8 +21,7 @@ struct StreamResolver: Sendable {
         }
     }
 
-    /// Fails with the first client's reason when none gives a stream, as
-    /// the first is the usual one.
+    /// Fails with the first client's reason, as the first is the usual one.
     private func resolveWithClients(videoId: String, maxKbps: Int?, visitorData: String) async throws -> ResolvedStream {
         var firstError: (any Error)?
         for client in ClientProfile.plainStreamClients {
@@ -51,11 +43,9 @@ struct StreamResolver: Sendable {
         )
     }
 
-    /// The `player` response for `videoId`, asked signed out as `client`,
-    /// with `visitorData` or else the saved visitor ID.
+    /// Asked signed out, with `visitorData` or else the saved visitor ID.
     func player(videoId: String, as client: ClientProfile, visitorData: String? = nil) async throws -> JSON {
-        // Not retried, as ytm-native's resolve_with: the next client is the
-        // retry, so a broken one costs a request rather than the song.
+        // Not retried: the next client is the retry, so a broken one costs a request rather than the song.
         try await innerTube.post(
             "player",
             body: ["videoId": videoId, "contentCheckOk": true, "racyCheckOk": true],
@@ -66,8 +56,7 @@ struct StreamResolver: Sendable {
         )
     }
 
-    /// The best plain-URL stream of a player response. A client that
-    /// answers with scrambled URLs only counts as having none.
+    /// A client that answers with scrambled URLs only counts as having none.
     static func stream(in json: JSON, userAgent: String, maxKbps: Int?) throws -> ResolvedStream {
         let response = try PlayerResponse(json: json)
         guard let format = bestAudio(response.formats, maxKbps: maxKbps),

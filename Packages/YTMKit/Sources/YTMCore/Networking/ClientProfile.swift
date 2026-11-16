@@ -1,12 +1,8 @@
 import Foundation
 
-/// An InnerTube client the app presents itself as: its name and version in
-/// the request body, the headers that go with them and the host it talks to.
-///
 /// YouTube decides what to send by the client: the web client gets pages,
 /// some apps get plain stream URLs, and the Android app gets timed lyrics.
 struct ClientProfile: Sendable, Hashable {
-    /// The hardware an app client claims to run on.
     struct Device: Sendable, Hashable {
         let make: String
         let model: String
@@ -21,8 +17,7 @@ struct ClientProfile: Sendable, Hashable {
     let version: String
     let host: String
     let userAgent: String
-    /// Sent as `Origin`, as the client's own requests do; app clients on
-    /// Android send none.
+    /// Sent as `Origin`; app clients on Android send none.
     let origin: String?
     let device: Device?
     let androidSdkVersion: Int?
@@ -30,7 +25,6 @@ struct ClientProfile: Sendable, Hashable {
     /// the consent cookie a browser that dismissed YouTube's banner sends.
     let isWeb: Bool
 
-    /// `https://<host>/youtubei/v1/<endpoint>?prettyPrint=false`.
     func url(_ endpoint: String) -> URL? {
         var parts = URLComponents()
         parts.scheme = "https"
@@ -40,7 +34,6 @@ struct ClientProfile: Sendable, Hashable {
         return parts.url
     }
 
-    /// `context.client`, as this client fills it in.
     func context(hl: String, gl: String, visitorData: String?) -> [String: Any] {
         var client: [String: Any] = ["clientName": name, "clientVersion": version, "hl": hl, "gl": gl]
         if let visitorData { client["visitorData"] = visitorData }
@@ -55,7 +48,6 @@ struct ClientProfile: Sendable, Hashable {
         return client
     }
 
-    /// The headers every request as this client carries.
     func headers(visitorData: String?) -> [String: String] {
         var headers = [
             "Content-Type": "application/json",
@@ -73,21 +65,18 @@ struct ClientProfile: Sendable, Hashable {
 }
 
 extension ClientProfile {
-    /// Chrome on Windows, as ytm-native's web requests send.
     static let browserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 
-    /// YouTube Music's website: every page, the library and, signed in with
-    /// Premium, the 256 kbps formats. The version is the site's own of
-    /// November 2026.
+    /// Every page, the library and, with Premium, the 256 kbps formats.
+    /// The version is the site's own of November 2026.
     static let webRemix = ClientProfile(
         name: "WEB_REMIX", id: "67", version: "1.20261110.04.00", host: "music.youtube.com",
         userAgent: browserUserAgent, origin: "https://music.youtube.com", device: nil,
         androidSdkVersion: nil, isWeb: true
     )
 
-    /// YouTube Studio, the second web client the Premium path tries, as
-    /// ytm-native's `streams/premium` does.
+    /// YouTube Studio, the second web client the Premium path tries.
     static let webCreator = ClientProfile(
         name: "WEB_CREATOR", id: "62", version: "1.20260708.06.00", host: "www.youtube.com",
         userAgent: browserUserAgent, origin: "https://www.youtube.com", device: nil,
@@ -102,16 +91,14 @@ extension ClientProfile {
         androidSdkVersion: nil, isWeb: true
     )
 
-    /// YouTube Music's Android app, which is given lyrics line by line with
-    /// their timings (ytm-native's `api/lyrics.rs`).
+    /// Given lyrics line by line with their timings.
     static let androidMusic = ClientProfile(
         name: "ANDROID_MUSIC", id: "21", version: "7.21.50", host: "music.youtube.com",
         userAgent: "com.google.android.apps.youtube.music/7.21.50 (Linux; U; Android 14) gzip",
         origin: nil, device: nil, androidSdkVersion: 34, isWeb: false
     )
 
-    /// YouTube on Apple Vision Pro: the first client the free stream path
-    /// asks, as YouTube hands it plain stream URLs.
+    /// The free stream path's first choice: YouTube hands it plain stream URLs.
     static let visionOS = ClientProfile(
         name: "VISIONOS", id: "101", version: "1.02", host: "www.youtube.com",
         userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",

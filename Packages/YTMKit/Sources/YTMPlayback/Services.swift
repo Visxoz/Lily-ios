@@ -3,10 +3,8 @@ import YTMAudio
 import YTMCore
 
 // The seams the player talks through, so its logic can be tested without
-// YouTube or a sound device. Each names only what the player uses; the real
-// types conform as they are.
+// YouTube or a sound device.
 
-/// What the player asks of YouTube Music.
 protocol MusicService: Sendable {
     var isSignedIn: Bool { get async }
     func stream(videoId: String, quality: AudioQuality) async throws -> ResolvedStream
@@ -32,7 +30,6 @@ extension YTMusic: MusicService {
     }
 }
 
-/// The audio engine, as `AudioPlayer` offers it.
 @MainActor protocol AudioOutput: AnyObject {
     var events: AsyncStream<AudioEvent> { get }
     var currentTime: Double { get }
@@ -53,7 +50,6 @@ extension YTMusic: MusicService {
 
 extension AudioPlayer: AudioOutput {}
 
-/// Where plays are scrobbled.
 protocol Scrobbling: Sendable {
     /// Yields when the account stops allowing access.
     var accessRevoked: AsyncStream<Void> { get }

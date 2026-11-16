@@ -3,7 +3,6 @@ import Foundation
 import Testing
 @testable import YTMAudio
 
-/// A container file on disk, fully parsed, ready to decode from.
 struct DecodableFile {
     let source: any PacketSource
     let file: FileHandle
@@ -51,9 +50,8 @@ private func mismatch(_ signal: ArraySlice<Float>, _ reference: [Float], _ start
 }
 
 struct PacketDecoderTests {
-    /// AudioToolbox's Opus decoder runs `opusDecoderDelay` ahead of libopus,
-    /// which this holds by decoding what its own encoder made: with the
-    /// pre-skip cut, the sound must start on the very frame it did.
+    /// AudioToolbox's Opus decoder runs `opusDecoderDelay` ahead of libopus:
+    /// decoding its own encoder's Opus, the sound must start where it did.
     @Test func cutsOpusToTheExactLengthAndPlace() throws {
         let samples = Fixtures.signal(frames: 48_000, silence: 1_000)
         let decoded = try DecodableFile(Fixtures.opusWebM(samples)).decode()
@@ -91,7 +89,6 @@ struct PacketDecoderTests {
         }
     }
 
-    /// Decodes `packets` of `file`'s bytes until no frames come, and says why.
     private func decode(_ file: DecodableFile, listing packets: [(offset: Int64, size: Int)]) throws -> (frames: Int, then: PacketDecoder.Supply) {
         var state = file.state
         state.packets = PacketIndex()

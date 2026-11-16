@@ -4,7 +4,6 @@ import YTMAudio
 @testable import YTMCore
 @testable import YTMPlayback
 
-/// A song for tests: `album` and `number` place it on an album.
 func song(_ id: String, album: String? = nil, number: Int? = nil, seconds: Int = 200, video: Bool = false) -> Track {
     Track(
         id: id, title: "Song \(id)", artists: [ArtistRef(id: "UC\(id)", name: "Artist")],
@@ -16,9 +15,6 @@ func songs(_ ids: String...) -> [Track] {
     ids.map { song($0) }
 }
 
-/// YouTube Music as the tests set it up: streams for every song unless told
-/// otherwise, radios and Premium answers from tables, and a log of what was
-/// asked.
 final class FakeMusic: MusicService {
     struct State {
         var signedIn = false
@@ -36,8 +32,7 @@ final class FakeMusic: MusicService {
         /// Playlists as `page` and `loadMore` serve them, a batch at a time.
         var playlistBatches: [String: [[Track]]] = [:]
         var ratings: [String: Rating] = [:]
-        /// Streams, and cards' tracks, held back until `release`, as a slow
-        /// network, and the calls waiting on them.
+        /// Streams and cards' tracks held back until `release`, as a slow network.
         var held: Set<String> = []
         var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
         var calls: [String] = []
@@ -51,8 +46,7 @@ final class FakeMusic: MusicService {
 
     var calls: [String] { state.withLock(\.calls) }
 
-    /// Lets what is held for `videoId`, or a card's ID, through, now and
-    /// from then on.
+    /// Lets what is held for `videoId`, or a card's ID, through for good.
     func release(_ videoId: String) {
         let waiting = state.withLock { state in
             state.held.remove(videoId)
@@ -77,7 +71,6 @@ final class FakeMusic: MusicService {
         )
     }
 
-    /// Waits while `id` is held.
     private func waitWhileHeld(_ id: String) async {
         guard state.withLock({ $0.held.contains(id) }) else { return }
         await withCheckedContinuation { continuation in
@@ -133,7 +126,6 @@ final class FakeMusic: MusicService {
         return state.withLock { $0.radios[playlistId] } ?? []
     }
 
-    /// A playlist's page with its first batch, and `more` while others remain.
     func page(_ route: Route) async throws -> Page {
         guard case .playlist(let id) = route else { throw YTMError(.notFound, "No such page.") }
         log("page \(id)")
@@ -145,7 +137,6 @@ final class FakeMusic: MusicService {
         )
     }
 
-    /// The page with its next batch, the token naming the playlist and batch.
     func loadMore(_ page: Page) async throws -> Page {
         guard case .tracks(let token, let index)? = page.more, let id = page.header?.playlistId,
               let step = token.split(separator: "#").last.flatMap({ Int($0) }), page.sections.indices.contains(index),
@@ -188,7 +179,6 @@ final class FakeMusic: MusicService {
     }
 }
 
-/// The audio engine, recording what it was told; tests deliver its events.
 @MainActor final class FakeAudio: AudioOutput {
     let events: AsyncStream<AudioEvent>
     var currentTime = 0.0
@@ -244,7 +234,6 @@ final class FakeMusic: MusicService {
     }
 }
 
-/// Last.fm, recording the plays it was given.
 actor FakeLastFM: Scrobbling {
     nonisolated let accessRevoked = AsyncStream<Void> { _ in }
     private(set) var nowPlaying: [String] = []
@@ -270,7 +259,6 @@ final class ObservedChange: Sendable {
     }
 }
 
-/// A player wired to the fakes, with its own store in a temporary folder.
 @MainActor struct Rig {
     let music = FakeMusic()
     let audio = FakeAudio()
@@ -307,7 +295,6 @@ final class ObservedChange: Sendable {
         }
     }
 
-    /// The item the engine plays now.
     var playing: AudioItem? { audio.played.last?.item }
 
     /// Plays the item the engine was last given until its first sound.
@@ -318,7 +305,6 @@ final class ObservedChange: Sendable {
     }
 }
 
-/// A rig whose player has started, as at launch.
 @MainActor func started(_ rig: Rig = Rig()) async -> Rig {
     await rig.player.start()
     return rig

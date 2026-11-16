@@ -5,7 +5,6 @@ import Testing
 struct AudioCacheTests {
     private let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
 
-    /// Stores `bytes` as `key`'s file, played `age` seconds ago.
     private func store(_ key: String, bytes: Int, age: TimeInterval, in cache: AudioCache) throws {
         let part = try cache.makePart(for: key)
         try Data(count: bytes).write(to: part)

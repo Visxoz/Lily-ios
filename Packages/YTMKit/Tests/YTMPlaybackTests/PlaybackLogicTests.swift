@@ -3,8 +3,6 @@ import Testing
 @testable import YTMCore
 @testable import YTMPlayback
 
-/// The pure logic of ytm-native's `app/` files, with their Rust tests ported
-/// one for one where they have them.
 struct GaplessTests {
     private func track(_ album: String?, _ number: Int?) -> Track {
         Track(id: "x", title: "x", album: album.map { AlbumRef(id: $0, name: "Album") }, trackNumber: number)

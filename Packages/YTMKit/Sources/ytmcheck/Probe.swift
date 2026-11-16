@@ -2,14 +2,11 @@ import Foundation
 @testable import YTMAudio
 @testable import YTMCore
 
-/// A resolved stream as googlevideo serves it: a URL can resolve and still
-/// be refused, so the first bytes are fetched, as ytm-native's canary does,
-/// and read by the engine's own demuxer.
+/// A URL can resolve and still be refused, so the first bytes are fetched and
+/// read by the engine's own demuxer.
 extension Findings {
     static let probeLength = 64 << 10
 
-    /// What every stream must say of itself: a playable format on an allowed
-    /// host, within `maxKbps`, as long as the song (`seconds`) when known.
     mutating func audit(_ stream: ResolvedStream, _ label: String, seconds: Int?, maxKbps: Int?) {
         let itags: Set<Int> = stream.codec == .opus ? [249, 250, 251, 774] : [140, 141]
         expect(itags.contains(stream.itag), "\(label): itag \(stream.itag) isn't \(stream.codec)")
@@ -24,8 +21,7 @@ extension Findings {
         }
     }
 
-    /// Fetches the stream's first 64 KB with its headers, and parses them as
-    /// the engine would. Returns a line for the notes.
+    /// Returns a line for the notes.
     mutating func probe(_ stream: ResolvedStream, _ label: String) async throws -> String {
         var request = URLRequest(url: stream.url)
         for (name, value) in stream.headers { request.setValue(value, forHTTPHeaderField: name) }

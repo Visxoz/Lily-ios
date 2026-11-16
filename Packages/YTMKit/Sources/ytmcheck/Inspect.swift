@@ -1,12 +1,8 @@
 import Foundation
 import YTMCore
 
-/// `search <q>` and `page <route>`: a page printed in full, to read the
-/// parsed results against what ytm-native shows.
+/// `search <q>` and `page <route>`: a page printed in full.
 enum Inspect {
-    /// A route from words: `home`, `explore`, `charts`, `new-releases`,
-    /// `moods`, `kind:id` (album, artist, playlist, genre, search,
-    /// browse:id[:params]), or a bare browse or playlist ID.
     static func route(_ text: String) -> Route? {
         switch text.lowercased() {
         case "home": return .home
@@ -89,7 +85,7 @@ enum Inspect {
         return "   [\(card.kind)] \(card.title) — \(card.subtitle)  [\(card.id.prefix(40))]\(colour)  \(artwork(card.thumbnail))"
     }
 
-    /// Where artwork comes from and the size it is asked at, never the whole URL.
+    /// The host and asked size only, never the whole URL.
     static func artwork(_ url: String?) -> String {
         guard let url else { return "no art" }
         guard let parsed = URL(string: url), let host = parsed.host() else { return "bad art URL" }

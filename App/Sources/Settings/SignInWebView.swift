@@ -2,9 +2,8 @@ import SwiftUI
 import WebKit
 import os
 
-/// Google's own sign-in page, as ytm-native's WebView2 window: private, kept
-/// to the sign-in chain, with no new windows or downloads. Once it reaches
-/// YouTube Music signed in, it hands over the cookies that go there.
+/// Google's sign-in page: private, kept to the sign-in chain, with no new
+/// windows or downloads.
 struct SignInWebView: UIViewRepresentable {
     /// The cookies sent to YouTube Music, HttpOnly ones included, once a session is among them.
     let onSession: ([HTTPCookie]) -> Void
@@ -22,8 +21,8 @@ struct SignInWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        // Private mode, as ytm-native's: the page's cookies stay in memory
-        // and go with the view, so each attempt starts signed out.
+        // The page's cookies stay in memory and go with the view, so each
+        // attempt starts signed out.
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = Self.userAgent
@@ -44,10 +43,8 @@ struct SignInWebView: UIViewRepresentable {
         context.coordinator.openURL = context.environment.openURL
     }
 
-    /// Safari on a Mac. ytm-native's WebView2 reads to Google as desktop Edge,
-    /// so Google runs the desktop sign-in, which hands over to YouTube Music
-    /// directly; a phone's is routed through YouTube's mobile site. A bare
-    /// WKWebView reads as an embedded page, which Google may refuse.
+    /// Safari on a Mac: Google's desktop sign-in hands over to YouTube Music directly,
+    /// a phone's detours via YouTube's mobile site, and a bare WKWebView may be refused.
     private static var userAgent: String {
         let os = ProcessInfo.processInfo.operatingSystemVersion
         return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
@@ -70,17 +67,15 @@ struct SignInWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
             if action.shouldPerformDownload { return .cancel }
-            // Only the page itself is kept to the chain, as WebView2 reports
-            // only top-level navigations: frames inside Google's pages load
-            // freely, and links for a new window go on to `createWebViewWith`.
+            // Only the page itself is kept to the chain: frames inside Google's
+            // pages load freely, and new-window links go on to `createWebViewWith`.
             guard let frame = action.targetFrame, frame.isMainFrame, let url = action.request.url else { return .allow }
             guard SignInHosts.allows(url) else {
                 leave(for: url)
                 return .cancel
             }
-            // Signed in by the time Google sends the page to YouTube: hand
-            // over without loading it, which also keeps iOS from opening the
-            // YouTube Music app for the link.
+            // Hand over without loading the YouTube page, which also keeps iOS
+            // from opening the YouTube Music app for the link.
             if let host = url.host(), SignInHosts.isYouTube(host), await handOver(from: webView) {
                 return .cancel
             }
@@ -126,9 +121,8 @@ struct SignInWebView: UIViewRepresentable {
             parent.onFailure("Couldn't sign in with Google: the sign-in page stopped.")
         }
 
-        /// Hands over the cookies YouTube Music is sent, as ytm-native's
-        /// `cookies_for_url`, once Google has set a session among them, and
-        /// says whether it did; until then the page is still signing in.
+        /// Hands over YouTube Music's cookies once Google has set a session among
+        /// them; false while the page is still signing in.
         @discardableResult
         private func handOver(from webView: WKWebView) async -> Bool {
             guard !signedIn else { return true }
@@ -147,7 +141,6 @@ struct SignInWebView: UIViewRepresentable {
             parent.onFailure("Couldn't sign in with Google: \(error.localizedDescription)")
         }
 
-        /// Opens a link the sign-in page refused in the browser, when it may go there.
         private func leave(for url: URL) {
             Self.log.info("sign-in page: refused \(url.host() ?? "", privacy: .public)\(url.path(), privacy: .private)")
             if SignInHosts.opensInBrowser(url) {

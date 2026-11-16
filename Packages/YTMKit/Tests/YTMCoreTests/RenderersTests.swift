@@ -6,8 +6,7 @@ private func json(_ text: String) throws -> JSON {
     try JSON(data: Data(text.utf8))
 }
 
-/// ytm-native's home feed fixture: a carousel of tiles, one malformed, and
-/// a carousel of list items.
+/// A carousel of tiles, one malformed, and a carousel of list items.
 private let homePage = #"""
 {"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{
   "contents":[

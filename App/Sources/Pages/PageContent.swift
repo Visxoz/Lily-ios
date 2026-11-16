@@ -1,15 +1,10 @@
 import SwiftUI
 import YTMCore
 
-/// A loaded page, as ytm-native's `PageView` and `PageRow`: under a tint
-/// that scrolls with it, Home's greeting, the header, then every section, in
-/// one lazy stack so only rows near the screen are built. The page's title
-/// takes the bar once the header has scrolled away.
 struct PageContent: View {
     let page: Page
     let route: Route
-    /// Loads further steps of the page and refreshes it; nil for a page held
-    /// on the device, as the songs played are.
+    /// Nil for a page held on the device, as the songs played are.
     var model: PageModel?
 
     @Environment(AppModel.self) private var app
@@ -18,13 +13,10 @@ struct PageContent: View {
     @State private var frame = Frame()
     @State private var position = ScrollPosition(edge: .top)
     @State private var titleShown = false
-    /// The header artwork's colour, once sampled.
     @State private var artworkTint: RGB?
 
-    /// Header colours already sampled, so a page opened again starts in its
-    /// colour, as ytm-native's accent cache has it. Keyed by URL alone, as
-    /// the size isn't known until the header is measured and doesn't change
-    /// the colour.
+    /// So a page opened again starts in its colour. Keyed by URL alone: the
+    /// size isn't known until the header is measured, and doesn't change it.
     private static var tints: [String: RGB] = [:]
 
     /// The scroll view's width and the bar's height over it.
@@ -33,7 +25,6 @@ struct PageContent: View {
         var top: CGFloat = 0
     }
 
-    /// The header artwork sampled for the tint, at the pixels it is drawn.
     private nonisolated struct TintSource: Hashable {
         let url: String
         let pixels: Int
@@ -70,18 +61,17 @@ struct PageContent: View {
                     .modifier(PastEdges())
             }
         }
-        // The mask stands in for the scroll view's own clip, so it can run past
-        // the sides (`PastEdges`). It overhangs the top and bottom too, as the
-        // safe area it ignores eases in on a tab's first page, briefly clipping
-        // the tint below the bar and leaving the bare panel above it; not while
-        // Now Playing shrinks the screen, whose edges still clip.
+        // The mask stands in for the scroll view's clip so it can run past
+        // the sides (`PastEdges`). It overhangs top and bottom as the safe
+        // area eases in on a tab's first page, briefly clipping the tint; not
+        // while Now Playing shrinks the screen, whose edges still clip.
         .scrollClipDisabled()
         .mask { PastEdgesMask() }
         .scrollPosition($position)
         .onChange(of: model?.replacements) { position.scrollTo(edge: .top) }
         .background { theme.panel.modifier(PastEdges()).ignoresSafeArea() }
         // The tint runs unbroken under the bar, whose edge shows only with
-        // the sticky title, as ytm-native's.
+        // the sticky title.
         .scrollEdgeEffectHidden(!titleShown, for: .top)
         .onGeometryChange(for: Frame.self) { proxy in
             Frame(width: proxy.size.width, top: proxy.safeAreaInsets.top)
@@ -117,8 +107,8 @@ struct PageContent: View {
                 Self.tints[tintSource.url] = background
             }
         }
-        // As ytm-native's `load_art`: the page's art is fetched as the page is
-        // built, rather than as each row scrolls in, and stops once it is left.
+        // The page's art is fetched as the page is built, rather than as each
+        // row scrolls in, and stops once it is left.
         .task(id: [itemCount, model?.replacements ?? 0]) { await prefetchArt() }
     }
 
@@ -126,8 +116,8 @@ struct PageContent: View {
         !page.headerTracks.isEmpty
     }
 
-    /// Tracks and cards on the page, so a further step, which may only grow
-    /// one section's tracks, fetches its art too.
+    /// So a further step, which may only grow one section's tracks, fetches
+    /// its art too.
     private var itemCount: Int {
         page.sections.reduce(0) { count, section in
             switch section {
@@ -137,9 +127,8 @@ struct PageContent: View {
         }
     }
 
-    /// Downloads the art of every track row, then every card, at the pixels
-    /// each will be drawn at. Albums' numbered rows and the chips and top
-    /// result draw none of it, or their own, so they are left out.
+    /// Albums' numbered rows, the chips and the top result draw none of this
+    /// art, or their own, so they are left out.
     private func prefetchArt() async {
         // The first screen's own loads go first, so none is asked for twice.
         try? await Task.sleep(for: .milliseconds(250))
@@ -167,7 +156,6 @@ struct PageContent: View {
     }
 }
 
-/// "Good morning" and so on, by the local time, as ytm-native greets Home.
 private struct Greeting: View {
     @Environment(\.theme) private var theme
 
@@ -190,10 +178,8 @@ private struct Greeting: View {
     }
 }
 
-/// The page's colour fading into the panel behind its top, reaching up under
-/// the bar, and easing to a new colour as ytm-native's does. Above the page
-/// it carries on solid, so pulling to refresh opens on the colour rather
-/// than on the bare panel.
+/// Above the page it carries on solid, so pulling to refresh opens on the
+/// colour rather than on the bare panel.
 struct PageTint: View {
     /// Further than a pull can open.
     static let overscroll: CGFloat = 1000
@@ -218,16 +204,14 @@ struct PageTint: View {
     }
 }
 
-/// While Now Playing opens, shows or closes, the page's colours run past
-/// the screen's sides. The zoom shrinks the screen behind it a little, which
-/// would otherwise show the black behind the app down each side. Only then,
-/// as a page sliding in or out would show them over the page beside it.
+/// While Now Playing's zoom shrinks the screen, the page runs past its sides
+/// to hide the black behind; only then, or a sliding page would overlap the
+/// one beside it.
 private struct PastEdges: ViewModifier {
     static let width: CGFloat = 16
 
     @Environment(AppModel.self) private var app
 
-    /// Whether Now Playing is opening, showing or closing.
     static func shown(in app: AppModel) -> Bool {
         app.sheet == .nowPlaying || app.nowPlayingShown
     }
@@ -237,8 +221,7 @@ private struct PastEdges: ViewModifier {
     }
 }
 
-/// The page's clip, a view of its own so Now Playing opening or closing
-/// redraws only it rather than the whole page.
+/// A view of its own so Now Playing opening or closing redraws only the clip.
 private struct PastEdgesMask: View {
     @Environment(AppModel.self) private var app
 
@@ -250,8 +233,6 @@ private struct PastEdgesMask: View {
     }
 }
 
-/// The bar's title once the header has scrolled away, with Play beside it
-/// as ytm-native's sticky title has.
 private struct StickyTitle: View {
     let title: String
     let canPlay: Bool
@@ -272,7 +253,6 @@ private struct StickyTitle: View {
     }
 }
 
-/// Pull to refresh, for pages fetched from YouTube.
 private struct Refresh: ViewModifier {
     let model: PageModel?
 

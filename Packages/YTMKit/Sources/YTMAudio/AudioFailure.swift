@@ -1,4 +1,3 @@
-/// Why an item could not play, each worded for the user.
 enum AudioFailure: Error, Equatable {
     /// The network failed after every retry.
     case download
@@ -10,9 +9,7 @@ enum AudioFailure: Error, Equatable {
     case damaged
     /// The audio cache could not be written.
     case storage
-    /// The audio output would not start.
     case output
-    /// The stream ended without a sound.
     case silent
 
     var message: String {

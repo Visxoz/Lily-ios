@@ -1,9 +1,8 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's sign-in dialog with its Google window, as one sheet: Google's
-/// own page, and once that reaches YouTube Music signed in, its cookies sign
-/// the app in. The password goes to Google only.
+/// Google's own page signs in and its YouTube Music cookies sign the app in, so
+/// the password goes to Google only.
 struct SignInScreen: View {
     private enum Phase: Equatable {
         case browsing
@@ -84,7 +83,6 @@ struct SignInScreen: View {
 }
 
 private extension Theme {
-    /// The sign-in dialog's error text, which ytm-native colours apart from its theme.
     var signInError: Color {
         Color(rgb: RGB(hex: isLight ? 0xc4002b : 0xff6b81))
     }

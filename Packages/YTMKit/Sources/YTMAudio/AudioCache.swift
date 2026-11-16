@@ -1,6 +1,5 @@
 import Foundation
 
-/// Whole audio files on disk, so a song heard before plays with no network.
 /// Downloads go to `.part` files that count only once complete; past the size
 /// cap the least recently played files go first.
 final class AudioCache {
@@ -15,9 +14,8 @@ final class AudioCache {
     private let files = FileManager.default
     private static let partExtension = "part"
 
-    /// Works on the disk, so it is made on the engine's queue. Leftover
-    /// parts, from downloads cut short by the app ending, are removed, and
-    /// the cache is trimmed to its cap, which may have shrunk since.
+    /// Works on the disk, so it is made on the engine's queue. Trims to the cap,
+    /// which may have shrunk since the last launch.
     init(_ location: Location) {
         directory = location.directory
         limit = location.limit
@@ -42,8 +40,7 @@ final class AudioCache {
         return url
     }
 
-    /// A new, empty part file for a download of `key`. Each download has its
-    /// own, so the same song playing twice at once never shares one.
+    /// Each download has its own part, so the same song playing twice at once never shares one.
     func makePart(for key: String) throws -> URL {
         let url = directory.appending(path: "\(Self.safeName(key)).\(UUID().uuidString).\(Self.partExtension)")
         guard files.createFile(atPath: url.path(percentEncoded: false), contents: nil) else {
@@ -52,7 +49,6 @@ final class AudioCache {
         return url
     }
 
-    /// Keeps a finished part as `key`'s file, then trims the cache to its cap.
     func commit(_ part: URL, as key: String) {
         let url = file(for: key)
         // rename(2) replaces any older file atomically, and readers of the

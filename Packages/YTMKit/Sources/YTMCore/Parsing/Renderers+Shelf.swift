@@ -1,14 +1,8 @@
 import Foundation
 
 extension Renderers {
-    /// A shelf in its `{"<kind>Renderer": {...}}` wrapper as one section:
-    /// carousels, lists (`musicShelfRenderer`, `musicPlaylistShelfRenderer`),
-    /// grids, and the top search result (`musicCardShelfRenderer`).
-    ///
-    /// A shelf with songs is a track list, played as `mode` says; otherwise
-    /// its cards are, laid out as `layout`, or by the shelf's kind (grids as
-    /// grids, genre chips as chips, the rest as carousels). Nil for other
-    /// shelves and for empty ones.
+    /// A wrapped shelf as one section: a track list played as `mode` if it has
+    /// songs, else cards laid out as `layout` or by its kind; nil when empty.
     static func section(
         _ wrapped: JSON, context: ItemContext = ItemContext(), mode: QueueMode = .section, layout: CardLayout? = nil
     ) -> Section? {
@@ -54,16 +48,13 @@ extension Renderers {
         return .cards(title, cards, layout: layout ?? (chips ? .chips : shelfLayout), more: more)
     }
 
-    /// The sections of a section list's `contents`, skipping shelves that
-    /// can't be read.
     static func sections(
         _ sectionList: JSON, context: ItemContext = ItemContext(), mode: QueueMode = .section, layout: CardLayout? = nil
     ) -> [Section] {
         sectionList["contents"].array.compactMap { section($0, context: context, mode: mode, layout: layout) }
     }
 
-    /// A browse or search response's section list, first page or
-    /// continuation, whichever layout the page came in.
+    /// A browse or search response's section list, whichever layout it came in.
     static func sectionList(in response: JSON) -> JSON {
         let contents = response["contents"]
         let tab = { (renderer: JSON) in renderer["tabs"][0]["tabRenderer", "content", "sectionListRenderer"] }
@@ -78,18 +69,13 @@ extension Renderers {
         return .missing
     }
 
-    /// The token of the next page of a shelf, grid or section list (its
-    /// unwrapped body): `continuations`' next continuation, or a trailing
-    /// `continuationItemRenderer`.
+    /// The next-page token of a shelf, grid or section list's unwrapped body.
     static func continuation(_ renderer: JSON) -> String? {
         let data = renderer["continuations"][0].first("nextContinuationData", "nextRadioContinuationData")
         if let token = data["continuation"].string, !token.isEmpty { return token }
         return trailingToken(renderer.first("contents", "items"))
     }
 
-    /// A continuation response's items and the token after them, from
-    /// `continuationContents` (shelves, grids, section lists, the radio panel)
-    /// or `onResponseReceivedActions`' appended items.
     static func continuationItems(in response: JSON) -> (items: [JSON], token: String?) {
         if let (_, renderer) = response["continuationContents"].onlyValue {
             return (renderer.first("contents", "items").array, continuation(renderer))
@@ -100,7 +86,6 @@ extension Renderers {
         return (items.array, trailingToken(items))
     }
 
-    /// The token of a list's trailing `continuationItemRenderer`.
     private static func trailingToken(_ items: JSON) -> String? {
         token(items.last["continuationItemRenderer", "continuationEndpoint"])
     }

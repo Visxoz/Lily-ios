@@ -1,14 +1,10 @@
 import Foundation
 
-/// The pages Google's sign-in may show, as ytm-native's `google_sign_in.rs`:
-/// the sign-in and cookie consent hosts, the hand-over to YouTube Music and
-/// YouTube Music itself. Everything else leaves for the browser.
+/// The hosts Google's sign-in may show; everything else leaves for the browser.
 nonisolated enum SignInHosts {
     static let musicHost = "music.youtube.com"
-    /// YouTube's own hosts, which sign-in passes through on its way to
-    /// YouTube Music: www.youtube.com/signin on a computer, and others on a
-    /// phone. They are never handed to the system, which would open the
-    /// YouTube or YouTube Music app for them and leave sign-in behind.
+    /// Sign-in passes through these on its way to YouTube Music. Never handed to
+    /// the system, which would open the YouTube apps and leave sign-in behind.
     private static let youtubeHosts: Set<String> = ["youtube.com", "www.youtube.com", "m.youtube.com", musicHost]
     /// Sign-in and cookie consent hosts, allowed on any path.
     private static let signInHosts: Set<String> = [
@@ -42,15 +38,13 @@ nonisolated enum SignInHosts {
         return isYouTube(host) || signInHosts.contains(host) || isGoogleAccountsHost(host)
     }
 
-    /// Where the session's cookies may be read from: sign-in has finished
-    /// once a YouTube page has them.
+    /// Sign-in has finished once a YouTube page has the session's cookies.
     static func isYouTube(_ host: String) -> Bool {
         youtubeHosts.contains(host)
     }
 
-    /// Whether a link the sign-in page refused opens in the browser: web
-    /// links such as Google's help pages do, but not sign-in hops, whose URLs
-    /// carry tokens, nor YouTube's, which iOS gives to the YouTube apps.
+    /// Refused links open in the browser, except sign-in hops, whose URLs carry
+    /// tokens, and YouTube's, which iOS gives to the YouTube apps.
     static func opensInBrowser(_ url: URL) -> Bool {
         guard url.scheme == "https" || url.scheme == "http", let host = url.host() else { return false }
         return !host.hasPrefix(accountsPrefix) && !host.hasSuffix("youtube.com")

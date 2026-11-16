@@ -14,13 +14,10 @@ let package = Package(
         .library(name: "YTMPlayback", targets: ["YTMPlayback"]),
     ],
     targets: [
-        // Models, YouTube Music's InnerTube API, streams, persistence,
-        // Last.fm and artwork. Foundation and Apple frameworks only.
+        // Foundation and Apple frameworks only.
         .target(name: "YTMCore", swiftSettings: strict),
-        // The streaming AAC decoder and the AVAudioEngine graph: gapless,
-        // crossfade, equaliser, normalisation. Knows nothing of YouTube.
+        // Knows nothing of YouTube.
         .target(name: "YTMAudio", swiftSettings: strict),
-        // The queue and the player that ties the API to the audio engine.
         .target(name: "YTMPlayback", dependencies: ["YTMCore", "YTMAudio"], swiftSettings: strict),
         // A macOS command line check that talks to YouTube for real.
         .executableTarget(name: "ytmcheck", dependencies: ["YTMCore", "YTMAudio"], swiftSettings: strict),

@@ -1,12 +1,7 @@
 import AVFoundation
 
-/// The engine's nodes: one player, into a mixer that carries the mute and
-/// pause ramps and converts each item's rate to the output's, into
-/// the equaliser, and out. Gains and fades that must land on a given sample,
-/// normalisation and crossfades, are applied to the buffers before they are
-/// scheduled, so one player is all the graph needs. The mixer smooths every
-/// change of its volume over about 25 ms, so neither pausing nor muting
-/// ever clicks.
+/// Sample-exact gains and fades are applied to the buffers before scheduling, so one player is enough.
+/// The mixer smooths every volume change over about 25 ms, so pausing and muting never click.
 final class AudioGraph {
     let engine = AVAudioEngine()
     let player = AVAudioPlayerNode()
@@ -36,8 +31,7 @@ final class AudioGraph {
         connectOutput()
     }
 
-    /// Connects the mixer onwards at the output's current format, as after
-    /// the output device changes.
+    /// Call again after the output device changes.
     func connectOutput() {
         let rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
         outputRate = rate > 0 ? rate : 48_000
@@ -48,8 +42,7 @@ final class AudioGraph {
         applyEqualiser()
     }
 
-    /// Connects the stopped player at the rate of the item's buffers, so a
-    /// change of rate leaves a short gap. False if the engine refused.
+    /// The player must be stopped, so a change of rate leaves a short gap. False if the engine refused.
     func connectPlayer(_ format: AVAudioFormat) -> Bool {
         do {
             try engine.connectNode(player, to: mixer, fromBus: 0, toBus: 0, format: format)
@@ -60,7 +53,6 @@ final class AudioGraph {
         return true
     }
 
-    /// Starts the engine if it is not running; false if it would not.
     func start() -> Bool {
         guard !engine.isRunning else { return true }
         engine.prepare()
@@ -72,13 +64,12 @@ final class AudioGraph {
         }
     }
 
-    /// The output's level as a factor: 0 muted, 1 otherwise.
+    /// 0 muted, 1 otherwise.
     func setLevel(_ level: Float) {
         self.level = level
         applyVolume()
     }
 
-    /// Silences the output, ramping down, for a pause.
     func setSilenced(_ silenced: Bool) {
         self.silenced = silenced
         applyVolume()
@@ -89,14 +80,12 @@ final class AudioGraph {
         applyEqualiser()
     }
 
-    /// Takes on `old`'s mute and equaliser, as a graph made in its place.
     func adoptSettings(of old: AudioGraph) {
         setLevel(old.level)
         setEqualiser(enabled: old.equaliserSetting.enabled, gains: old.equaliserSetting.gains)
     }
 
-    /// The player's sample being rendered, and the host time it renders at
-    /// when the device gives one.
+    /// The host time is nil when the device gives none.
     func renderedSample() -> (sample: Int64, hostTime: UInt64?)? {
         guard let nodeTime = player.lastRenderTime, let time = player.playerTime(forNodeTime: nodeTime) else { return nil }
         return (time.sampleTime, nodeTime.isHostTimeValid ? nodeTime.hostTime : nil)
@@ -106,8 +95,7 @@ final class AudioGraph {
         mixer.outputVolume = silenced ? 0 : level
     }
 
-    /// Sets each band, and lowers the whole signal by the bands' combined
-    /// peak so they cannot push the music past full scale.
+    /// Lowers the whole signal by the bands' combined peak so they cannot push the music past full scale.
     private func applyEqualiser() {
         let gains = equaliserSetting.gains
         for (band, gain) in zip(equaliser.bands, gains) {

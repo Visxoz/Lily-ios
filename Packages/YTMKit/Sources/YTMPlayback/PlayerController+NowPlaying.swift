@@ -2,13 +2,9 @@ import Foundation
 import os
 import YTMCore
 
-/// What shows the playing song, as ytm-native's `now_playing.rs` and
-/// `library.rs`: the song and its stream, its lyrics, its rating, and the
-/// system's Now Playing.
 extension PlayerController {
-    /// Likes or dislikes the song `videoId` (the one playing for nil), or
-    /// takes that back if the playing song already had it; `.none` takes back
-    /// either. Disliking the playing song skips it. Signed in only.
+    /// Rates `videoId` (nil for the one playing), or takes the rating back if the
+    /// playing song already had it. Disliking the playing song skips it. Signed in only.
     public func rate(_ rating: Rating, videoId: String? = nil) {
         guard let id = videoId ?? current?.id else { return }
         let playing = id == current?.id
@@ -46,9 +42,8 @@ extension PlayerController {
         }
     }
 
-    /// Shows `track` as the one playing, at `position`: Now Playing, the
-    /// saved session, and for a new song (not one shown again, as on repeat
-    /// or a retry) its rating and lyrics afresh.
+    /// Only a new song, not one shown again as on repeat or a retry, reloads its
+    /// rating and lyrics.
     func present(_ track: Track, at position: Double) {
         let newSong = current?.id != track.id
         current = track
@@ -108,8 +103,7 @@ extension PlayerController {
         }
     }
 
-    /// Fetches the lyrics of the song coming next ahead, only while lyrics
-    /// are on screen, so the panel fills as the song changes.
+    /// Fetches the next song's lyrics ahead, only while lyrics are on screen.
     func prefetchLyrics(of id: String) {
         guard showsLyrics, id != current?.id, lyricsCache[id] == nil, lyricsAhead.insert(id).inserted else { return }
         let music = music
@@ -128,7 +122,6 @@ extension PlayerController {
         lyricsCache[id] = .some(found)
     }
 
-    /// Shows how the account rated `id`, the playing song, once YouTube says.
     func loadRating(of id: String) {
         ratingGeneration += 1
         rating = .none
@@ -146,9 +139,8 @@ extension PlayerController {
         }
     }
 
-    /// Shows what the Premium path has found of the account, and remembers a
-    /// firm answer across launches, so neither is asked for again on the
-    /// first songs.
+    /// Remembers a firm Premium answer across launches, so it isn't asked for
+    /// again on the first songs.
     func syncPremiumStatus() {
         let status = chooser.status
         if premiumStatus != status { premiumStatus = status }

@@ -1,11 +1,8 @@
 import SwiftUI
 import YTMCore
 
-/// One queue entry, as `panel/queue.slint`'s `QueueRow`: the artwork, under
-/// the equaliser while it is the one playing; the title, bold then rather
-/// than in ytm-native's accent, which the artwork behind Now Playing drowns;
-/// the artists, after a sparkle for a song Smart Shuffle mixed in; and the
-/// length. Every row is `Theme.queueRow` tall.
+/// The playing title is bold rather than in the accent, which the artwork
+/// behind Now Playing drowns.
 struct QueueRow: View {
     let track: Track
     let current: Bool

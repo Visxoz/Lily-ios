@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// The player bar's play button: a circle in the text colour, or the
-/// spinner while the song loads or stalls, as `player-bar.slint`. Apart, so
-/// play and pause redraw this alone.
+/// A view of its own, so play and pause redraw this alone.
 struct PlayPauseButton: View {
     let size: CGFloat
 

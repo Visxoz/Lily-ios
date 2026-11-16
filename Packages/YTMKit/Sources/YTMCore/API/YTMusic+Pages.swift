@@ -1,7 +1,6 @@
 import Foundation
 
 extension YTMusic {
-    /// The page behind a route.
     @concurrent
     public func page(_ route: Route) async throws -> Page {
         switch route {
@@ -22,21 +21,16 @@ extension YTMusic {
         }
     }
 
-    /// Fetches the next step of what `page` has still to show, and leaves
-    /// `more` set while there is another, as ytm-native's `complete`: a
-    /// playlist's next batch of tracks, or Home's next page of shelves, with
-    /// those that can now show (`HomeFeed.release`). A step that fails ends
-    /// the page with what arrived (on Home, the shelves held back, though
-    /// the feed isn't saved cut short); only cancellation throws, so a page
-    /// left mid-load is never taken as whole.
+    /// Leaves `more` set while there is another step. A step that fails ends
+    /// the page with what arrived; only cancellation throws, so a page left
+    /// mid-load is never taken as whole.
     @concurrent
     public func loadMore(_ page: Page) async throws -> Page {
         try await loadStep(page).page
     }
 
-    /// As `loadMore`, saying too whether the step arrived `whole`: not once
-    /// a step of Home failed, which the app then keeps neither as Home nor
-    /// for long, as ytm-native's `complete_home`.
+    /// As `loadMore`; not `whole` once a step of Home failed, so the app keeps
+    /// it neither as Home nor for long.
     @concurrent
     public func loadStep(_ page: Page) async throws -> (page: Page, whole: Bool) {
         var page = page

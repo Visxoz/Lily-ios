@@ -1,9 +1,6 @@
 import SwiftUI
 
-/// ytm-native's `Equalizer` (`widgets/spinner.slint`): three bouncing bars
-/// marking the playing track. They step eight times a second while playing,
-/// as ytm-native's `EQ_FRAME`, and rest low while paused, so a paused row
-/// draws nothing.
+/// Rests low while paused, so a paused row draws nothing.
 struct Equalizer: View {
     let active: Bool
     var colour: Color?

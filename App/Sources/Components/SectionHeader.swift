@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// A section's title row, as ytm-native's `title` rows, with "More" when the
-/// section leads to a fuller page.
 struct SectionHeader: View {
     let title: String
     let more: Route?

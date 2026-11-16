@@ -2,18 +2,14 @@ import Foundation
 import Observation
 import YTMCore
 
-/// The settings the player follows, and the account it plays for. Any
-/// change to `SettingsStore.value`, from here or from Settings, takes effect
-/// as it is made: mute and the equaliser at once, normalisation
-/// within the few seconds the engine has scheduled; shuffle in the queue;
-/// quality and crossfade from the next song queued.
+/// Settings changes take effect as made: normalisation within the few seconds the
+/// engine has scheduled, quality and crossfade from the next song queued.
 extension PlayerController {
     public func toggleMute() {
         settings.value.muted.toggle()
         apply(settings.value)
     }
 
-    /// The shuffle button: off, shuffle, Smart Shuffle, then off again.
     public func cycleShuffle() {
         settings.value.shuffle = switch settings.value.shuffle {
         case .off: .on
@@ -23,7 +19,6 @@ extension PlayerController {
         apply(settings.value)
     }
 
-    /// The repeat button: off, all, one, then off again.
     public func cycleRepeat() {
         settings.value.repeatMode = switch settings.value.repeatMode {
         case .off: .all
@@ -33,9 +28,8 @@ extension PlayerController {
         apply(settings.value)
     }
 
-    /// Call after signing in or out: a new account says nothing yet about
-    /// Premium, and the playing song's rating is its own. The saved Home
-    /// belongs to the old account; dropping it is the caller's.
+    /// Call after signing in or out. Dropping the saved Home, the old account's,
+    /// is the caller's job.
     public func accountDidChange() async {
         chooser.reset()
         premiumStatus = .unknown
@@ -48,7 +42,6 @@ extension PlayerController {
         if let id = current?.id { loadRating(of: id) }
     }
 
-    /// Follows every change to the settings from now on.
     func followSettings() {
         let settings = settings
         listening.append(Task { [weak self] in
@@ -58,8 +51,7 @@ extension PlayerController {
         })
     }
 
-    /// Puts `new` into effect, doing only what changed since the settings
-    /// last applied.
+    /// Does only what changed since the settings last applied.
     func apply(_ new: Settings) {
         let old = applied
         applied = new
@@ -93,8 +85,7 @@ extension PlayerController {
         }
     }
 
-    /// Prepares the Premium player script in the background, so the first
-    /// song doesn't wait for it, when Premium audio can apply.
+    /// Prepares the Premium player script ahead, so the first song doesn't wait for it.
     func preparePremium() {
         guard signedIn, settings.value.quality == .high else { return }
         let music = music

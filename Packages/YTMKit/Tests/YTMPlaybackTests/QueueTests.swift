@@ -1,8 +1,7 @@
 import Testing
 @testable import YTMPlayback
 
-/// The tests of ytm-native's `queue.rs`, ported one for one, plus SwiftUI's multi-entry moves. `#expect` cannot
-/// take a bare mutating call, so those that return a flag are bound first.
+/// `#expect` cannot take a bare mutating call, so those that return a flag are bound first.
 struct QueueTests {
     private func queue(_ count: Int) -> Queue<Int> {
         var queue = Queue<Int>(seed: 42)
@@ -12,7 +11,7 @@ struct QueueTests {
 
     private func items(_ queue: Queue<Int>) -> [Int] { Array(queue.items) }
 
-    /// ytm-native's `move_to(from, to)`, where `to` is the final index, in SwiftUI's `onMove` terms.
+    /// `to` is the final index, turned into SwiftUI's `onMove` offset.
     private func move(_ queue: inout Queue<Int>, _ from: Int, to: Int) -> Bool {
         queue.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to)
     }
@@ -311,7 +310,7 @@ struct QueueTests {
         #expect(q.current == nil)
     }
 
-    /// Each entry's ID stays with it through every edit, so a row stays the same row however the queue moves.
+    /// A row stays the same row however the queue moves.
     @Test func entryIdsFollowTheirEntries() throws {
         var q = queue(6)
         q.jump(to: 1)

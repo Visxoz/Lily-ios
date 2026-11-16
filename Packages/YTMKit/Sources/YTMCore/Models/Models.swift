@@ -1,8 +1,7 @@
 import Foundation
 
-// The pages and items the UI shows, independent of InnerTube's shapes.
-// Every model is a value type, Sendable and Codable, so it crosses actors
-// freely and can be saved as is (session, history, the cached Home feed).
+// Every model is Sendable and Codable: it crosses actors and is saved as is
+// (session, history, the cached Home feed).
 
 public struct ArtistRef: Codable, Hashable, Sendable {
     public var id: String?
@@ -32,11 +31,10 @@ public struct Track: Codable, Hashable, Sendable, Identifiable {
     public var album: AlbumRef?
     /// Length in seconds, when YouTube said.
     public var duration: Int?
-    /// Square artwork, at row size; `ImagePipeline` decodes it at any pixel edge.
     public var thumbnail: String?
     public var trackNumber: Int?
-    /// A music video, which may have a song version: audio only, and the
-    /// rendition YouTube Music itself plays.
+    /// A music video, which may have an audio-only song version YouTube Music
+    /// plays instead.
     public var isVideo: Bool
     /// The entry's ID within a playlist, which removing it needs.
     public var setVideoId: String?
@@ -63,7 +61,6 @@ public struct Track: Codable, Hashable, Sendable, Identifiable {
 }
 
 extension ArtistRef {
-    /// "A, B, C", as ytm-native's `join_artists` words several artists.
     public static func joined(_ artists: [ArtistRef]) -> String {
         artists.lazy.map(\.name).joined(separator: ", ")
     }
@@ -135,7 +132,6 @@ public struct TrackSection: Codable, Hashable, Sendable {
     public var mode: QueueMode
     /// Album pages show track numbers instead of artwork.
     public var numbered: Bool
-    /// "More" opens this, as on artist pages' songs.
     public var more: Route?
 
     public init(title: String, tracks: [Track], mode: QueueMode, numbered: Bool = false, more: Route? = nil) {
@@ -172,7 +168,6 @@ public enum Section: Codable, Hashable, Sendable {
         }
     }
 
-    /// Where the section's "More" leads.
     public var more: Route? {
         switch self {
         case .tracks(let s): s.more
@@ -266,19 +261,14 @@ public enum Route: Codable, Hashable, Sendable {
     case artist(String)
     /// A mood or genre, by its browse params.
     case genre(String)
-    /// The signed-in library's sub-lists.
     case libraryPlaylists, libraryAlbums, libraryArtists, librarySongs
-    /// "More" on an artist's discography or a Home shelf: a browse ID and
-    /// its params.
+    /// "More" on an artist's discography or a Home shelf.
     case browse(id: String, params: String?)
-    /// Explore's sub-pages.
     case newReleases, charts, moodsAndGenres
 
-    /// Liked music, an auto playlist.
     public static let likedSongs = Route.playlist(BuiltInPlaylist.likedMusic)
 }
 
-/// YouTube Music's built-in playlists, by ID.
 enum BuiltInPlaylist {
     /// Liked music, an auto playlist.
     static let likedMusic = "LM"
@@ -286,11 +276,9 @@ enum BuiltInPlaylist {
     static let episodesForLater = "SE"
     /// The "Shuffle all" row.
     static let shuffleAll = "MLCT"
-    /// The rows list items skip, as rustypipe does.
     static let skippedInLists: Set = [likedMusic, shuffleAll, episodesForLater]
 }
 
-/// A song's thumbs, as the account rated it.
 public enum Rating: String, Codable, Hashable, Sendable {
     case none = "INDIFFERENT"
     case like = "LIKE"
@@ -313,7 +301,6 @@ public struct PlaylistOption: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
-/// Lyrics line by line, timed where YouTube has them so.
 public struct Lyrics: Codable, Hashable, Sendable {
     public var lines: [String]
     /// Each line's start in seconds when synced, else empty.
@@ -342,7 +329,6 @@ public struct Lyrics: Codable, Hashable, Sendable {
     }
 }
 
-/// The signed-in account, as shown in Settings.
 public struct Account: Codable, Hashable, Sendable {
     public var name: String
     public var handle: String?
@@ -355,9 +341,8 @@ public struct Account: Codable, Hashable, Sendable {
     }
 }
 
-/// How much of a stream to ask for. Low and Normal cap the bitrate, for
-/// metered connections; High takes the best YouTube offers, which is 256
-/// kbps Opus when signed in with Premium.
+/// Low and Normal cap the bitrate for metered connections; High takes the
+/// best YouTube offers, 256 kbps Opus with Premium.
 public enum AudioQuality: String, Codable, CaseIterable, Hashable, Sendable {
     case low, normal, high
 
@@ -379,7 +364,6 @@ public enum AudioCodec: String, Codable, Hashable, Sendable {
     case aac
 }
 
-/// A playable stream, chosen from the player endpoint's formats.
 public struct ResolvedStream: Codable, Hashable, Sendable {
     public var url: URL
     /// Headers the download must send, as the client that asked.
@@ -411,16 +395,14 @@ public struct ResolvedStream: Codable, Hashable, Sendable {
         self.isPremium = isPremium
     }
 
-    /// The player's badge, as ytm-native's `quality_label`: "OPUS 165", with
-    /// Premium formats at YouTube's nominal 256 kbps rather than their bitrate.
+    /// "OPUS 165", with Premium formats at YouTube's nominal 256 kbps.
     public var badge: String {
         let kbps = PremiumResolver.premiumItags.contains(itag) ? 256 : (bitrate + 500) / 1000
         return "\(codec.rawValue.uppercased()) \(kbps)"
     }
 }
 
-/// What the app does with a failure it shows: a sentence, never a URL or
-/// cookie.
+/// A failure fit to show: a sentence, never a URL or cookie.
 public struct YTMError: Error, Hashable, Sendable, CustomStringConvertible {
     public enum Kind: String, Hashable, Sendable {
         case network, http, parse, unplayable, notSignedIn, notFound, refused

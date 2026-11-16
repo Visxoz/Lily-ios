@@ -1,25 +1,21 @@
 import Accelerate
 import Foundation
 
-/// Where a crossfade starts in the item fading out and how long it lasts,
-/// worked out once both items' silences are known.
+/// Worked out once both items' silences are known; `start` is a frame of the item fading out.
 struct FadePlan {
     let from: Track
     let start: Int64
     let length: Int64
 }
 
-/// A crossfade under way: the item fading out, mixed under the start of the next.
 struct Fade {
     let from: Track
     let length: Int64
-    /// Frames mixed so far.
     var mixed: Int64 = 0
 
     var remaining: Int64 { length - mixed }
 }
 
-/// The sample arithmetic of fades, as ytm-native's `engine.rs`.
 enum Crossfade {
     /// About -60 dBFS: quieter than this, a frame counts as silence.
     static let silence: Float = 0.001
@@ -31,25 +27,21 @@ enum Crossfade {
         abs(channels.left[frame]) < silence && abs(channels.right[frame]) < silence
     }
 
-    /// Silent frames at the front of `count` frames.
     static func leadingSilence(_ channels: Channels, count: Int) -> Int {
         (0..<count).first { !isSilent(channels, at: $0) } ?? count
     }
 
-    /// The frame after the last that is not silent among `count`, or 0.
+    /// The frame after the last that is not silent, or 0.
     static func soundEnd(_ channels: Channels, count: Int) -> Int {
         ((0..<count).last { !isSilent(channels, at: $0) }).map { $0 + 1 } ?? 0
     }
 
-    /// A gain running straight from one factor to another across a buffer,
-    /// so a change of normalisation is heard as a glide, never a click.
+    /// Across a buffer, so a change of normalisation is heard as a glide, never a click.
     struct Ramp {
         let from: Float
         let to: Float
-        /// The buffer's frames.
         let length: Int
 
-        /// The gain at frame `frame` of the buffer.
         func at(_ frame: Int) -> Float {
             from + step * Float(min(frame, length))
         }
@@ -57,7 +49,7 @@ enum Crossfade {
         var step: Float { (to - from) / Float(max(length, 1)) }
     }
 
-    /// Writes `count` frames scaled by `gain` into `out` from `offset`, its frame of the ramp.
+    /// `offset` is both the frame of `out` and the frame of the ramp.
     static func copy(_ channels: Channels, gain: Ramp, count: Int, into out: UnsafePointer<UnsafeMutablePointer<Float>>, at offset: Int) {
         var step = gain.step
         // Each call moves `start` on, so it is set afresh for the second channel.
@@ -67,11 +59,8 @@ enum Crossfade {
         vDSP_vrampmul(channels.right, 1, &start, &step, out[1] + offset, 1, vDSP_Length(count))
     }
 
-    /// Mixes `count` frames of the item fading out under the one fading in,
-    /// frame `at` of a fade `length` frames long, into `out` from `offset`,
-    /// its frame of each side's ramp.
-    /// Equal-power curves keep the loudness steady through the overlap,
-    /// where linear ones dip midway. Either side may have ended, and is silence.
+    /// Equal-power curves keep the loudness steady through the overlap, where linear ones dip midway.
+    /// A nil side has ended and counts as silence; `offset` is also each side's frame of its ramp.
     static func mix(
         incoming: (channels: Channels, gain: Ramp)?,
         outgoing: (channels: Channels, gain: Ramp)?,
@@ -102,8 +91,7 @@ enum Crossfade {
         }
     }
 
-    /// Fades the first frames of a buffer in from silence, as the sound
-    /// after a start, seek or stall would otherwise step in and click.
+    /// The sound after a start, seek or stall would otherwise step in and click.
     static func fadeIn(_ out: UnsafePointer<UnsafeMutablePointer<Float>>, count: Int, over length: Int) {
         let frames = min(count, length)
         for frame in 0..<frames {

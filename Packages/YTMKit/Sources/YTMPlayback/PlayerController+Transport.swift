@@ -2,9 +2,6 @@ import Foundation
 import os
 import YTMCore
 
-/// Loading songs and the transport controls, as ytm-native's `playback.rs`:
-/// play, pause, seek, skip, and what happens when a song fails or the queue
-/// runs out.
 extension PlayerController {
     /// Pressing previous later than this into a song restarts it instead.
     static let restartAfterSeconds = 3.0
@@ -13,14 +10,12 @@ extension PlayerController {
         setPaused(isPlaying)
     }
 
-    /// Skips to the next song; at the queue's end, with autoplay on, to the
-    /// first of a radio of the last.
+    /// At the queue's end with autoplay on, plays on into a radio of the last.
     public func next() {
         next(user: true)
     }
 
-    /// Restarts the song when more than 3 s in, which counts as a new play;
-    /// otherwise goes back to the song before.
+    /// A restart counts as a new play.
     public func previous() {
         if enginePosition > Self.restartAfterSeconds {
             seek(to: 0)
@@ -30,7 +25,6 @@ extension PlayerController {
         if queue.back(repeat: repeatMode) != nil { startCurrent() }
     }
 
-    /// Plays the queue entry at `index`, as tapping it in the queue does.
     public func jump(to index: Int) {
         if queue.jump(to: index) != nil { startCurrent() }
     }
@@ -51,8 +45,7 @@ extension PlayerController {
         publishPlayback(at: target)
     }
 
-    /// Pauses or plays on. Playing with nothing loaded, as after a launch or
-    /// once the queue has played out, starts the song shown.
+    /// Playing with nothing loaded starts the song shown.
     func setPaused(_ paused: Bool) {
         guard current != nil else { return }
         if !paused, isStopped {
@@ -70,8 +63,6 @@ extension PlayerController {
         publishPlayback()
     }
 
-    /// Moves on after the song, or a skip when `user`: the next entry, a
-    /// radio once the queue has played out with autoplay on, or a stop.
     func next(user: Bool) {
         if queue.advance(user: user, repeat: repeatMode) != nil {
             startCurrent()
@@ -97,9 +88,8 @@ extension PlayerController {
                 }
             }
             let result = await Result { try await music.radio(videoId: seed) }
-            // Something else started playing meanwhile, such as another
-            // queue, and plays on as it is. Not the queue's revision: the
-            // radio queued as the last song started may have just extended it.
+            // The playback generation, not the queue's revision: the radio
+            // queued as the last song started may have just extended it.
             guard let self, !Task.isCancelled, playback.generation == generation else { return }
             switch result {
             case .success(let tracks): appendUnique(tracks)
@@ -114,7 +104,6 @@ extension PlayerController {
         }
     }
 
-    /// Loads and plays the queue's current song.
     func startCurrent() {
         guard let track = queue.current else {
             stop()
@@ -163,8 +152,6 @@ extension PlayerController {
         }
     }
 
-    /// Hands the engine the song's stream, from a seek made or a position
-    /// restored before it loaded.
     private func load(_ track: Track, _ prefetched: StreamPrefetcher.Prefetched) {
         show(prefetched.stream)
         let start = takeResumePosition()
@@ -181,20 +168,16 @@ extension PlayerController {
         }
     }
 
-    /// The position to start at, if it is the current song's.
     private func takeResumePosition() -> Double {
         defer { playback.resume = nil }
         guard let resume = playback.resume, resume.id == queue.current?.id else { return 0 }
         return resume.position
     }
 
-    /// A song that couldn't load or play. A Premium stream gets one retry on
-    /// the free one, carrying on from where the sound got to without
-    /// counting a second play; otherwise the next song plays, until a few
-    /// in a row have failed.
+    /// A Premium stream gets one retry on the free one without counting a
+    /// second play; otherwise the next song plays, until a few in a row fail.
     func playbackFailed(_ title: String, _ message: String) {
         Logger.playback.warning("playback failed: \(message, privacy: .public)")
-        // A stream that would not play is not handed out again.
         if let id = queue.current?.id { prefetcher.remove(id) }
         if let id = queue.current?.id, playback.currentPremium, playback.forceFree != id {
             playback.currentPremium = false
@@ -209,26 +192,20 @@ extension PlayerController {
         if playback.failures < Self.maxConsecutiveFailures, queue.peekNext(repeat: repeatMode) != nil {
             next(user: true)
         } else {
-            // Stopped like any other end, so nothing runs on.
             stop()
         }
     }
 
-    /// The system's media services restarted, taking the engine's audio
-    /// graph with them: the graph is made afresh, and a song that was loaded
-    /// starts again from where its sound got to. That is read first, as the
-    /// rebuild stops the sound, and the song loads once the new graph is
-    /// made: a stream kept for it loads at once.
+    /// The system's media services restarted, taking the audio graph with
+    /// them. The position is read first, as the rebuild stops the sound.
     func mediaServicesReset() {
         let position = enginePosition
         audio.rebuild()
         if !isStopped { restartCurrent(from: position) }
     }
 
-    /// Loads the current song again, carrying on from where the sound got
-    /// to, or `position`, without counting a second play. At the very end,
-    /// as when the next song fails to open, there is nothing left to carry
-    /// on, so it starts over.
+    /// Reloads the current song from where it got to, or `position`, without
+    /// counting a second play; at the very end it starts over.
     private func restartCurrent(from position: Double? = nil) {
         guard let id = queue.current?.id else { return }
         let position = position ?? enginePosition

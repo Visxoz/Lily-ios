@@ -10,13 +10,11 @@ public enum ShuffleMode: String, Codable, CaseIterable, Sendable {
     case off, on, smart
 }
 
-/// The app's colours: dark, light, or pure black for OLED screens.
 public enum Look: String, Codable, CaseIterable, Sendable {
     case dark, light, black
 }
 
-/// The colour of active controls: one of a few, or one taken from the
-/// playing song's artwork. In the order Settings offers them.
+/// The colour of active controls, in the order Settings offers them.
 public enum Accent: String, Codable, CaseIterable, Sendable {
     case red, orange, green, teal, blue, purple, pink, artwork
 
@@ -48,7 +46,6 @@ public enum Accent: String, Codable, CaseIterable, Sendable {
     }
 }
 
-/// The user's preferences, saved as settings.json.
 public struct Settings: Codable, Equatable, Sendable {
     /// YTMCore cannot see YTMAudio's EqualiserBands, so its band count is repeated here and checked by a test.
     static let equaliserBands = 6
@@ -66,7 +63,6 @@ public struct Settings: Codable, Equatable, Sendable {
     public var equaliserGains: [Float] = Array(repeating: 0, count: Settings.equaliserBands)
     /// Report songs played to the signed-in account's YouTube history.
     public var youtubeHistory = true
-    /// Show like and dislike buttons beside the song playing.
     public var ratingButtons = true
     public var look: Look = .dark
     public var accent: Accent = .red
@@ -77,9 +73,8 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public init() {}
 
-    /// Reads each setting on its own, so one that can't be read (a value
-    /// from a newer version, say) goes back to its default alone rather than
-    /// taking an opt-out such as `youtubeHistory` with it.
+    /// Reads each setting on its own, so an unreadable one resets alone rather
+    /// than taking an opt-out such as `youtubeHistory` with it.
     public init(from decoder: any Decoder) throws {
         self.init()
         let file = try decoder.container(keyedBy: CodingKeys.self)
@@ -102,8 +97,7 @@ public struct Settings: Codable, Equatable, Sendable {
 }
 
 extension KeyedDecodingContainer {
-    /// Overwrites `value` with the key's, when present, readable and `valid`;
-    /// otherwise leaves it, which is the default.
+    /// Overwrites `value` with the key's when present, readable and `valid`.
     func read<T: Decodable>(_ value: inout T, _ key: Key, valid: (T) -> Bool = { _ in true }) {
         if let decoded = try? decodeIfPresent(T.self, forKey: key), valid(decoded) {
             value = decoded

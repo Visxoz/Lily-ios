@@ -1,8 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// The Library tab: the account's playlists, albums and artists signed in;
-/// signed out, the sidebar's "Bring your library" card from ytm-native.
 struct LibraryScreen: View {
     @Environment(AppModel.self) private var app
 
@@ -15,8 +13,6 @@ struct LibraryScreen: View {
     }
 }
 
-/// ytm-native's sign-in card (`shell/sidebar.slint`), under the Library's
-/// tint as its pages are.
 private struct BringYourLibrary: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme

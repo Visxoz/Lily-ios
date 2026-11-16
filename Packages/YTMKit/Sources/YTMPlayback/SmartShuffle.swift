@@ -2,17 +2,13 @@ import Foundation
 import os
 import YTMCore
 
-/// Smart Shuffle, as ytm-native's `smart_shuffle.rs`: while shuffling,
-/// recommended songs are mixed into the queue, one after every few of the
-/// user's own, whether it is a playlist, album or radio. They come from the
-/// radio of one of the queue's songs, a batch at a time as the queue runs,
-/// and are marked in the queue so that turning Smart Shuffle off takes them
-/// out again.
+/// Mixes recommendations from a queued song's radio in after every few of the
+/// user's own songs, marked so turning Smart Shuffle off takes them out again.
 struct SmartShuffle {
     /// The user's own songs between two recommendations.
     static let gaps = 3...4
-    /// How many of the user's own songs ahead get their recommendations; the
-    /// rest follow as the queue runs, so a long playlist never asks for all.
+    /// Own songs ahead that get recommendations, so a long playlist never
+    /// asks for all.
     static let lookahead = 8
     /// Recently played songs that are not recommended again.
     static let recent = 100
@@ -21,12 +17,10 @@ struct SmartShuffle {
     /// batch asked for an earlier queue is dropped as it arrives.
     private(set) var generation: UInt64 = 0
     private(set) var fetching = false
-    /// Recommendations fetched and not yet placed.
     private var pool: [Track] = []
     /// Own songs to pass before the next recommendation; zero picks anew.
     private var gap = 0
-    /// IDs in the queue or recently played, rebuilt only when the queue
-    /// changed under it, so each check is a lookup.
+    /// IDs in the queue or recently played; rebuilt only when the queue's revision changes.
     private var known: Set<String> = []
     private var knownRevision: Int?
 
@@ -37,7 +31,6 @@ struct SmartShuffle {
         gap = 0
     }
 
-    /// Puts recommendations among the upcoming songs where they are due.
     /// Returns the seed of a batch to ask for when the pool ran dry, and
     /// marks it as being fetched.
     mutating func topUp(_ queue: inout Queue<Track>, recent: some Sequence<String>) -> String? {
@@ -82,8 +75,8 @@ struct SmartShuffle {
         return seed
     }
 
-    /// Takes a batch asked for at `generation`; returns whether it brought
-    /// anything new to place. A batch for an earlier queue is dropped.
+    /// Returns whether the batch brought anything new to place; one for an
+    /// earlier queue is dropped.
     mutating func receive(_ tracks: [Track]?, generation: UInt64) -> Bool {
         guard generation == self.generation else { return false }
         fetching = false
@@ -91,7 +84,6 @@ struct SmartShuffle {
         return !pool.isEmpty
     }
 
-    /// The next pooled recommendation not already in the queue.
     private mutating func fresh() -> Track? {
         while !pool.isEmpty {
             let track = pool.removeFirst()
@@ -100,22 +92,18 @@ struct SmartShuffle {
         return nil
     }
 
-    /// A random one of the user's own songs, to seed a batch from.
     private static func seed(_ queue: Queue<Track>) -> String? {
         queue.entries.filter { !$0.isRecommended }.randomElement()?.item.id
     }
 }
 
 extension PlayerController {
-    /// Places Smart Shuffle's recommendations where they are due, and asks
-    /// for a batch when the pool runs dry. Runs from `prefetchNext`, so it
-    /// happens at each song start.
+    /// Runs from `prefetchNext`, so at each song start.
     func topUpSmartShuffle() {
         guard settings.value.shuffle == .smart else { return }
         let recent = history.history.tracks.prefix(SmartShuffle.recent).lazy.map(\.id)
         // On a copy, written back only when something was placed: the queue
-        // is observed, and most calls place nothing. The copy shares the
-        // queue's storage until then.
+        // is observed, and most calls place nothing.
         var upcoming = queue
         let seed = smart.topUp(&upcoming, recent: recent)
         if upcoming.revision != queue.revision { queue = upcoming }
@@ -128,8 +116,7 @@ extension PlayerController {
             if case .failure(let error) = result {
                 Logger.playback.debug("smart shuffle could not fetch recommendations: \(sentence(for: error), privacy: .public)")
             }
-            // Nothing new means nothing to place; the next song start asks
-            // again from another seed.
+            // Nothing new: the next song start asks again from another seed.
             if smart.receive(try? result.get(), generation: generation) {
                 prefetchNext()
             }

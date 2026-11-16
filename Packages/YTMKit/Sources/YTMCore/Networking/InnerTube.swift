@@ -1,20 +1,14 @@
 import Foundation
 
-/// YouTube's internal API, `youtubei/v1`, as the app speaks it: one POST per
-/// call, with the client's context, the visitor ID and, signed in, the
-/// account's cookies and hashes.
 final class InnerTube: Sendable {
     let auth: GoogleAuth
     private let visitor: VisitorData
 
-    /// English, so parsers can read YouTube's labels ("Song", "1.2M"), and
-    /// the US, which picks charts and catalogue: rustypipe's defaults, which
-    /// ytm-native never changes.
+    /// English, so parsers can read YouTube's labels ("Song", "1.2M"); the
+    /// country picks charts and catalogue.
     static let language = "en"
     static let country = "US"
 
-    /// How many times a 5xx, a 429 or a timeout is asked again, as
-    /// rustypipe's default `n_http_retries`.
     static let retries = 2
 
     /// The consent cookie a browser that dismissed YouTube's banner sends,
@@ -26,16 +20,9 @@ final class InnerTube: Sendable {
         visitor = VisitorData(store: store, request: VisitorData.request)
     }
 
-    /// POSTs `body` to `endpoint` (such as "browse", "next", "search") as
-    /// `client`, and returns the parsed answer.
-    ///
-    /// The client's `context.client` is merged in under any keys `body`
-    /// gives there itself. `authenticated` sends the account's cookies when
-    /// signed in, for web clients; signed out, or with it false, the request
-    /// is anonymous. `visitorData` stands in for the saved visitor ID, to
-    /// try one before keeping it. `retries` is how many times a 5xx, a 429
-    /// or a timeout is asked again; requests with a fallback of their own
-    /// pass 0. Runs, and parses, off the caller's actor.
+    /// Keys `body` gives in `context.client` override the client's own.
+    /// `authenticated` only affects web clients; `visitorData` tries an ID
+    /// before keeping it. Requests with a fallback of their own pass `retries: 0`.
     @concurrent
     func post(
         _ endpoint: String, body: [String: Any] = [:], client: ClientProfile = .webRemix,
@@ -70,46 +57,35 @@ final class InnerTube: Sendable {
         return try JSON(data: data)
     }
 
-    /// A browse page by its ID, with `params` when the page wants them.
     func browse(_ browseId: String, params: String? = nil, authenticated: Bool = true) async throws -> JSON {
         var body: [String: Any] = ["browseId": browseId]
         if let params { body["params"] = params }
         return try await post("browse", body: body, authenticated: authenticated)
     }
 
-    /// The page after `token` of a browse list.
     func continuation(_ token: String, authenticated: Bool = true) async throws -> JSON {
         try await post("browse", body: ["continuation": token], authenticated: authenticated)
     }
 
-    /// The visitor ID requests are sent with; streams' players want it too.
     func visitorData() async throws -> String {
         try await visitor.value()
     }
 
-    /// A visitor ID to try in place of `refused`, which YouTube may have
-    /// refused, without keeping it yet. Callers asking together share one
-    /// fetch.
+    /// A visitor ID to try in place of `refused`, not kept yet. Callers asking
+    /// together share one fetch.
     func candidateVisitorData(replacing refused: String) async throws -> String {
         try await visitor.candidate(replacing: refused)
     }
 
-    /// Keeps `candidate`, which worked where `refused` failed, for every
-    /// request after.
+    /// Keeps `candidate`, which worked where `refused` failed.
     func adoptVisitorData(_ candidate: String, replacing refused: String) async {
         await visitor.adopt(candidate, replacing: refused)
     }
 }
 
-/// The visitor ID YouTube identifies a signed-out browser by, which
-/// InnerTube wants with every request. Fetched from YouTube Music's
-/// `visitor_id` endpoint as the patched rustypipe's `util/visitor_data.rs`
-/// does, and saved, so a launch needs no fetch; once a day old it is
-/// replaced in the background.
-///
-/// A fresh ID only replaces the saved one once it has worked where the
-/// saved one failed, as ytm-native's `forget_visitor`: both failing points
-/// at the song, not the ID.
+/// Saved so a launch needs no fetch, and replaced in the background once a day
+/// old. A fresh ID only replaces the saved one once it has worked where the
+/// saved one failed: both failing points at the song, not the ID.
 actor VisitorData {
     private struct Saved: Codable, Sendable {
         let value: String
@@ -128,9 +104,8 @@ actor VisitorData {
         self.request = request
     }
 
-    /// The saved ID, or, with none saved, a new one, kept. A saved ID a day
-    /// old is still sent while a new one is fetched behind it, as rustypipe
-    /// refreshes its pool, so no request waits on the refresh.
+    /// A day-old saved ID is still sent while a new one is fetched behind it,
+    /// so no request waits on the refresh.
     func value() async throws -> String {
         guard let saved else {
             let value = try await fetch()
@@ -186,9 +161,8 @@ actor VisitorData {
         -saved.fetched.timeIntervalSinceNow < maxAge
     }
 
-    /// The endpoint's answer, or YouTube Music's home page when the endpoint
-    /// answers in another shape. A refusal (an HTTP error or a redirect)
-    /// fails at once: the page, on the same host, would be refused too.
+    /// Falls back to the home page when the endpoint answers in another shape.
+    /// A refusal fails at once: the page, on the same host, would be refused too.
     static func request() async throws -> String {
         let client = ClientProfile.webRemix
         guard let url = client.url("visitor_id"), let home = URL(string: "https://music.youtube.com/") else {

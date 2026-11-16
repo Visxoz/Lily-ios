@@ -1,6 +1,6 @@
 import Foundation
 
-/// What one check found: problems fail it, notes only describe what it saw.
+/// Problems fail a check; notes only describe what it saw.
 struct Findings {
     private(set) var problems: [String] = []
     private(set) var notes: [String] = []
@@ -18,15 +18,12 @@ struct Findings {
     }
 }
 
-/// Runs checks one after another, as ytm-native's canary does, printing each
-/// as it ends and a tally at the close.
 @MainActor final class Report {
     private var passed = 0
     private var failed: [String] = []
     private let clock = ContinuousClock()
 
-    /// Runs `body` as the check `name`; a thrown error fails it with the
-    /// error's sentence.
+    /// A thrown error fails the check.
     func check(_ name: String, _ body: (inout Findings) async throws -> Void) async {
         var findings = Findings()
         let started = clock.now
@@ -46,7 +43,7 @@ struct Findings {
         if ok { passed += 1 } else { failed.append(name) }
     }
 
-    /// Prints the tally; true when every check passed.
+    /// True when every check passed.
     func summarise() -> Bool {
         print("\n\(passed) passed, \(failed.count) failed")
         for name in failed { print("  FAIL \(name)") }

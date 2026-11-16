@@ -1,14 +1,10 @@
 import SwiftUI
 import YTMCore
 
-/// What `page-view.slint` shows in place of a page: the spinner while it
-/// loads, or a message, such as why it failed, with a button to try again,
-/// under the page's tint as the page itself would be.
 struct PageStatus: View {
     enum Phase {
         case loading
         case failed(message: String, retry: () -> Void)
-        /// Nothing to show yet, and nothing to do about it.
         case empty(String)
     }
 

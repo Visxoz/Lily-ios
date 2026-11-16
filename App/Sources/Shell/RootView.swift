@@ -1,9 +1,6 @@
 import SwiftUI
 import YTMCore
 
-/// ytm-native's window on a phone: the sidebar's pages and the top bar's
-/// search become tabs, the player bar a mini player above them (in each
-/// tab, see `TabRoot`) that opens Now Playing, and the dialogs sheets.
 struct RootView: View {
     @Environment(AppModel.self) private var app
     @Namespace private var transition
@@ -39,8 +36,7 @@ struct RootView: View {
             SheetContent(sheet: sheet, transition: transition)
         }
         // Full screen rather than a sheet, so a swipe down is the zoom's own
-        // close, shrinking into the mini player under the finger, not the
-        // sheet sliding away and then zooming once let go.
+        // close rather than the sheet sliding away and then zooming.
         .fullScreenCover(item: presented { $0 == .nowPlaying }) { sheet in
             SheetContent(sheet: sheet, transition: transition)
         }
@@ -52,7 +48,6 @@ struct RootView: View {
         .onChange(of: app.player.libraryRevision) { app.libraryChanged() }
     }
 
-    /// `app.sheet` while it is one `shows` takes, which a dismissal clears.
     private func presented(_ shows: @escaping (AppSheet) -> Bool) -> Binding<AppSheet?> {
         Binding {
             app.sheet.flatMap { shows($0) ? $0 : nil }
@@ -62,7 +57,6 @@ struct RootView: View {
     }
 }
 
-/// A tab's label in ytm-native's own icons rather than SF Symbols.
 private struct TabLabel: View {
     let title: String
     let icon: Icon
@@ -76,9 +70,7 @@ private struct TabLabel: View {
     }
 }
 
-/// What `AppSheet` presents, each with the toast over it, as ytm-native's
-/// toast shows above its dialogs and panel. Now Playing grows out of the
-/// mini player of the tab in view.
+/// Each with the toast over it, since a sheet covers the tabs' own.
 private struct SheetContent: View {
     let sheet: AppSheet
     let transition: Namespace.ID

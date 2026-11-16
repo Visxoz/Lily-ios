@@ -1,10 +1,8 @@
 import Foundation
 @testable import YTMCore
 
-/// The Premium path's moving parts, signed out: YouTube's player fetched,
-/// trimmed and self-tested, and a web client's scrambled format unlocked
-/// with it and served. Signed out there are no Premium formats, but the
-/// scrambling is the same, so this is what breaks when YouTube changes it.
+/// Signed out there are no Premium formats, but the scrambling is the same,
+/// so this is what breaks when YouTube changes it.
 enum PremiumChecks {
     static func run(_ report: Report) async {
         var player: PlayerScript?

@@ -2,19 +2,14 @@ import Foundation
 import Observation
 import YTMCore
 
-/// The songs played on this phone and the recent searches, as ytm-native's
-/// `history.json` and `searches.json`.
-///
-/// The history is written two seconds after the last play, so skipping
-/// through songs costs one write; the searches as soon as they change, as
-/// they are tiny. Load both once at launch with `load()` (the player's
-/// `start()` does).
+/// History is saved two seconds after the last play, searches at once as they are
+/// tiny. Load both once at launch with `load()` (the player's `start()` does).
 @MainActor @Observable public final class LocalHistory {
     public static let shared = LocalHistory(store: .shared)
 
     /// Newest first, one entry per song.
     public private(set) var history = PlayHistory()
-    /// Newest first, offered when the search field opens until the user types.
+    /// Newest first.
     public private(set) var searches = RecentSearches()
 
     @ObservationIgnored private let store: FileStore
@@ -40,9 +35,7 @@ import YTMCore
         await loading?.value
     }
 
-    /// The history as a page, newest first, as ytm-native's `history_page`
-    /// shows it when signed out or with the YouTube history off; nil when
-    /// nothing has played yet.
+    /// For when signed out or with the YouTube history off; nil when nothing has played.
     public var page: Page? {
         guard !history.tracks.isEmpty else { return nil }
         return Page(
@@ -68,7 +61,7 @@ import YTMCore
         store.save(history, to: .history)
     }
 
-    /// Adds a play, as its sound starts; only the player records them.
+    /// Only the player records plays, as each song's sound starts.
     func record(_ track: Track) {
         history.record(track)
         saving.schedule { [weak self] in

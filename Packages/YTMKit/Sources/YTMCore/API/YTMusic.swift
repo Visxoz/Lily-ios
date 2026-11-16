@@ -1,8 +1,6 @@
 import Foundation
 
-/// YouTube Music for the app: pages, what to play, streams and the library.
-/// Stateless apart from caches, so one instance is shared. Each concern
-/// lives in its own `YTMusic+….swift` beside this file.
+/// Stateless apart from caches, so one instance is shared.
 public final class YTMusic: Sendable {
     public static let shared = YTMusic()
 

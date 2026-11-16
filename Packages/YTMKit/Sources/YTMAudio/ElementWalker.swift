@@ -1,8 +1,5 @@
-/// Walks the elements of a container, EBML elements or MP4 boxes, as its
-/// bytes arrive in pieces of any size. The format says how to read a header
-/// and what to do with each element: step into it, read it whole, or skip
-/// it. Only the element being read, which is always small, is ever copied,
-/// and only when it is split across two pieces.
+/// Walks EBML elements or MP4 boxes as the bytes arrive in pieces of any size. Only the element being read,
+/// which is always small, is ever copied, and only when it is split across two pieces.
 struct ElementWalker {
     struct Header {
         var id: UInt32
@@ -40,8 +37,7 @@ struct ElementWalker {
         readHeader = header
     }
 
-    /// Walks the next bytes of the file. `element` gets each element read
-    /// whole, with its body and the body's offset in the file.
+    /// `element` gets each element read whole, with its body and the body's offset in the file.
     mutating func walk(
         _ bytes: UnsafeRawBufferPointer,
         action: (Header) -> Action,
@@ -113,9 +109,7 @@ struct ElementWalker {
         }
     }
 
-    /// Calls `body` with each element of `bytes`, which holds whole
-    /// elements, and each body's offset in `bytes`. One of unknown size runs
-    /// to the end.
+    /// `bytes` must hold whole elements; offsets are within `bytes`. One of unknown size runs to the end.
     static func forEach(
         in bytes: UnsafeRawBufferPointer,
         header readHeader: HeaderReader,
@@ -136,8 +130,7 @@ struct ElementWalker {
     }
 }
 
-/// Reads big-endian fields from the front of a container's bytes, failing
-/// rather than reading past their end.
+/// Big-endian; throws rather than reading past the end.
 struct ByteReader {
     private let bytes: UnsafeRawBufferPointer
     private(set) var offset = 0
@@ -153,7 +146,6 @@ struct ByteReader {
         offset += count
     }
 
-    /// The unsigned integer in the next `count` bytes, at most eight.
     mutating func uint(_ count: Int) throws -> UInt64 {
         guard count <= 8, count <= remaining else { throw AudioFailure.damaged }
         defer { offset += count }

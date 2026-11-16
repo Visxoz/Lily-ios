@@ -1,15 +1,8 @@
 import SwiftUI
 import YTMCore
 
-/// One tab: its own stack of pages, with the account button that opens
-/// Settings, as ytm-native's top bar has, the mini player above the tab bar
-/// while there is a song, and the toast above that while no sheet covers it
-/// (sheets show it too).
-///
-/// The mini player is the app's own rather than the tab bar's accessory,
-/// whose height the system fixes too small to reach comfortably. Each tab
-/// has its own, the source Now Playing grows out of while that tab is in
-/// view, so the sources never share an ID.
+/// The mini player is the app's own since the tab bar accessory is too short to
+/// reach comfortably; each tab has one, so the zoom sources never share an ID.
 struct TabRoot<Content: View>: View {
     let tab: AppTab
     let transition: Namespace.ID

@@ -2,9 +2,6 @@ import SwiftUI
 import YTMAudio
 import YTMCore
 
-/// Settings' Playback tab: the audio quality, normalising, crossfade, the
-/// way on to the equaliser, autoplay, and the audio cache. The player
-/// follows every change as it is made.
 struct PlaybackSettings: View {
     @Environment(AppModel.self) private var app
 
@@ -49,7 +46,6 @@ struct PlaybackSettings: View {
     }
 }
 
-/// The audio cache's size, with Clear, which drops the songs kept on disk.
 private struct StorageRow: View {
     @Environment(AppModel.self) private var app
     @State private var size: Int64?

@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import YTMCore
 
-/// ytm-native's `streams/mod.rs` tests, with googlevideo URLs, as the
-/// resolver only takes URLs on the allowlist.
+/// Googlevideo URLs throughout, as the resolver only takes URLs on the allowlist.
 @Suite struct StreamTests {
     private func response(_ formats: String...) throws -> JSON {
         try JSON(data: Data("""

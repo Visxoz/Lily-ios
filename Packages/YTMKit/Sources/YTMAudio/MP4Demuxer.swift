@@ -1,11 +1,8 @@
 import AudioToolbox
 import Foundation
 
-/// Reads AAC from fragmented MP4, as YouTube's 139, 140 and 141 come: the
-/// codec from the movie box, and each fragment's packets at their offsets
-/// in the file. `AudioFileStream` would parse these too, but it gives a
-/// packet split across two pieces of the download no offset in the file,
-/// which the index needs.
+/// AAC in fragmented MP4, as YouTube's 139, 140 and 141 come. `AudioFileStream` would parse these too, but
+/// gives a packet split across two pieces of the download no offset in the file, which the index needs.
 final class MP4Demuxer: PacketSource {
     /// AAC encoders' usual priming, for files whose edit list does not give it.
     static let defaultPriming: Int64 = 2_112
@@ -105,8 +102,7 @@ final class MP4Demuxer: PacketSource {
         format = SourceFormat(description: description, cookie: Data(cookie), leadingFrames: priming, duration: duration)
     }
 
-    /// The first edit that plays media: where it starts in the media, and
-    /// how long it lasts in the movie.
+    /// The first edit that plays media: its start in media ticks, its length in movie ticks.
     private static func edit(in trak: UnsafeRawBufferPointer) throws -> (start: UInt64, length: UInt64)? {
         guard let list = try MP4.child([MP4.edts, MP4.elst], in: trak) else { return nil }
         var reader = ByteReader(list)
@@ -124,8 +120,7 @@ final class MP4Demuxer: PacketSource {
         return nil
     }
 
-    /// `ticks` of `scale` as frames at `rate`. No edit runs past a day, so
-    /// a longer one is a damaged file, and could not be counted in frames.
+    /// No edit runs past a day, so a longer one is a damaged file.
     private static func frames(_ ticks: UInt64, scale: UInt64, rate: Double) throws -> Int64 {
         let frames = (Double(ticks) * rate / Double(scale)).rounded()
         guard frames <= rate * SourceFormat.longestSeconds else { throw AudioFailure.damaged }
@@ -187,7 +182,7 @@ final class MP4Demuxer: PacketSource {
         }
     }
 
-    /// Lists a track run's packets, returning where its data ends.
+    /// Returns where the run's data ends.
     private func readRun(_ run: UnsafeRawBufferPointer, base: Int64, follows end: Int64, defaultSize: UInt64) throws -> Int64 {
         var reader = ByteReader(run)
         let flags = try reader.uint(4)
@@ -210,7 +205,6 @@ final class MP4Demuxer: PacketSource {
     }
 }
 
-/// MP4 box headers and the box types read here.
 enum MP4 {
     static let moov = code("moov"), moof = code("moof"), mvhd = code("mvhd"), mvex = code("mvex")
     static let trex = code("trex"), trak = code("trak"), tkhd = code("tkhd"), edts = code("edts")
@@ -223,8 +217,7 @@ enum MP4 {
         name.utf8.reduce(0) { $0 << 8 | UInt32($1) }
     }
 
-    /// A box's size and type, with a 64-bit size when its size is 1, and no
-    /// size when 0, which runs to the end of the file.
+    /// A size of 1 means a 64-bit size follows; 0 means the box runs to the end of the file.
     static func header(_ bytes: UnsafeRawBufferPointer) throws -> ElementWalker.Header? {
         guard bytes.count >= 8 else { return nil }
         var reader = ByteReader(bytes)

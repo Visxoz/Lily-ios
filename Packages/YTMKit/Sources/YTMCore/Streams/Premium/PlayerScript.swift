@@ -2,7 +2,7 @@ import Foundation
 import os
 
 /// YouTube's web player for one version, cut down to the code that
-/// unscrambles stream URLs, as ytm-native's `streams/premium/player.rs`.
+/// unscrambles stream URLs.
 struct PlayerScript: Codable, Sendable {
     /// The player version, eight hex digits.
     let id: String
@@ -18,14 +18,12 @@ struct PlayerScript: Codable, Sendable {
 
     private static let iframeAPI = "https://www.youtube.com/iframe_api"
 
-    /// Inputs the player must change, solved before a new version is
-    /// trusted, as it is cached until YouTube's next one, and Premium
-    /// formats always need the signature.
+    /// Inputs the player must change before a new version is trusted, as it
+    /// is cached until YouTube's next one. Premium formats always need the signature.
     static let checkN = "abcdefghijklmnop"
     static let checkSignature = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"
 
-    /// The current player: from the store unless YouTube has a newer one,
-    /// else fetched, trimmed, checked and saved.
+    /// From the store unless YouTube has a newer one, else fetched, trimmed, checked and saved.
     @concurrent
     static func load(store: FileStore) async throws -> PlayerScript {
         let iframe = try await fetch(iframeAPI)
@@ -55,7 +53,6 @@ struct PlayerScript: Codable, Sendable {
         return player
     }
 
-    /// The player version in `iframe_api`, which names it in its script URL.
     static func playerId(inIframeAPI text: String) -> String? {
         for marker in [#"player\/"#, "player/"] {
             guard let start = text.range(of: marker)?.upperBound else { continue }
@@ -82,11 +79,8 @@ struct PlayerScript: Codable, Sendable {
     }
 }
 
-/// The player the session solves with, as ytm-native's `premium_player`:
-/// loaded once and shared by every song, with a pause after a failure so a
-/// broken player isn't fetched again for each one. A phone app can run for
-/// days, so the version is checked again after a few hours, in the
-/// background, while the known player keeps solving.
+/// Shared by every song, with a pause after a failure so a broken player isn't fetched for each one.
+/// A phone app can run for days, so the version is rechecked every few hours in the background.
 actor PlayerScripts {
     static let shared = PlayerScripts()
 
@@ -102,9 +96,7 @@ actor PlayerScripts {
         let now = ContinuousClock.now
         let backingOff = failed.map { now - $0 < Self.backoff } ?? false
         if let current {
-            // A known script keeps solving while a newer one is fetched behind
-            // it, as ytm-native keeps its player for the whole run, so no song
-            // waits for the recheck.
+            // A known script keeps solving while a newer one is fetched, so no song waits for the recheck.
             if now - current.checked >= Self.recheck, loading == nil, !backingOff { refresh(store: store) }
             return current.script
         }
@@ -114,9 +106,7 @@ actor PlayerScripts {
         return try await (loading ?? refresh(store: store)).value
     }
 
-    /// Starts the load on the actor, which records its outcome for every
-    /// caller. The task can't run before `loading` is set, as the actor is
-    /// busy until this returns.
+    /// The task can't run before `loading` is set, as the actor is busy until this returns.
     @discardableResult
     private func refresh(store: FileStore) -> Task<PlayerScript, any Error> {
         let task = Task {

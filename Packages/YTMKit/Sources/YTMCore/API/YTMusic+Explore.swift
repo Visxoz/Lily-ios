@@ -1,16 +1,11 @@
 import Foundation
 
-// Explore and the pages it leads to, as ytm-native's `api/pages.rs`: moods
-// and genres, one genre, new releases and the charts. All are the same for
-// every account, so they are asked for signed out.
+// Explore's pages are the same for every account, so are asked signed out.
 
 extension YTMusic {
-    /// Shown once a session: the list is the same for every account and
-    /// barely changes, and Home and Explore both show it.
+    /// Fetched once a session: the same for every account and barely changes.
     private static let moodsAndGenresCache = SessionCache<MoodsAndGenres>()
 
-    /// Moods & moments and genres chips, then the new albums and music
-    /// videos.
     @concurrent
     func explorePage() async throws -> Page {
         async let albums = newAlbums()
@@ -25,12 +20,9 @@ extension YTMusic {
         return Page(sections: sections.compactMap(\.self))
     }
 
-    /// A mood or genre's playlists, shelf by shelf.
     @concurrent
     func genrePage(params: String) async throws -> Page {
         let response = try await innerTube.browse("FEmusic_moods_and_genres_category", params: params, authenticated: false)
-        // Only playlists, as ytm-native shows a genre; its songs, videos
-        // and albums shelves are left out.
         let sections = Renderers.sections(Renderers.sectionList(in: response)).compactMap { section -> Section? in
             guard case .cards(let shelf) = section else { return nil }
             return .cards(shelf.title, shelf.cards.filter { $0.kind == .playlist }, layout: .carousel, more: shelf.more)
@@ -60,34 +52,27 @@ extension YTMusic {
 
     // MARK: - Shared with Home
 
-    /// Longest card row or video list on Home and Explore.
     static let shelfLimit = 20
 
-    /// The moods & genres list, fetched once a session; a failure isn't
-    /// kept, so the next page to want it asks again.
     func moodsAndGenres() async throws -> MoodsAndGenres {
         try await Self.moodsAndGenresCache.value { [innerTube] in
             try MoodsAndGenres(try await innerTube.browse("FEmusic_moods_and_genres", authenticated: false))
         }
     }
 
-    /// The newest albums and singles; none should the request fail.
     func newAlbums() async -> [Card] {
         await browseSections("FEmusic_new_releases_albums").cards(.album)
     }
 
-    /// The newest music videos; none should the request fail.
     private func newVideos() async -> [Track] {
         await browseSections("FEmusic_new_releases_videos").cards(.song).compactMap(\.track)
     }
 
-    /// The charts, for Home.
     func charts() async throws -> Charts {
         let response = try await innerTube.browse(Charts.browseId, params: Charts.params, authenticated: false)
         return Charts(Renderers.sections(Renderers.sectionList(in: response)))
     }
 
-    /// A page's sections, or none should the request fail.
     private func browseSections(_ id: String, params: String? = nil) async -> [Section] {
         guard let response = try? await innerTube.browse(id, params: params, authenticated: false) else { return [] }
         return Renderers.sections(Renderers.sectionList(in: response))
@@ -98,14 +83,12 @@ extension YTMusic {
     }
 }
 
-/// The moods & genres chips, as `FEmusic_moods_and_genres` lists them: its
-/// last two grids, moods first, as rustypipe's `music_genres` reads them.
+/// The last two grids of `FEmusic_moods_and_genres`, moods first.
 struct MoodsAndGenres: Sendable {
     var moods: [Card]
     var genres: [Card]
 
-    /// Throws for a reply with no chips, an error or a layout the app
-    /// doesn't know, as rustypipe does, so it isn't kept for the session.
+    /// Throws for a reply with no chips, so it isn't kept for the session.
     init(_ response: JSON) throws {
         let grids = Renderers.sectionList(in: response)["contents"].array.suffix(2).map { section in
             section["gridRenderer", "items"].array.compactMap { Renderers.genreCard($0["musicNavigationButtonRenderer"]) }
@@ -118,19 +101,16 @@ struct MoodsAndGenres: Sendable {
         }
     }
 
-    /// Every chip, moods first.
     var all: [Card] { moods + genres }
 }
 
-/// The charts page as ytm-native reads it for Home, after rustypipe's
-/// `music_charts`: shelves whose "More" opens a playlist are chart lists
-/// (top songs, then trending); the rest hold the chart playlists and the
-/// top artists.
+/// Shelves whose "More" opens a playlist are chart lists (top songs, then
+/// trending); the rest hold the chart playlists and the top artists.
 struct Charts: Sendable {
     static let browseId = "FEmusic_charts"
     static let params = "sgYPRkVtdXNpY19leHBsb3Jl"
 
-    /// The trending playlist, whose tracks the chart lists no longer carry.
+    /// The chart lists come without tracks, so trending is read from here.
     var trendingPlaylistId: String?
     /// The trending chart's own tracks, should there be no such playlist.
     var trendingTracks: [Track]
@@ -148,14 +128,12 @@ struct Charts: Sendable {
 }
 
 private extension Section {
-    /// The section's tracks; none for a card row.
     var tracks: [Track] {
         if case .tracks(let s) = self { s.tracks } else { [] }
     }
 }
 
 private extension [Section] {
-    /// The cards of `kind` across the sections, in order.
     func cards(_ kind: CardKind) -> [Card] {
         flatMap { section -> [Card] in
             guard case .cards(let s) = section else { return [] }
@@ -164,9 +142,8 @@ private extension [Section] {
     }
 }
 
-/// A value fetched once and kept for the session. Callers arriving while it
-/// is fetched share that fetch; a failure isn't kept, so the next caller
-/// asks again.
+/// A value kept for the session. Callers arriving mid-fetch share it; a
+/// failure isn't kept, so the next caller asks again.
 actor SessionCache<Value: Sendable> {
     private var cached: Value?
     private var fetching: Task<Value, any Error>?

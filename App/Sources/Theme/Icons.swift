@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// ytm-native's `Icons` global: Material Symbols paths on a 24×24 grid,
-/// drawn as native shapes. All paths are parsed together, once, the first
-/// time any icon is drawn.
+/// Material Symbols paths on a 24×24 grid, all parsed once on the first draw.
 nonisolated enum Icon: CaseIterable, Sendable {
     case home, homeOutline, explore, library, search
     case play, pause, next, previous, shuffle, sparkle, `repeat`, repeatOne
@@ -10,7 +8,6 @@ nonisolated enum Icon: CaseIterable, Sendable {
     case close, queue, lyrics, radio, account, note, more, clock, history
     case thumbUp, thumbUpFilled, thumbDown, thumbDownFilled, check, add, chevron
 
-    /// The path on the 24×24 grid.
     var path: Path { Self.paths[self] ?? Path() }
 
     private static let paths: [Icon: Path] = Dictionary(uniqueKeysWithValues: allCases.map { ($0, SVGPath.parse($0.data)) })
@@ -28,7 +25,6 @@ nonisolated enum Icon: CaseIterable, Sendable {
         case .next: "M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"
         case .previous: "M6 6h2v12H6zm3.5 6l8.5 6V6z"
         case .shuffle: "M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"
-        // Sparkles, for Smart Shuffle and the tracks it mixes in.
         case .sparkle: "M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"
         case .repeat: "M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"
         case .repeatOne: "M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"
@@ -55,7 +51,6 @@ nonisolated enum Icon: CaseIterable, Sendable {
     }
 }
 
-/// An icon's path scaled from the 24×24 grid to the rectangle it fills.
 nonisolated struct IconShape: Shape {
     let icon: Icon
 
@@ -67,15 +62,13 @@ nonisolated struct IconShape: Shape {
 }
 
 extension Image {
-    /// An icon as a template image, for the tab bar, which draws UIKit
-    /// images rather than SwiftUI shapes. Each is drawn once.
+    /// For the tab bar, which draws UIKit images rather than SwiftUI shapes.
     init(icon: Icon) {
         self.init(uiImage: TemplateIcons.image(for: icon))
     }
 }
 
-/// Icons drawn into template images at the 24-point grid's own size, kept
-/// as the tab bar asks for them again with every redraw of the tabs.
+/// Kept, as the tab bar asks for them again with every redraw of the tabs.
 private enum TemplateIcons {
     private static let size = CGSize(width: 24, height: 24)
     private static var drawn: [Icon: UIImage] = [:]

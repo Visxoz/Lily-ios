@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import YTMCore
 
-/// ytm-native's `api/library.rs` tests.
 @Suite struct LibraryEditsTests {
     private func json(_ text: String) throws -> JSON {
         try JSON(data: Data(text.utf8))
