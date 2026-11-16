@@ -19,9 +19,9 @@ public struct RGB: Codable, Hashable, Sendable {
 }
 
 /// Colours taken from artwork, as ytm-native's `images.rs`: a dark accent
-/// for backgrounds behind white text (page headers, Now Playing), a vivid
-/// one for controls when the accent follows the artwork, and either made
-/// readable in each look.
+/// for page headers behind white text, a grid of the artwork's colours for
+/// Now Playing, and a vivid one for controls when the accent follows the
+/// artwork, each made readable in each look.
 public enum ArtworkPalette {
     /// The least saturation `accent` gives, which greyish artwork gets.
     private static let minSaturation = 0.25
@@ -33,6 +33,9 @@ public enum ArtworkPalette {
     private static let hues = 12
     /// The edge of the copy sampled, never the full image.
     private static let sampleEdge = 16
+    /// The edge of the grid `colours` spreads the artwork's colours over,
+    /// each cell a block of the sample.
+    public static let meshEdge = 4
 
     /// One hue's pixels: red, green and blue summed by weight, the weight,
     /// and how much colour they carry.
@@ -40,11 +43,23 @@ public enum ArtworkPalette {
         var r = 0.0, g = 0.0, b = 0.0, weight = 0.0, chroma = 0.0
     }
 
+    /// The artwork's `accent`, and its colours across a `meshEdge`-square
+    /// grid, row by row from the top, as a blurred copy of it would show
+    /// them, for Now Playing's background. One sample serves both.
+    public static func colours(_ image: CGImage) -> (accent: RGB, mesh: [RGB]) {
+        let pixels = sample(image)
+        return (accent(pixels), mesh(pixels))
+    }
+
     /// The artwork's strongest colour, darkened enough for white text, as
     /// Spotify tints its page headers. ytm-native's `accent_of`.
     public static func accent(_ image: CGImage) -> RGB {
+        accent(sample(image))
+    }
+
+    private static func accent(_ pixels: [RGB]) -> RGB {
         var pools = [Pool](repeating: Pool(), count: hues)
-        for pixel in sample(image) {
+        for pixel in pixels {
             let (h, s, l) = hsl(pixel)
             // Saturated mid-tones count; greys, black and white hardly do.
             let chroma = s * (1 - abs(2 * l - 1))
@@ -78,6 +93,31 @@ public enum ArtworkPalette {
         // Bright hues such as yellow are darkened further to keep white text
         // at 4.5:1.
         return readable(fromHSL(h, saturation, 0.32), light: true)
+    }
+
+    /// Each cell's mean, keeping its hue with no more colour than the area
+    /// has, so greys stay grey, within the accent's band of lightness, so
+    /// white text reads across them all as it does on the accent.
+    private static func mesh(_ pixels: [RGB]) -> [RGB] {
+        let block = sampleEdge / meshEdge
+        let count = Double(block * block)
+        return (0..<meshEdge * meshEdge).map { cell in
+            let (row, column) = cell.quotientAndRemainder(dividingBy: meshEdge)
+            var (r, g, b) = (0.0, 0.0, 0.0)
+            for y in row * block..<(row + 1) * block {
+                for pixel in pixels[(y * sampleEdge + column * block)..<(y * sampleEdge + (column + 1) * block)] {
+                    r += pixel.r
+                    g += pixel.g
+                    b += pixel.b
+                }
+            }
+            let mean = RGB(r: r / count, g: g / count, b: b / count)
+            let (h, _, l) = hsl(mean)
+            // Chroma rather than saturation, which runs high for near-black
+            // with a cast.
+            let chroma = max(mean.r, mean.g, mean.b) - min(mean.r, mean.g, mean.b)
+            return readable(rgb(h, min(chroma * 1.5, 0.8), 0.25 + l * 0.1), light: true)
+        }
     }
 
     /// The artwork's colour for controls drawn in it, or nil for greyish
@@ -124,24 +164,27 @@ public enum ArtworkPalette {
         return 0.2126 * linear(colour.r) + 0.7152 * linear(colour.g) + 0.0722 * linear(colour.b)
     }
 
-    /// The pixels of `image` scaled to 16 × 16 in sRGB, or none when it
-    /// can't be drawn.
+    /// The centre square of `image` scaled to 16 × 16 in sRGB, black where
+    /// it can't be drawn.
     private static func sample(_ image: CGImage) -> [RGB] {
         let edge = sampleEdge
         var bytes = [UInt8](repeating: 0, count: edge * edge * 4)
-        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+        bytes.withUnsafeMutableBytes { buffer in
             guard let space = CGColorSpace(name: CGColorSpace.sRGB),
                   let context = CGContext(
                       data: buffer.baseAddress, width: edge, height: edge, bitsPerComponent: 8,
                       bytesPerRow: edge * 4, space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
                   )
-            else { return false }
+            else { return }
             // Averages each area, as ytm-native's triangle filter does.
             context.interpolationQuality = .high
-            context.draw(image, in: CGRect(x: 0, y: 0, width: edge, height: edge))
-            return true
+            // The centre square, as the artwork views crop to fill, so a video's
+            // wide thumbnail gives the colours shown rather than its edges'.
+            let scale = Double(edge) / Double(min(image.width, image.height))
+            let width = Double(image.width) * scale
+            let height = Double(image.height) * scale
+            context.draw(image, in: CGRect(x: (Double(edge) - width) / 2, y: (Double(edge) - height) / 2, width: width, height: height))
         }
-        guard drawn else { return [] }
         return stride(from: 0, to: bytes.count, by: 4).map {
             RGB(r: Double(bytes[$0]) / 255, g: Double(bytes[$0 + 1]) / 255, b: Double(bytes[$0 + 2]) / 255)
         }

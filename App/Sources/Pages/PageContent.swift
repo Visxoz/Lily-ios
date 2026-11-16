@@ -110,11 +110,11 @@ struct PageContent: View {
                 artworkTint = cached
                 return
             }
-            if let colours = await ArtworkColours.of(url: tintSource.url, pixelEdge: tintSource.pixels) {
-                artworkTint = colours.background
+            if let background = await ArtworkColours.background(url: tintSource.url, pixelEdge: tintSource.pixels) {
+                artworkTint = background
                 // Emptied once full rather than evicted one by one: past 64 pages, a revisit only fades in again.
                 if Self.tints.count >= 64 { Self.tints.removeAll() }
-                Self.tints[tintSource.url] = colours.background
+                Self.tints[tintSource.url] = background
             }
         }
         // As ytm-native's `load_art`: the page's art is fetched as the page is

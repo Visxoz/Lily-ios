@@ -150,7 +150,9 @@ The sign-in is kept in the iPhone's Keychain, for this device only. Google's pag
 <summary><b>Connecting Last.fm</b></summary>
 <br>
 
-Create an API account at [last.fm/api](https://www.last.fm/api/account/create), then enter its key and secret once under **Settings ▸ Account ▸ Last.fm** and tap **Connect**. Approve the app on Last.fm's page, and plays scrobble from then on, including ones made while you were offline.
+Tap **Settings ▸ Account ▸ Last.fm ▸ Connect**, then allow access on Last.fm's page. Plays scrobble from then on, including ones made while you were offline.
+
+Building it yourself? Last.fm needs an [API account](https://www.last.fm/api/account/create). Put its key and secret in `Config/Secrets.xcconfig` as `LASTFM_API_KEY = …` and `LASTFM_API_SECRET = …`; without them, Settings says Last.fm is unavailable.
 
 </details>
 

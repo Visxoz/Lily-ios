@@ -5,7 +5,7 @@ import YTMCore
 /// the mini player, in two pages a swipe moves between: the artwork, title,
 /// seek bar, transport, and the volume, quality badge and panel buttons;
 /// and below it the same controls folded into one row over the Up next and
-/// Lyrics chips with the queue or the lyrics, all over the artwork's colour.
+/// Lyrics chips with the queue or the lyrics, all over the artwork's colours.
 ///
 /// The pages scroll natively, so a swipe follows the finger and can't be
 /// lost to the zoom's own close. At the artwork a swipe down closes the
@@ -192,17 +192,28 @@ private struct LargeArtwork: View {
     }
 }
 
-/// Behind the screen, the artwork's colour darkening downwards, as the
-/// side panel's lyrics, fading as the song changes; the panel's own colour
-/// without artwork.
+/// Behind the screen, the artwork's colours where they sit in it, as a
+/// blurred copy would show them without the cost of blurring, darkening
+/// downwards as Spotify's, and fading as the song changes; the panel's own
+/// colour without artwork.
 private struct NowPlayingBackground: View {
+    private static let edge = ArtworkPalette.meshEdge
+    /// An even grid, its outer points on the screen's edges.
+    private static let points = (0..<edge * edge).map { cell in
+        SIMD2(Float(cell % edge), Float(cell / edge)) / Float(edge - 1)
+    }
+
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
     var body: some View {
         Group {
-            if let colour = app.artwork?.background {
-                LinearGradient(colors: [theme.tint(colour), theme.tint(colour.darker(0.5))], startPoint: .top, endPoint: .bottom)
+            if let mesh = app.artwork?.mesh {
+                // Each row darker than the one above, the bottom by a third.
+                let colours = mesh.enumerated().map { cell, colour in
+                    theme.tint(colour.darker(Double(cell / Self.edge) / Double(2 * (Self.edge - 1))))
+                }
+                MeshGradient(width: Self.edge, height: Self.edge, points: Self.points, colors: colours)
             } else {
                 theme.panel
             }

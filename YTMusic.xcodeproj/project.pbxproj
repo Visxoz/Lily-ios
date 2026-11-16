@@ -14,6 +14,7 @@
 
 /* Begin PBXFileReference section */
 		AA0000000000000000000A01 /* YTMusic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YTMusic.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000A02 /* YTMusic.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = YTMusic.xcconfig; path = Config/YTMusic.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -55,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000000000000000000S01 /* App */,
+				AA0000000000000000000A02 /* YTMusic.xcconfig */,
 				AA0000000000000000000G02 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -192,6 +194,7 @@
 		};
 		AA0000000000000000000C03 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000000000000000000A02 /* YTMusic.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -218,6 +221,7 @@
 		};
 		AA0000000000000000000C04 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000000000000000000A02 /* YTMusic.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

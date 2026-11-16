@@ -2,10 +2,20 @@ import CryptoKit
 import Foundation
 
 extension LastFM {
-    /// The user's API account, which ytm-native builds in instead.
-    struct Keys: Codable, Equatable, Sendable {
+    /// The app's API account, built in as ytm-native's from the
+    /// `LASTFM_API_KEY` and `LASTFM_API_SECRET` build settings.
+    struct Keys: Sendable {
         var apiKey: String
         var apiSecret: String
+
+        /// Nil in a build without them, whose settings expand to nothing.
+        static let builtIn: Keys? = {
+            func value(_ key: String) -> String? {
+                (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap { $0.isEmpty ? nil : $0 }
+            }
+            guard let apiKey = value("LastFMAPIKey"), let apiSecret = value("LastFMAPISecret") else { return nil }
+            return Keys(apiKey: apiKey, apiSecret: apiSecret)
+        }()
     }
 
     /// A connected account. The key does not expire; the user can revoke it
@@ -34,8 +44,8 @@ extension LastFM {
         /// Last.fm will never take the request as it is: invalid parameters,
         /// or a token that expired.
         case rejected(String)
-        /// The keys the user entered are wrong, which ytm-native's built-in
-        /// ones never are. Plays wait, as for `failed`, but connecting stops.
+        /// The built-in keys are unknown, suspended or mismatched. Plays
+        /// wait, as for `failed`, but connecting stops.
         case invalidKeys
         /// Last.fm could not be reached or could not answer; try again later.
         case failed(String)

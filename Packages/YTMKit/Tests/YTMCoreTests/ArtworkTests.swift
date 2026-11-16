@@ -80,6 +80,22 @@ private actor DownloadLog {
         #expect(ArtworkPalette.luminance(fixed) <= 0.3, "dark enough behind white icons")
         #expect(fixed.r > fixed.b, "keeps its hue")
     }
+
+    @Test func meshKeepsColoursWhereTheySit() throws {
+        let mesh = ArtworkPalette.colours(try image { _, y in y < 4 ? (230, 20, 20) : (255, 255, 255) }).mesh
+        #expect(mesh.count == ArtworkPalette.meshEdge * ArtworkPalette.meshEdge)
+        let (top, bottom) = (mesh[0], mesh[mesh.count - 1])
+        #expect(top.r > top.g && top.r > top.b, "red at the top, where the artwork has it")
+        #expect(abs(bottom.r - bottom.g) < 0.01 && abs(bottom.g - bottom.b) < 0.01, "white stays grey")
+        #expect(mesh.allSatisfy { ArtworkPalette.luminance($0) <= 0.18 }, "white text reads across it")
+    }
+
+    @Test func readsAWideThumbnailAsShownCroppedToASquare() throws {
+        // Blue in the middle, between black bars that a square crop leaves out.
+        let (accent, mesh) = ArtworkPalette.colours(try image(16, 8) { x, _ in (4..<12).contains(x) ? (40, 80, 220) : (0, 0, 0) })
+        #expect(accent.b > accent.r && accent.b > accent.g)
+        #expect(mesh.allSatisfy { $0.b > $0.r + 0.05 }, "no cell takes the bars")
+    }
 }
 
 @Suite struct ImagePipelineTests {

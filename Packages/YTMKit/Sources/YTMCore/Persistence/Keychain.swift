@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-/// Secrets (the sign-in cookies, Last.fm's keys and session) as generic
+/// Secrets (the sign-in cookies and the Last.fm session) as generic
 /// passwords that stay on this device.
 enum Keychain {
     private static let service = "YTMusic"

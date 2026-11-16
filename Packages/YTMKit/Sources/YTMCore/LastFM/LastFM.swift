@@ -5,9 +5,9 @@ import os
 /// connecting an account through the browser, showing what is playing, and
 /// logging plays, queued on disk until Last.fm takes them.
 ///
-/// ytm-native builds its API keys in; here the user enters theirs once. The
-/// keys and the account's session live in the Keychain. When a play counts
-/// is the player's to judge; this sends what it is given.
+/// The API keys are built in, as ytm-native's, and the account's session
+/// lives in the Keychain. When a play counts is the player's to judge; this
+/// sends what it is given.
 public actor LastFM {
     public static let shared = LastFM(store: .shared)
 
@@ -20,14 +20,13 @@ public actor LastFM {
     /// the plays, or refused one.
     static let retryAfter = Duration.seconds(60)
 
-    private static let keysItem = "lastfm.keys"
     private static let sessionItem = "lastfm.session"
     private static let log = Logger(subsystem: "YTMusic", category: "LastFM")
 
     private let store: FileStore
+    private let keys = Keys.builtIn
     // Read on first use rather than at launch, so neither the Keychain nor
     // the disk is touched on the main actor.
-    private lazy var keys: Keys? = Self.read(Keys.self, from: Self.keysItem)
     private lazy var session: Session? = Self.read(Session.self, from: Self.sessionItem)
     private lazy var pending = loadPending()
     /// A batch is on its way to Last.fm.
@@ -56,20 +55,9 @@ public actor LastFM {
     }
 
     public var username: String? { session?.name }
-    public var hasKeys: Bool { keys != nil }
-
-    /// Keeps the user's API key and secret, or forgets them when either is
-    /// empty. A different key ends the session, which belongs to the old one.
-    public func setKeys(apiKey: String, apiSecret: String) {
-        let apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let apiSecret = apiSecret.trimmingCharacters(in: .whitespacesAndNewlines)
-        let new = apiKey.isEmpty || apiSecret.isEmpty ? nil : Keys(apiKey: apiKey, apiSecret: apiSecret)
-        guard new != keys else { return }
-        let sameKey = new?.apiKey == keys?.apiKey
-        keys = new
-        Self.write(new, to: Self.keysItem)
-        if !sameKey, session != nil { end() }
-    }
+    /// Whether this build has the API keys, without which Settings offers
+    /// no Connect, as ytm-native's `available`.
+    public static var isAvailable: Bool { Keys.builtIn != nil }
 
     /// Connects an account: opens the page where the user allows access,
     /// then asks every few seconds whether they have, through any brief
@@ -77,7 +65,7 @@ public actor LastFM {
     /// another sign-in or a sign-out.
     public func signIn(open: @Sendable (URL) async -> Void) async throws {
         guard let keys else {
-            throw YTMError(.refused, "Enter your Last.fm API key and secret first.")
+            throw YTMError(.refused, "Last.fm isn't available in this build.")
         }
         generation += 1
         let generation = generation
@@ -104,7 +92,7 @@ public actor LastFM {
         } catch let failure as Failure {
             Self.log.error("Could not connect Last.fm: \(String(describing: failure), privacy: .public)")
             throw failure == .invalidKeys
-                ? YTMError(.refused, "Last.fm didn't accept the API key and secret. Check them and try again.")
+                ? YTMError(.refused, "Last.fm didn't accept this build's API key.")
                 : YTMError(.network, "Couldn't connect to Last.fm. Try again in a moment.")
         }
     }
