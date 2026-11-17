@@ -1,4 +1,4 @@
-# YouTube changes without warning, so its pages, streams and audio are checked daily, signed out.
+# YouTube changes without warning, so its pages, lyrics and radio are checked daily, signed out.
 name: Live checks
 
 on:
@@ -40,5 +40,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: swift run ytmcheck all
+      # YouTube asks a datacenter address to sign in before it gives out streams, so the stream,
+      # Premium and audio checks only work from home: `swift run ytmcheck all` on a Mac.
+      - run: |
+          status=0
+          for group in pages lyrics radio; do swift run ytmcheck "$group" || status=1; done
+          exit $status
         working-directory: Packages/YTMKit
