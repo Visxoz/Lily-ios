@@ -1,42 +1,83 @@
-# Pushing a tag v<version> (annotated, its message being the release notes) checks, builds and
-# publishes that version with its app source. Run by hand, it does all but publish, as a dry run.
+# Called by CI once a commit on main passes its checks. When the app's version has no tag yet,
+# it builds that version, then tags the commit and publishes it with its app source, so bumping
+# MARKETING_VERSION is all a release takes.
 name: Release
 
 on:
-  push:
-    tags: ['v*']
-  workflow_dispatch:
+  workflow_call:
+    secrets:
+      LASTFM_API_KEY:
+        required: true
+      LASTFM_API_SECRET:
+        required: true
 
 permissions: {}
-
-# One at a time, so each release's source builds on the one before.
-concurrency:
-  group: release
-  cancel-in-progress: false
 
 defaults:
   run:
     shell: bash
 
 jobs:
-  checks:
-    name: Checks
-    uses: ./.github/workflows/ci.yml
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      previous: ${{ steps.version.outputs.previous }}
+      new: ${{ steps.version.outputs.new }}
+    steps:
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          versions=$(gh api "repos/$REPO/contents/Lily.xcodeproj/project.pbxproj?ref=$GITHUB_SHA" -H 'Accept: application/vnd.github.raw' \
+            | grep -oE 'MARKETING_VERSION = [^;]+' | cut -d' ' -f3 | sort -u)
+          if [[ ! $versions =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error::MARKETING_VERSION should be one version, the same in every configuration, not: $versions"
+            exit 1
+          fi
+          version=$versions
+          previous=$(gh release list --repo "$REPO" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')
+          tagged=$(gh api "repos/$REPO/git/matching-refs/tags/v$version" --jq "any(.[]; .ref == \"refs/tags/v$version\")")
+
+          if [[ -n $previous && $(printf '%s\n' "${previous#v}" "$version" | sort -V | tail -n 1) != "$version" ]]; then
+            echo "::error::Version $version is older than the latest release, $previous."
+            exit 1
+          fi
+          # Only the latest release's own tag may already exist; any other was made by hand or outlived
+          # its release, and releasing over it would name some other commit.
+          new=true
+          if [[ $tagged == true ]]; then
+            if [[ v$version != "$previous" ]]; then
+              echo "::error::v$version is tagged but isn't the latest release. Bump the version, or delete the tag."
+              exit 1
+            fi
+            new=false
+          fi
+          printf 'version=%s\nprevious=%s\nnew=%s\n' "$version" "$previous" "$new" >> "$GITHUB_OUTPUT"
+          echo "Version $version: $([[ $new == true ]] && echo 'new, so it will be released' || echo 'already released')."
 
   build:
     name: Build
-    needs: checks
+    needs: version
+    if: needs.version.outputs.new == 'true'
     runs-on: xcode-27
     timeout-minutes: 30
     permissions:
       contents: read
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      VERSION: ${{ needs.version.outputs.version }}
+      PREVIOUS: ${{ needs.version.outputs.previous }}
     steps:
+      # The whole history, for the release notes' commits since the last release.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Add the Last.fm keys
@@ -59,36 +100,25 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           info() { /usr/libexec/PlistBuddy -c "Print $1" build/DerivedData/Build/Products/Release-iphoneos/Lily.app/Info.plist; }
-          version=$(info CFBundleShortVersionString)
-          build=$(info CFBundleVersion)
-          min_os=$(info MinimumOSVersion)
-          tag=v$version
-          if [[ $GITHUB_REF_TYPE == tag && $GITHUB_REF_NAME != "$tag" ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME doesn't match the app's version, $version."
+          if [[ $(info CFBundleShortVersionString) != "$VERSION" ]]; then
+            echo "::error::The app was built as $(info CFBundleShortVersionString), not $VERSION."
             exit 1
           fi
+          tag=v$VERSION
 
-          # Asked of the API, as checkout fetches the tag's commit and loses an annotated tag's message.
-          object=
-          if [[ $GITHUB_REF_TYPE == tag ]]; then
-            object=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.type + " " + .object.sha')
-          fi
-          if [[ $object == "tag "* ]]; then
-            gh api "repos/$REPO/git/tags/${object#tag }" --jq .message > build/notes.md
+          # What a user would notice, from the commit subjects, as commits go straight to main.
+          if [[ -n $PREVIOUS ]]; then
+            git log --reverse --format=%s "$PREVIOUS..$GITHUB_SHA" | sed -nE 's/^(feat|fix|perf): /- /p' > build/notes.md
+            [[ -s build/notes.md ]] || echo "Lily $VERSION." > build/notes.md
+            gh release download "$PREVIOUS" --repo "$REPO" --pattern source.json --output "$RUNNER_TEMP/previous.json"
           else
-            echo "Lily $version." > build/notes.md
-          fi
-
-          # Earlier versions come from the release this one will replace as the latest.
-          if [[ $(gh release list --repo "$REPO" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq length) == 0 ]]; then
+            echo "The first release of Lily." > build/notes.md
             echo '{}' > "$RUNNER_TEMP/previous.json"
-          else
-            gh release download --repo "$REPO" --pattern source.json --output "$RUNNER_TEMP/previous.json"
           fi
 
           size=$(stat -f%z build/Lily.ipa)
           sha=$(shasum -a 256 build/Lily.ipa | cut -d' ' -f1)
-          jq --arg version "$version" --arg build "$build" --arg min_os "$min_os" \
+          jq --arg version "$VERSION" --arg build "$(info CFBundleVersion)" --arg min_os "$(info MinimumOSVersion)" \
             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg sha "$sha" --argjson size "$size" \
             --arg url "https://github.com/$REPO/releases/download/$tag/Lily.ipa" \
             --rawfile notes build/notes.md --slurpfile previous "$RUNNER_TEMP/previous.json" '
@@ -111,8 +141,7 @@ jobs:
 
   publish:
     name: Publish
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -124,9 +153,8 @@ jobs:
         with:
           name: release
 
-      # Lets anyone check the .ipa was built here, from this tag. GitHub only attests public repositories for free.
-      - if: ${{ !github.event.repository.private }}
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      # Lets anyone check the .ipa was built here, from this commit.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: Lily.ipa
 
@@ -134,10 +162,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          if [[ $(gh api "repos/$REPO/commits/$TAG" --jq .sha) != "$GITHUB_SHA" ]]; then
-            echo "::error::$TAG moved during the run, so it no longer names what was built."
-            exit 1
-          fi
-          gh release create "$TAG" Lily.ipa source.json --repo "$REPO" --title "Lily ${TAG#v}" --notes-file notes.md --verify-tag
+          gh release create "v$VERSION" Lily.ipa source.json --repo "$REPO" --target "$GITHUB_SHA" \
+            --title "Lily $VERSION" --notes-file notes.md

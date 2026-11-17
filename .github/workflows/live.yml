@@ -34,6 +34,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || needs.visibility.outputs.public == 'true'
     runs-on: xcode-27
     timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
@@ -47,3 +50,18 @@ jobs:
           for group in pages lyrics radio; do swift run ytmcheck "$group" || status=1; done
           exit $status
         working-directory: Packages/YTMKit
+
+      # One open issue per breakage, commented on while it lasts, rather than a failed run nobody opens.
+      - name: Open an issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Live checks are failing"
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq '.[0].number // ""')
+          if [[ -n $existing ]]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "Still failing: $run"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "A daily check against YouTube failed; its log names the check: $run"
+          fi
