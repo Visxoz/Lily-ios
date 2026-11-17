@@ -1,0 +1,143 @@
+# Pushing a tag v<version> (annotated, its message being the release notes) checks, builds and
+# publishes that version with its app source. Run by hand, it does all but publish, as a dry run.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions: {}
+
+# One at a time, so each release's source builds on the one before.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  build:
+    name: Build
+    needs: checks
+    runs-on: xcode-27
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Add the Last.fm keys
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+        run: |
+          if [[ -z $LASTFM_API_KEY || -z $LASTFM_API_SECRET ]]; then
+            echo "::error::The LASTFM_API_KEY and LASTFM_API_SECRET secrets are missing."
+            exit 1
+          fi
+          printf 'LASTFM_API_KEY = %s\nLASTFM_API_SECRET = %s\n' "$LASTFM_API_KEY" "$LASTFM_API_SECRET" > Config/Secrets.xcconfig
+
+      - name: Build Lily.ipa
+        run: zsh scripts/build-ipa.sh
+
+      - name: Write the app source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          info() { /usr/libexec/PlistBuddy -c "Print $1" build/DerivedData/Build/Products/Release-iphoneos/Lily.app/Info.plist; }
+          version=$(info CFBundleShortVersionString)
+          build=$(info CFBundleVersion)
+          min_os=$(info MinimumOSVersion)
+          tag=v$version
+          if [[ $GITHUB_REF_TYPE == tag && $GITHUB_REF_NAME != "$tag" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match the app's version, $version."
+            exit 1
+          fi
+
+          # Asked of the API, as checkout fetches the tag's commit and loses an annotated tag's message.
+          object=
+          if [[ $GITHUB_REF_TYPE == tag ]]; then
+            object=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.type + " " + .object.sha')
+          fi
+          if [[ $object == "tag "* ]]; then
+            gh api "repos/$REPO/git/tags/${object#tag }" --jq .message > build/notes.md
+          else
+            echo "Lily $version." > build/notes.md
+          fi
+
+          # Earlier versions come from the release this one will replace as the latest.
+          if [[ $(gh release list --repo "$REPO" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq length) == 0 ]]; then
+            echo '{}' > "$RUNNER_TEMP/previous.json"
+          else
+            gh release download --repo "$REPO" --pattern source.json --output "$RUNNER_TEMP/previous.json"
+          fi
+
+          size=$(stat -f%z build/Lily.ipa)
+          sha=$(shasum -a 256 build/Lily.ipa | cut -d' ' -f1)
+          jq --arg version "$version" --arg build "$build" --arg min_os "$min_os" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg sha "$sha" --argjson size "$size" \
+            --arg url "https://github.com/$REPO/releases/download/$tag/Lily.ipa" \
+            --rawfile notes build/notes.md --slurpfile previous "$RUNNER_TEMP/previous.json" '
+            .apps[0].versions = [{
+              version: $version, buildVersion: $build, date: $date, downloadURL: $url, size: $size,
+              sha256: $sha, minOSVersion: $min_os, localizedDescription: ($notes | sub("\\s+$"; ""))
+            }] + [($previous[0].apps[0].versions // [])[] | select(.version != $version)]
+          ' docs/source.json > build/source.json
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            build/Lily.ipa
+            build/source.json
+            build/notes.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    name: Publish
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+
+      # Lets anyone check the .ipa was built here, from this tag. GitHub only attests public repositories for free.
+      - if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: Lily.ipa
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ $(gh api "repos/$REPO/commits/$TAG" --jq .sha) != "$GITHUB_SHA" ]]; then
+            echo "::error::$TAG moved during the run, so it no longer names what was built."
+            exit 1
+          fi
+          gh release create "$TAG" Lily.ipa source.json --repo "$REPO" --title "Lily ${TAG#v}" --notes-file notes.md --verify-tag

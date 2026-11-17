@@ -6,6 +6,7 @@
 
 [![Release](https://img.shields.io/github/v/release/Visxoz/Lily-ios?style=flat&labelColor=18181b&color=d65db1&label=release)](https://github.com/Visxoz/Lily-ios/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Visxoz/Lily-ios/total?style=flat&labelColor=18181b&color=d65db1&label=downloads)](https://github.com/Visxoz/Lily-ios/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Visxoz/Lily-ios/ci.yml?branch=main&style=flat&labelColor=18181b&label=CI)](https://github.com/Visxoz/Lily-ios/actions/workflows/ci.yml)
 [![iOS 26](https://img.shields.io/badge/iOS-26-0a84ff?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#install)
 [![Swift 6.4](https://img.shields.io/badge/Swift-6.4-f05138?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0a84ff?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
@@ -13,9 +14,9 @@
 
 <br>
 
-<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json"><img src="docs/add-altstore.svg" height="44" alt="Add to AltStore"></a>
-<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json"><img src="docs/add-sidestore.svg" height="44" alt="Add to SideStore"></a>
-<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json"><img src="docs/add-feather.svg" height="44" alt="Add to Feather"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-altstore.svg" height="44" alt="Add to AltStore"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-sidestore.svg" height="44" alt="Add to SideStore"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-feather.svg" height="44" alt="Add to Feather"></a>
 <a href="https://github.com/Visxoz/Lily-ios/releases/latest"><img src="docs/get-github.svg" height="44" alt="Download from GitHub"></a>
 
 <sub>Free, for iOS 26 and later · open this page on your iPhone and tap a store to add Lily, with updates as they come</sub>
@@ -151,10 +152,12 @@ On your iPhone, tap **Add to AltStore**, **Add to SideStore** or **Add to Feathe
 If a button does nothing, add the source by hand: copy this link, and paste it in your store's **Sources** tab.
 
 ```
-https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json
+https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json
 ```
 
 Or grab `Lily.ipa` from the [latest release](https://github.com/Visxoz/Lily-ios/releases/latest) and open it with any of them. Lily works signed out straight away.
+
+Every release is built by [GitHub Actions](.github/workflows/release.yml) from its tag, never on anyone's computer. To check a download came from there, run `gh attestation verify Lily.ipa --repo Visxoz/Lily-ios --signer-workflow Visxoz/Lily-ios/.github/workflows/release.yml`.
 
 > [!NOTE]
 > Apps signed with a free Apple ID last seven days. AltStore and SideStore refresh them in the background; if they haven't, open the store and tap **Refresh All**.
@@ -248,7 +251,8 @@ cd Packages/YTMKit
 swift test               # the unit tests
 swift run ytmcheck all   # checks every page, stream and decode path against live YouTube
 cd ../..
-scripts/build-ipa.sh     # build/Lily.ipa, unsigned, and its entry in docs/source.json
+scripts/build-ipa.sh     # build/Lily.ipa, unsigned
+scripts/lint.sh          # the lint CI runs
 ```
 
 Or open `Lily.xcodeproj` and run it on the iPhone simulator.

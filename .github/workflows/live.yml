@@ -1,0 +1,44 @@
+# YouTube changes without warning, so its pages, streams and audio are checked daily, signed out.
+name: Live checks
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live
+  cancel-in-progress: true
+
+jobs:
+  # A scheduled run's event says nothing of the repository, so its visibility is asked for.
+  visibility:
+    name: Visibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      public: ${{ steps.check.outputs.public }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "public=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private | not')" >> "$GITHUB_OUTPUT"
+
+  youtube:
+    name: YouTube
+    needs: visibility
+    # A private repository pays for macOS minutes, so only a run asked for by hand happens there.
+    if: github.event_name == 'workflow_dispatch' || needs.visibility.outputs.public == 'true'
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: swift run ytmcheck all
+        working-directory: Packages/YTMKit
