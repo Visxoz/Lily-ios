@@ -291,7 +291,7 @@ extension PlaybackEngine {
     }
 
     func startPlayer() {
-        guard graph.start(), (try? graph.player.playAudio()) != nil else {
+        guard graph.start(), graph.play() else {
             outputFailed()
             return
         }

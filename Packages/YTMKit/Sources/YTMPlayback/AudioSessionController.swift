@@ -11,24 +11,48 @@ import os
     private var observers: [NotificationCenter.ObservationToken] = []
     /// The media services reset has no typed message, so it is observed by name.
     private var resetObserver: (any NSObjectProtocol)?
+    /// iOS 26 has no typed session messages either, so interruptions come by name there.
+    private var interruptionObserver: (any NSObjectProtocol)?
 
     init(player: PlayerController) {
         let session = AVAudioSession.sharedInstance()
         let center = NotificationCenter.default
-        observers = [
-            center.addObserver(of: session, for: .didBecomeInactive) { [weak self, weak player] message in
-                guard let self else { return }
-                // However the system took the session, the next play must ask
-                // for it again; only an interruption pauses the player.
-                isActive = false
-                guard let player, case .systemInterruption = message.deactivationResult else { return }
-                interrupted(player)
-            },
-            center.addObserver(of: session, for: .resumptionRecommendation) { [weak self, weak player] message in
+        if #available(iOS 27, *) {
+            observers = [
+                center.addObserver(of: session, for: .didBecomeInactive) { [weak self, weak player] message in
+                    guard let self else { return }
+                    // However the system took the session, the next play must ask
+                    // for it again; only an interruption pauses the player.
+                    isActive = false
+                    guard let player, case .systemInterruption = message.deactivationResult else { return }
+                    interrupted(player)
+                },
+                center.addObserver(of: session, for: .resumptionRecommendation) { [weak self, weak player] message in
+                    guard let self, let player else { return }
+                    resume(player, recommended: message.recommendation == .shouldResume)
+                },
+            ]
+        } else {
+            interruptionObserver = center.addObserver(
+                forName: AVAudioSession.interruptionNotification, object: session, queue: .main
+            ) { [weak self, weak player] notification in
+                let info = notification.userInfo
+                let type = (info?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
+                let options = AVAudioSession.InterruptionOptions(rawValue: info?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0)
                 guard let self, let player else { return }
-                resume(player, recommended: message.recommendation == .shouldResume)
-            },
-        ]
+                MainActor.assumeIsolated {
+                    switch type {
+                    case .began:
+                        isActive = false
+                        interrupted(player)
+                    case .ended:
+                        resume(player, recommended: options.contains(.shouldResume))
+                    default:
+                        break
+                    }
+                }
+            }
+        }
         resetObserver = center.addObserver(
             forName: AVAudioSession.mediaServicesWereResetNotification, object: session, queue: .main
         ) { [weak self, weak player] _ in
@@ -39,7 +63,9 @@ import os
 
     isolated deinit {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
-        if let resetObserver { NotificationCenter.default.removeObserver(resetObserver) }
+        for observer in [resetObserver, interruptionObserver].compactMap(\.self) {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     /// Must run before the engine plays; a no-op once active, until the system takes the session away.

@@ -37,20 +37,39 @@ final class AudioGraph {
         outputRate = rate > 0 ? rate : 48_000
         let format = AVAudioFormat(standardFormatWithSampleRate: outputRate, channels: 2)
         // Plain nodes at a standard format: the engine has no reason to refuse.
-        try? engine.connectNode(mixer, to: equaliser, fromBus: 0, toBus: 0, format: format)
-        try? engine.connectNode(equaliser, to: engine.outputNode, fromBus: 0, toBus: 0, format: format)
+        _ = connect(mixer, to: equaliser, format: format)
+        _ = connect(equaliser, to: engine.outputNode, format: format)
         applyEqualiser()
     }
 
     /// The player must be stopped, so a change of rate leaves a short gap. False if the engine refused.
     func connectPlayer(_ format: AVAudioFormat) -> Bool {
-        do {
-            try engine.connectNode(player, to: mixer, fromBus: 0, toBus: 0, format: format)
-        } catch {
-            return false
-        }
+        guard connect(player, to: mixer, format: format) else { return false }
         playerFormat = format
         return true
+    }
+
+    /// iOS 26 has only the raising form. It is safe with what arrives here, standard float stereo at a
+    /// positive rate, but raises if anything other than a mixer input changes while the engine runs.
+    private func connect(_ node: AVAudioNode, to next: AVAudioNode, format: AVAudioFormat?) -> Bool {
+        guard #available(iOS 27, *) else {
+            // After a device change the engine may already have been restarted; the seek that follows starts it again.
+            if engine.isRunning, !(next is AVAudioMixerNode) { engine.stop() }
+            engine.connect(node, to: next, fromBus: 0, toBus: 0, format: format)
+            return true
+        }
+        return (try? engine.connectNode(node, to: next, fromBus: 0, toBus: 0, format: format)) != nil
+    }
+
+    /// False if the player refused. On iOS 26, play() raises unless the player is connected and the
+    /// engine running; the engine can stop between `start` and here when the system takes the output.
+    func play() -> Bool {
+        guard #available(iOS 27, *) else {
+            guard engine.isRunning else { return false }
+            player.play()
+            return true
+        }
+        return (try? player.playAudio()) != nil
     }
 
     func start() -> Bool {

@@ -7,7 +7,7 @@ let strict: [SwiftSetting] = [
 
 let package = Package(
     name: "YTMKit",
-    platforms: [.iOS("27.2"), .macOS("27.0")],
+    platforms: [.iOS("26.0"), .macOS("27.0")],
     products: [
         .library(name: "YTMCore", targets: ["YTMCore"]),
         .library(name: "YTMAudio", targets: ["YTMAudio"]),
