@@ -6,14 +6,19 @@
 
 [![Release](https://img.shields.io/github/v/release/Visxoz/Lily-ios?style=flat&labelColor=18181b&color=d65db1&label=release)](https://github.com/Visxoz/Lily-ios/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Visxoz/Lily-ios/total?style=flat&labelColor=18181b&color=d65db1&label=downloads)](https://github.com/Visxoz/Lily-ios/releases)
-[![iOS 27.2](https://img.shields.io/badge/iOS-27.2-0a84ff?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#install)
+[![iOS 26](https://img.shields.io/badge/iOS-26-0a84ff?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#install)
 [![Swift 6.4](https://img.shields.io/badge/Swift-6.4-f05138?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0a84ff?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![Licence](https://img.shields.io/github/license/Visxoz/Lily-ios?style=flat&labelColor=18181b&color=3f3f46&label=licence)](LICENSE)
 
 <br>
 
-<a href="https://github.com/Visxoz/Lily-ios/releases/latest"><img src="docs/download.svg" width="300" alt="Download for iPhone"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json"><img src="docs/add-altstore.svg" height="44" alt="Add to AltStore"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json"><img src="docs/add-sidestore.svg" height="44" alt="Add to SideStore"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json"><img src="docs/add-feather.svg" height="44" alt="Add to Feather"></a>
+<a href="https://github.com/Visxoz/Lily-ios/releases/latest"><img src="docs/get-github.svg" height="44" alt="Download from GitHub"></a>
+
+<sub>Free, for iOS 26 and later · open this page on your iPhone and tap a store to add Lily, with updates as they come</sub>
 
 <br>
 
@@ -141,14 +146,18 @@ Find them behind the download button at the top of Library, and the settings in 
 
 ## Install
 
-Grab `Lily.ipa` from the [latest release](https://github.com/Visxoz/Lily-ios/releases/latest), then:
+On your iPhone, tap **Add to AltStore**, **Add to SideStore** or **Add to Feather** at the top of this page. Your store opens and adds Lily's source; install Lily from it, and new versions show up there as updates.
 
-1. Open it with **SideStore** (or share it to SideStore), or tap **+** in SideStore's My Apps and pick the file.
-2. SideStore signs it with your own Apple ID and installs it.
-3. Open **Lily**. It works signed out straight away.
+If a button does nothing, add the source by hand: copy this link, and paste it in your store's **Sources** tab.
+
+```
+https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/source.json
+```
+
+Or grab `Lily.ipa` from the [latest release](https://github.com/Visxoz/Lily-ios/releases/latest) and open it with any of them. Lily works signed out straight away.
 
 > [!NOTE]
-> Apps signed with a free Apple ID last seven days. SideStore refreshes them in the background; if it hasn't, open SideStore and tap **Refresh All**.
+> Apps signed with a free Apple ID last seven days. AltStore and SideStore refresh them in the background; if they haven't, open the store and tap **Refresh All**.
 
 ## Getting around
 
@@ -239,7 +248,7 @@ cd Packages/YTMKit
 swift test               # the unit tests
 swift run ytmcheck all   # checks every page, stream and decode path against live YouTube
 cd ../..
-scripts/build-ipa.sh     # build/Lily.ipa, unsigned, for SideStore
+scripts/build-ipa.sh     # build/Lily.ipa, unsigned, and its entry in docs/source.json
 ```
 
 Or open `Lily.xcodeproj` and run it on the iPhone simulator.
