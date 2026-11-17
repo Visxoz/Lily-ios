@@ -119,6 +119,7 @@ struct PillLabel: View {
 struct Pill: View {
     let title: String
     let active: Bool
+    var compact = false
     let action: () -> Void
 
     @Environment(\.theme) private var theme
@@ -126,9 +127,10 @@ struct Pill: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: compact ? 13 : 14, weight: .semibold))
                 .foregroundStyle(active ? theme.textInverse : theme.text)
-                .padding(.horizontal, 14)
+                .lineLimit(1)
+                .padding(.horizontal, compact ? 10 : 14)
                 .frame(height: 32)
                 .background(Capsule().fill(active ? theme.text : theme.hover))
                 .contentShape(Capsule())
@@ -143,10 +145,18 @@ struct PillGroup: View {
     let titles: [String]
     @Binding var selection: Int
 
+    /// Tighter pills only when the row won't fit, so no title is cut short.
     var body: some View {
-        HStack(spacing: 6) {
+        ViewThatFits(in: .horizontal) {
+            pills(compact: false)
+            pills(compact: true)
+        }
+    }
+
+    private func pills(compact: Bool) -> some View {
+        HStack(spacing: compact ? 4 : 6) {
             ForEach(titles.indices, id: \.self) { index in
-                Pill(title: titles[index], active: selection == index) { selection = index }
+                Pill(title: titles[index], active: selection == index, compact: compact) { selection = index }
             }
         }
     }
