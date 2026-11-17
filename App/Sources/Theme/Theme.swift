@@ -3,8 +3,8 @@ import YTMCore
 
 /// Views take their colours from here, never literals.
 nonisolated struct Theme: Equatable, Sendable {
-    /// YouTube Music's red, the accent when nothing else gives one.
-    static let youtubeRed = RGB(hex: 0xff0033)
+    /// Lily's orchid, the accent when nothing else gives one.
+    static let lily = RGB(hex: 0xd65db1)
 
     static let panelRadius: CGFloat = 8
     /// Every queue row is this tall, so a dragged row's place is arithmetic.
@@ -39,7 +39,7 @@ nonisolated struct Theme: Equatable, Sendable {
     /// Darkens the foot of an artist's banner behind its white text.
     let bannerShade = Color(rgb: .black).opacity(0.69)
 
-    /// Behind Home, a dark take on the accent; YouTube Music's red gives #5c0012.
+    /// Behind Home, a dark take on the accent; Lily's orchid gives #4d2140.
     private let homeTint: RGB
 
     init(look: Look, accent: RGB) {
@@ -66,7 +66,7 @@ nonisolated struct Theme: Equatable, Sendable {
 
     /// `artworkAccent` is the playing artwork's vivid colour, for the accent that follows it.
     init(settings: Settings, artworkAccent: RGB?) {
-        let accent = settings.accent.rgb.map(RGB.init(hex:)) ?? artworkAccent ?? Self.youtubeRed
+        let accent = settings.accent.rgb.map(RGB.init(hex:)) ?? artworkAccent ?? Self.lily
         self.init(look: settings.look, accent: ArtworkPalette.readable(accent, look: settings.look))
     }
 
@@ -96,7 +96,7 @@ nonisolated struct Theme: Equatable, Sendable {
 }
 
 extension EnvironmentValues {
-    @Entry var theme = Theme(look: .dark, accent: Theme.youtubeRed)
+    @Entry var theme = Theme(look: .black, accent: Theme.lily)
 }
 
 nonisolated extension RGB {

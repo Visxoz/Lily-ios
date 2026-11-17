@@ -4,7 +4,7 @@ import YTMCore
 
 extension Logger {
     /// Never cookies or stream URLs.
-    static let playback = Logger(subsystem: "YTMusic", category: "Playback")
+    static let playback = Logger(subsystem: "Lily", category: "Playback")
 }
 
 extension Result where Failure == any Error {

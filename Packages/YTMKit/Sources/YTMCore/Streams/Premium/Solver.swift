@@ -18,7 +18,7 @@ enum Solver {
     fileprivate static let checkInterval = 0.05
 
     /// Solves one at a time, off the cooperative pool, as a solve blocks.
-    private static let queue = DispatchQueue(label: "YTMusic.Solver", qos: .userInitiated)
+    private static let queue = DispatchQueue(label: "Lily.Solver", qos: .userInitiated)
 
     static func solve(_ code: String, n: String?, signature: String?) async throws -> Solution {
         try await withCheckedThrowingContinuation { continuation in

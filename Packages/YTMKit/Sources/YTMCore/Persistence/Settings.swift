@@ -16,11 +16,12 @@ public enum Look: String, Codable, CaseIterable, Sendable {
 
 /// The colour of active controls, in the order Settings offers them.
 public enum Accent: String, Codable, CaseIterable, Sendable {
-    case red, orange, green, teal, blue, purple, pink, artwork
+    case lily, red, orange, green, teal, blue, purple, pink, artwork
 
     /// As `0xRRGGBB`, or nil for the artwork's, which changes with the song.
     public var rgb: UInt32? {
         switch self {
+        case .lily: 0xd65db1  // The orchid of Lily's icon
         case .red: 0xff0033  // YouTube Music's red
         case .orange: 0xff6a13
         case .green: 0x1db954
@@ -34,6 +35,7 @@ public enum Accent: String, Codable, CaseIterable, Sendable {
 
     public var name: String {
         switch self {
+        case .lily: "Lily"
         case .red: "Red"
         case .orange: "Orange"
         case .green: "Green"
@@ -64,8 +66,8 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Report songs played to the signed-in account's YouTube history.
     public var youtubeHistory = true
     public var ratingButtons = true
-    public var look: Look = .dark
-    public var accent: Accent = .red
+    public var look: Look = .black
+    public var accent: Accent = .lily
     /// The account has been served Premium formats, so songs without them (music videos) never mark it as not Premium.
     public var premiumAccount = false
     /// The account was taken as without Premium: songs start on the free stream while a background check confirms it.

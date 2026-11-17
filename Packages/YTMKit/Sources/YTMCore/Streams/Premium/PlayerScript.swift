@@ -129,5 +129,5 @@ actor PlayerScripts {
 
 extension Logger {
     /// What the Premium path did, for Console; never cookies or URLs.
-    package static let premium = Logger(subsystem: "YTMusic", category: "Premium")
+    package static let premium = Logger(subsystem: "Lily", category: "Premium")
 }

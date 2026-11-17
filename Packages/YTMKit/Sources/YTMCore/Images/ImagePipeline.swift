@@ -22,7 +22,7 @@ public final class ImagePipeline: Sendable {
     /// Prefetches at once: few, so the artwork a view asks for itself never
     /// queues behind a page's worth for the media host's connections.
     private static let prefetchWidth = 4
-    private static let log = Logger(subsystem: "YTMusic", category: "ImagePipeline")
+    private static let log = Logger(subsystem: "Lily", category: "ImagePipeline")
     /// Downloaded songs' artwork, at the player's size, which serves every smaller one.
     private static let kept = FileStore.shared.downloads.appending(path: "Artwork", directoryHint: .isDirectory)
 

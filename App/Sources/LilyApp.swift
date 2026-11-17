@@ -3,7 +3,7 @@ import SwiftUI
 /// The session is saved as the app leaves the screen, which on a phone may be
 /// the last chance.
 @main
-struct YTMusicApp: App {
+struct LilyApp: App {
     @State private var app: AppModel
     @Environment(\.scenePhase) private var scenePhase
 

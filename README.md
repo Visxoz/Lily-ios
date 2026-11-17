@@ -1,22 +1,23 @@
 <div align="center">
 
-<img src="docs/banner.svg" width="100%" alt="YT Music for iOS: YouTube Music, as a real iPhone app">
+<img src="docs/banner.svg" width="100%" alt="Lily: a native YouTube Music client for iPhone">
 
 <br>
 
-[![Release](https://img.shields.io/badge/release-1.0.0-ff0033?style=flat&labelColor=18181b)](https://github.com/Visxoz/YTMusic-Native-IOS/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Visxoz/Lily-ios?style=flat&labelColor=18181b&color=d65db1&label=release)](https://github.com/Visxoz/Lily-ios/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Visxoz/Lily-ios/total?style=flat&labelColor=18181b&color=d65db1&label=downloads)](https://github.com/Visxoz/Lily-ios/releases)
 [![iOS 27.2](https://img.shields.io/badge/iOS-27.2-0a84ff?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#install)
 [![Swift 6.4](https://img.shields.io/badge/Swift-6.4-f05138?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0a84ff?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
-[![Licence](https://img.shields.io/badge/licence-GPL--3.0-3f3f46?style=flat&labelColor=18181b)](LICENSE)
+[![Licence](https://img.shields.io/github/license/Visxoz/Lily-ios?style=flat&labelColor=18181b&color=3f3f46&label=licence)](LICENSE)
 
 <br>
 
-<a href="https://github.com/Visxoz/YTMusic-Native-IOS/releases/latest"><img src="docs/download.svg" width="300" alt="Download for iPhone"></a>
+<a href="https://github.com/Visxoz/Lily-ios/releases/latest"><img src="docs/download.svg" width="300" alt="Download for iPhone"></a>
 
 <br>
 
-<img src="docs/hero.jpg" width="100%" alt="YT Music for iOS: an artist page with its banner, synced lyrics in the artwork's colours, and the queue">
+<img src="docs/hero.jpg" width="100%" alt="Lily: an artist page with its banner, synced lyrics in the artwork's colours, and the queue">
 
 <sub>Artist pages with their banner · lyrics that follow the song, in its artwork's colours · a queue you drag into order</sub>
 
@@ -41,14 +42,14 @@ Swift and SwiftUI from top to bottom, on Apple's own audio engine. No web views,
 <td width="33%" valign="top">
 
 ### Looks the part
-Dark, light or pure black, in seven accents, or one that follows the song's artwork. Pages are tinted to match, and Now Playing takes on the artwork's colours.
+Pure black and orchid out of the box, or dark or light, in eight other accents including one that follows the song's artwork. Pages are tinted to match, and Now Playing takes on the artwork's colours.
 
 </td>
 </tr>
 <tr>
 <td width="33%" valign="top">
 
-### Plays like YouTube Music
+### All of YouTube Music
 Radio, autoplay, Smart Shuffle, repeat, history and search with recent searches. Speed dial on Home, and artist pages with the whole discography. Songs, albums and playlists download to play offline.
 
 </td>
@@ -96,7 +97,7 @@ The lock screen, Control Center, the volume buttons and your AirPods, Last.fm, a
 </tr>
 </table>
 
-Pick a theme and an accent colour in **Settings ▸ Appearance**: Red, Orange, Green, Teal, Blue, Purple, Pink, or **From the artwork**.
+Lily starts in pure black with its own orchid. Pick another look and accent in **Settings ▸ Appearance**: Lily, Red, Orange, Green, Teal, Blue, Purple, Pink, or **From the artwork**.
 
 ## Sounds as good as YouTube gets
 
@@ -140,11 +141,11 @@ Find them behind the download button at the top of Library, and the settings in 
 
 ## Install
 
-Grab `YTMusic.ipa` from the [latest release](https://github.com/Visxoz/YTMusic-Native-IOS/releases/latest), then:
+Grab `Lily.ipa` from the [latest release](https://github.com/Visxoz/Lily-ios/releases/latest), then:
 
 1. Open it with **SideStore** (or share it to SideStore), or tap **+** in SideStore's My Apps and pick the file.
 2. SideStore signs it with your own Apple ID and installs it.
-3. Open **YT Music**. It works signed out straight away.
+3. Open **Lily**. It works signed out straight away.
 
 > [!NOTE]
 > Apps signed with a free Apple ID last seven days. SideStore refreshes them in the background; if it hasn't, open SideStore and tap **Refresh All**.
@@ -182,7 +183,7 @@ Building it yourself? Last.fm needs an [API account](https://www.last.fm/api/acc
 </details>
 
 > [!WARNING]
-> YT Music for iOS is an unofficial client. It uses YouTube's undocumented API, which is against YouTube's terms of service. Google could ask you to confirm you're not a bot or sign the session out, and could in principle restrict the account. A separate account is the safest choice.
+> Lily is an unofficial client. It uses YouTube's undocumented API, which is against YouTube's terms of service. Google could ask you to confirm you're not a bot or sign the session out, and could in principle restrict the account. A separate account is the safest choice.
 
 ## Under the hood
 
@@ -212,7 +213,7 @@ flowchart LR
 | Demuxing | Its own WebM and MP4 readers (`YTMAudio`) |
 | Opus and AAC | AudioToolbox |
 | Audio output | AVAudioEngine, with AVAudioUnitEQ |
-| Interface | SwiftUI, with ytm-native's own icons drawn as shapes, and Now Playing's mesh gradient taken from the artwork |
+| Interface | SwiftUI, with Lily's own icons drawn as shapes, and Now Playing's mesh gradient taken from the artwork |
 | Networking | URLSession over HTTP/2 |
 | Artwork | ImageIO, decoded at the size it's shown |
 | Lock screen, AirPods and volume | MediaPlayer |
@@ -238,10 +239,10 @@ cd Packages/YTMKit
 swift test               # the unit tests
 swift run ytmcheck all   # checks every page, stream and decode path against live YouTube
 cd ../..
-scripts/build-ipa.sh     # build/YTMusic.ipa, unsigned, for SideStore
+scripts/build-ipa.sh     # build/Lily.ipa, unsigned, for SideStore
 ```
 
-Or open `YTMusic.xcodeproj` and run it on the iPhone simulator.
+Or open `Lily.xcodeproj` and run it on the iPhone simulator.
 
 | Path | What it holds |
 | --- | --- |
@@ -255,7 +256,7 @@ Or open `YTMusic.xcodeproj` and run it on the iPhone simulator.
 
 ## Licence
 
-YT Music for iOS is a port of [ytm-native](https://github.com/Visxoz/ytm-native) and, like it, free software under the [GNU General Public License, version 3](LICENSE).
+Lily for iPhone is a port of [Lily for Windows](https://github.com/Visxoz/lily) and, like it, free software under the [GNU General Public License, version 3](LICENSE).
 
 <br>
 

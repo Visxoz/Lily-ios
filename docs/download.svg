@@ -7,8 +7,8 @@
 
   <!-- A phone, in the accent -->
   <g transform="translate(28 18)">
-    <rect x="0" y="0" width="22" height="40" rx="5" fill="none" stroke="#ff0033" stroke-width="3"/>
-    <rect x="7" y="4" width="8" height="2.5" rx="1.25" fill="#ff0033"/>
+    <rect x="0" y="0" width="22" height="40" rx="5" fill="none" stroke="#d65db1" stroke-width="3"/>
+    <rect x="7" y="4" width="8" height="2.5" rx="1.25" fill="#d65db1"/>
   </g>
 
   <text x="72" y="36" font-size="20" font-weight="700" fill="#f4f4f5">Download for iPhone</text>

@@ -10,19 +10,26 @@ import Testing
     @Test func anUnreadableSettingResetsOnlyItself() throws {
         let settings = try decode(#"{"youtubeHistory": false, "accent": "beige", "equaliserGains": [1], "volume": 0.5}"#)
         #expect(!settings.youtubeHistory, "the opt-out is kept")
-        #expect(settings.accent == .red)
+        #expect(settings.accent == .lily)
         #expect(settings.equaliserGains == Array(repeating: 0, count: 6))
     }
 
     @Test func fillsMissingFieldsWithDefaults() throws {
-        let settings = try decode(#"{"look": "black", "accent": "artwork", "shuffle": "smart"}"#)
-        #expect(settings.look == .black && settings.accent == .artwork && settings.shuffle == .smart)
+        let settings = try decode(#"{"look": "dark", "accent": "artwork", "shuffle": "smart"}"#)
+        #expect(settings.look == .dark && settings.accent == .artwork && settings.shuffle == .smart)
         #expect(settings.normalise && !settings.crossfade && settings.quality == .high)
         let saved = try JSONEncoder().encode(settings)
         #expect(try JSONDecoder().decode(Settings.self, from: saved) == settings)
     }
 
-    @Test func accentsAreYTMNativesColours() {
+    @Test func defaultsToLilysOrchidOnBlack() {
+        let settings = Settings()
+        #expect(settings.accent == .lily && settings.look == .black)
+        #expect(Accent.allCases.first == .lily, "offered first")
+        #expect(Accent.lily.rgb == 0xd65db1)
+    }
+
+    @Test func accentsAreLilysColours() {
         #expect(Accent.red.rgb == 0xff0033)
         #expect(Accent.artwork.rgb == nil)
         #expect(Accent.artwork.name == "From the artwork")

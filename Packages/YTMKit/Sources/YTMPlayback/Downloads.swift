@@ -296,7 +296,7 @@ import YTMCore
     private func watchNetwork() {
         let (paths, sink) = AsyncStream.makeStream(of: (online: Bool, metered: Bool).self, bufferingPolicy: .bufferingNewest(1))
         monitor.pathUpdateHandler = { sink.yield((online: $0.status == .satisfied, metered: $0.isExpensive)) }
-        monitor.start(queue: DispatchQueue(label: "YTMusic.Downloads.network", qos: .utility))
+        monitor.start(queue: DispatchQueue(label: "Lily.Downloads.network", qos: .utility))
         watching = Task { [weak self] in
             for await path in paths {
                 self?.follow(online: path.online, metered: path.metered)

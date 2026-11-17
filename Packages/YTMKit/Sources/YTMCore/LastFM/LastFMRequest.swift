@@ -69,6 +69,8 @@ enum LastFMAPI {
 
     private static let endpoint = URL(string: "https://ws.audioscrobbler.com/2.0/")
     private static let authPage = "https://www.last.fm/api/auth/"
+    /// "Lily/1.0", as Lily for Windows names itself; plain "Lily" outside the app, as in ytmcheck, which has no version.
+    private static let userAgent = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String).map { "Lily/\($0)" } ?? "Lily"
 
     /// Adds `api_sig`: the MD5 of every name and value in byte-wise name
     /// order, then the secret, as Last.fm requires of every signed call.
@@ -130,7 +132,7 @@ enum LastFMAPI {
         request.httpMethod = "POST"
         request.httpBody = form(params)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.setValue("YTMusic-iOS", forHTTPHeaderField: "User-Agent")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
 
         let data: Data
         let response: URLResponse

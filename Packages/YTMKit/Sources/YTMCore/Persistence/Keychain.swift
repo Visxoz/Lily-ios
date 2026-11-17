@@ -3,7 +3,7 @@ import Security
 
 /// Secrets (sign-in cookies, the Last.fm session) as device-only generic passwords.
 enum Keychain {
-    private static let service = "YTMusic"
+    private static let service = "Lily"
 
     private static func query(_ key: String) -> [CFString: Any] {
         [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key]

@@ -9,18 +9,18 @@ public enum StoreFile: String, Sendable {
     case downloads
 }
 
-/// JSON files in Application Support/YTMusic/. Writes run in order on one
+/// JSON files in Application Support/Lily/. Writes run in order on one
 /// serial queue, atomically, and one overtaken by a newer save is skipped.
 public final class FileStore: Sendable {
     public static let shared = FileStore(
-        directory: URL.applicationSupportDirectory.appending(path: "YTMusic", directoryHint: .isDirectory)
+        directory: URL.applicationSupportDirectory.appending(path: "Lily", directoryHint: .isDirectory)
     )
 
     private let directory: URL
-    private let queue = DispatchQueue(label: "YTMusic.FileStore", qos: .utility)
+    private let queue = DispatchQueue(label: "Lily.FileStore", qos: .utility)
     /// The newest save ticket per file, so older ones queued behind it are skipped.
     private let latest = Mutex<[StoreFile: UInt64]>([:])
-    private static let log = Logger(subsystem: "YTMusic", category: "FileStore")
+    private static let log = Logger(subsystem: "Lily", category: "FileStore")
 
     /// `directory` is created on the first save.
     init(directory: URL) {

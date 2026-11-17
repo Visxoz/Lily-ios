@@ -220,5 +220,5 @@ final class StreamLoader {
 }
 
 extension Logger {
-    static let audio = Logger(subsystem: "YTMusic", category: "audio")
+    static let audio = Logger(subsystem: "Lily", category: "audio")
 }

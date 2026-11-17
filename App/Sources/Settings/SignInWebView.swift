@@ -52,7 +52,7 @@ struct SignInWebView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        private static let log = Logger(subsystem: "YTMusic", category: "sign-in")
+        private static let log = Logger(subsystem: "Lily", category: "sign-in")
         /// A signed-in session has one of these.
         private static let sessionCookies: Set<String> = ["SAPISID", "__Secure-3PAPISID"]
 

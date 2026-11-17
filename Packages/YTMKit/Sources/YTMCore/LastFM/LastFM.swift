@@ -14,7 +14,7 @@ public actor LastFM {
     static let retryAfter = Duration.seconds(60)
 
     private static let sessionItem = "lastfm.session"
-    private static let log = Logger(subsystem: "YTMusic", category: "LastFM")
+    private static let log = Logger(subsystem: "Lily", category: "LastFM")
 
     private let store: FileStore
     private let keys = Keys.builtIn

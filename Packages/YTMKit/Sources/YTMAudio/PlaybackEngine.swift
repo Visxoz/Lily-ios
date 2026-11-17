@@ -15,7 +15,7 @@ actor PlaybackEngine {
     }
 
     nonisolated let clock = PlaybackClock()
-    nonisolated let queue = DispatchSerialQueue(label: "YTMusic.audio", qos: .userInitiated)
+    nonisolated let queue = DispatchSerialQueue(label: "Lily.audio", qos: .userInitiated)
     nonisolated var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
 
     static let bufferSeconds = 0.5
