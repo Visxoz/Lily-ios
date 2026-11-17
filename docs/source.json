@@ -71,17 +71,6 @@
         "https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/equaliser.jpg",
         "https://raw.githubusercontent.com/Visxoz/Lily-ios/refs/heads/main/docs/home-light.jpg"
       ],
-      "versions": [
-        {
-          "version": "1.0.0",
-          "buildVersion": "1",
-          "date": "2026-11-17T04:24:48Z",
-          "downloadURL": "https://github.com/Visxoz/Lily-ios/releases/download/v1.0.0/Lily.ipa",
-          "size": 7726799,
-          "minOSVersion": "26.0",
-          "localizedDescription": "The first public release."
-        }
-      ],
       "appPermissions": {
         "entitlements": [],
         "privacy": {}
