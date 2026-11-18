@@ -51,10 +51,15 @@ struct PageContent: View {
                     SectionRows(section: page.sections[index], width: frame.width - 2 * Metrics.pagePadding)
                 }
                 // The rest loads while the page is on screen (`PageScreen`).
-                if page.more != nil {
-                    Spinner(size: 28)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                if let more = page.more {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if case .shelves = more {
+                            SectionBones(layouts: model?.shelvesToCome ?? [])
+                        } else {
+                            TrackBones(count: 3, art: true)
+                        }
+                    }
+                    .skeleton()
                 }
             }
             .padding(.bottom, Metrics.pageBottom)

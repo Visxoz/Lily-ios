@@ -47,6 +47,12 @@ final class PageModel {
         if case .loaded(let page) = phase { page } else { nil }
     }
 
+    /// The layouts of Home's shelves yet to come: neither sent (YouTube's may be dropped) nor shown.
+    var shelvesToCome: [CardLayout?] {
+        let arrived = Set(((source?.sections ?? []) + (page?.sections ?? [])).map(\.title))
+        return YTMusic.homeShelves.filter { !arrived.contains($0.title) }.map(\.layout)
+    }
+
     /// Skips the load if it already holds this account's page, except History
     /// each visit, Home while a stand-in shows, and any page once `isStale`.
     func appear(in app: AppModel, returning: Bool) async {
