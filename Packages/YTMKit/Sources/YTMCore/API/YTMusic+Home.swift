@@ -34,9 +34,10 @@ extension YTMusic {
         return sections.isEmpty ? nil : Page(sections: sections)
     }
 
-    /// The saved Home belongs to the account signed in when it was saved.
-    public func clearCachedHome() {
+    /// The saved Home and visitor ID belong to the account they were saved under.
+    public func forgetAccount() async {
         store.remove(.home)
+        await innerTube.forgetVisitorData()
     }
 
     /// Only once whole: a first page alone would stand in later as a shorter,

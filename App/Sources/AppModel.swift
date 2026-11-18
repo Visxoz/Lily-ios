@@ -166,7 +166,7 @@ final class AppModel {
     /// Drops everything the last account loaded. `quietly`, as for a sign-in YouTube rejected,
     /// skips announcing it and switching to Library or Home.
     func accountChanged(quietly: Bool = false) async {
-        api.clearCachedHome()
+        await api.forgetAccount()
         isSignedIn = await api.auth.isSignedIn
         account = nil
         // Together with the bump, so no page asked for by the last account

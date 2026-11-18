@@ -156,6 +156,26 @@ private final class FlakyServer: URLProtocol {
         #expect(await issuer.fetches == 2)
     }
 
+    @Test func forgettingFetchesANewIDAndDropsAnAdoptionStartedBefore() async throws {
+        let issuer = Issuer()
+        let store = FileStore(directory: .temporaryDirectory.appending(path: "ytm-visitor-\(UUID().uuidString)"))
+        let visitor = VisitorData(store: store) { await issuer.issue() }
+        #expect(try await visitor.value() == "v1")
+        let candidate = try await visitor.candidate(replacing: "v1")
+        await visitor.forget()
+        await visitor.adopt(candidate, replacing: "v1")
+        #expect(try await visitor.value() == "v3", "neither the forgotten ID nor its candidate is sent")
+        #expect(store.load(Saved.self, from: .visitor)?.value == "v3")
+    }
+
+    @Test func ignoresASavedIDThatIsNoHeader() async throws {
+        let issuer = Issuer()
+        let store = FileStore(directory: .temporaryDirectory.appending(path: "ytm-visitor-\(UUID().uuidString)"))
+        store.save(Saved(value: "a\r\nb", fetched: .now), to: .visitor)
+        let visitor = VisitorData(store: store) { await issuer.issue() }
+        #expect(try await visitor.value() == "v1")
+    }
+
     /// VisitorData's saved file, in the same shape.
     private struct Saved: Codable, Sendable {
         let value: String

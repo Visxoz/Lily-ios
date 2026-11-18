@@ -81,6 +81,10 @@ final class InnerTube: Sendable {
     func adoptVisitorData(_ candidate: String, replacing refused: String) async {
         await visitor.adopt(candidate, replacing: refused)
     }
+
+    func forgetVisitorData() async {
+        await visitor.forget()
+    }
 }
 
 /// Saved so a launch needs no fetch, and replaced in the background once a day
@@ -95,9 +99,12 @@ actor VisitorData {
     private static let maxAge: TimeInterval = 24 * 60 * 60
     private let store: FileStore
     private let request: @Sendable () async throws -> String
-    private lazy var saved: Saved? = store.load(Saved.self, from: .visitor)
+    /// Checked, as it goes into a header.
+    private lazy var saved: Saved? = store.load(Saved.self, from: .visitor).flatMap { Self.isUsable($0.value) ? $0 : nil }
     /// The fetch in flight, which every caller arriving meanwhile awaits.
     private var fetching: Task<String, any Error>?
+    /// Bumped by `forget`.
+    private var generation = 0
 
     init(store: FileStore, request: @escaping @Sendable () async throws -> String) {
         self.store = store
@@ -107,12 +114,7 @@ actor VisitorData {
     /// A day-old saved ID is still sent while a new one is fetched behind it,
     /// so no request waits on the refresh.
     func value() async throws -> String {
-        guard let saved else {
-            let value = try await fetch()
-            // Callers that shared the fetch keep it once.
-            if self.saved.map(Self.isFresh) != true { keep(value) }
-            return value
-        }
+        guard let saved else { return try await fetchAndKeep() }
         if !Self.isFresh(saved), fetching == nil {
             Task { try? await refresh() }
         }
@@ -124,8 +126,15 @@ actor VisitorData {
         // Requests arriving before the first refresh starts each queue one;
         // those behind a finished refresh have nothing to do.
         guard saved.map(Self.isFresh) != true else { return }
+        _ = try await fetchAndKeep()
+    }
+
+    /// Callers sharing a fetch keep it once; none keeps one `forget` overtook.
+    private func fetchAndKeep() async throws -> String {
+        let generation = generation
         let value = try await fetch()
-        if saved.map(Self.isFresh) != true { keep(value) }
+        if generation == self.generation, saved.map(Self.isFresh) != true { keep(value) }
+        return value
     }
 
     /// An ID to try in place of `refused`: the saved one if another caller
@@ -136,10 +145,18 @@ actor VisitorData {
     }
 
     /// Keeps `candidate` in place of `refused`, unless another caller has
-    /// replaced it already.
+    /// replaced it already or `forget` dropped it.
     func adopt(_ candidate: String, replacing refused: String) {
-        guard saved.map({ $0.value == refused }) ?? true else { return }
+        guard saved?.value == refused else { return }
         keep(candidate)
+    }
+
+    /// The ID belongs to the account it was sent with; the next request fetches another.
+    func forget() {
+        generation += 1
+        saved = nil
+        fetching = nil
+        store.remove(.visitor)
     }
 
     private func fetch() async throws -> String {
@@ -147,7 +164,8 @@ actor VisitorData {
         let request = request
         let task = Task { try await request() }
         fetching = task
-        defer { fetching = nil }
+        // Unless `forget` let another start meanwhile.
+        defer { if fetching == task { fetching = nil } }
         return try await task.value
     }
 
