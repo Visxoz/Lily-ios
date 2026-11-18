@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct Spinner: View {
-    var size: CGFloat = 32
+    let size: CGFloat
 
     @Environment(\.theme) private var theme
 

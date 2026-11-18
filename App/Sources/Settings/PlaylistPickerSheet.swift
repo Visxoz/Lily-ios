@@ -65,7 +65,16 @@ struct PlaylistPickerSheet: View {
                 .padding(.horizontal, 12)
             }
         } else {
-            Spinner()
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<6, id: \.self) { index in
+                    Bone(width: Bone.length(index), height: 12)
+                        .padding(.horizontal, 12)
+                        .frame(height: Self.rowHeight)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .skeleton()
         }
     }
 

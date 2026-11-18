@@ -13,8 +13,14 @@ struct LyricsPanel: View {
         Group {
             switch player.lyrics {
             case .loading:
-                Spinner(size: 32)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Lines of `LyricLine`'s height and spacing.
+                VStack(alignment: .leading, spacing: 19) {
+                    ForEach(0..<8, id: \.self) { Bone(width: Bone.length($0) * 1.5, height: 20) }
+                }
+                .padding(.horizontal, NowPlayingScreen.padding)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .skeleton()
             case .loaded(let lyrics):
                 LyricsLines(lyrics: lyrics, close: close)
             case .idle, .unavailable, .failed:
