@@ -17,6 +17,8 @@ enum HomeFeed {
         speedDialTitle, "Quick picks", "Forgotten favorites", "Trending songs for you", "Mixed for you",
         "Fresh finds, old favorites",
     ]
+    /// Of `shelfOrder`, the song lists; the rest are carousels, but Speed dial.
+    static let songShelves: Set = ["Quick picks", "Trending songs for you"]
     /// The latest plays put before YouTube's Speed dial, which seldom has
     /// them: few, so its own picks still fill most of the first page.
     static let recentPlays = 3

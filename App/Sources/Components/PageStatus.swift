@@ -3,7 +3,7 @@ import YTMCore
 
 struct PageStatus: View {
     enum Phase {
-        case loading
+        case loading(Route)
         case failed(message: String, retry: () -> Void)
         case empty(String)
     }
@@ -15,23 +15,12 @@ struct PageStatus: View {
     @Environment(AppModel.self) private var app
 
     @Environment(\.theme) private var theme
-    @State private var spinnerDue = false
 
     var body: some View {
         Group {
             switch phase {
-            case .loading:
-                // Held back a moment, so a page from the cache or a quick reply never flashes it.
-                Spinner(size: 40)
-                    .opacity(spinnerDue ? 1 : 0)
-                    .task {
-                        do {
-                            try await Task.sleep(for: .milliseconds(250))
-                        } catch {
-                            return
-                        }
-                        withAnimation(Theme.normal) { spinnerDue = true }
-                    }
+            case .loading(let route):
+                PageSkeleton(route: route)
             case .failed(let message, let retry):
                 VStack(spacing: 20) {
                     Message(text: message)

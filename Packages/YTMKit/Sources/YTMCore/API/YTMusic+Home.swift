@@ -4,6 +4,15 @@ extension YTMusic {
     private static let homeGenres = 12
     private static let trendingLimit = 10
 
+    /// Signed-in Home's shelves in order, each with its layout (nil for songs), so the app can draw them ahead.
+    public static let homeShelves: [(title: String, layout: CardLayout?)] = HomeFeed.shelfOrder.map { title in
+        switch title {
+        case HomeFeed.speedDialTitle: (title, .speedDial)
+        case _ where HomeFeed.songShelves.contains(title): (title, nil)
+        default: (title, .carousel)
+        }
+    }
+
     /// Signed in, the feed's first shelves with `more` fetching the rest;
     /// signed out, the charts.
     @concurrent

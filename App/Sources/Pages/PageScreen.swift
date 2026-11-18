@@ -27,14 +27,15 @@ struct PageScreen: View {
         Group {
             switch model.phase {
             case .loading:
-                PageStatus(phase: .loading, tint: Theme.routeTint(route))
+                PageStatus(phase: .loading(route), tint: Theme.routeTint(route))
             case .failed(let message):
                 PageStatus(phase: .failed(message: message) {
                     Task { await model.retry(in: app) }
                 }, tint: Theme.routeTint(route))
             case .loaded(let page):
                 PageContent(page: page, route: route, model: model)
-                    .transition(.opacity.combined(with: .offset(y: 16)))
+                    // No rise: it lands over a skeleton of its shape.
+                    .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.3), value: model.page != nil)

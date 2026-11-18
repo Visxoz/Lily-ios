@@ -37,7 +37,7 @@ final class PageModel {
     @ObservationIgnored private var loadingMore = false
 
     /// Shows a page the cache still holds at once, so a page returned to
-    /// within five minutes has no spinner or rise.
+    /// within five minutes has no skeleton or fade.
     init(route: Route, app: AppModel) {
         self.route = route
         if app.accountGeneration > 0, let page = app.cachedPage(route) { show(page, for: app) }

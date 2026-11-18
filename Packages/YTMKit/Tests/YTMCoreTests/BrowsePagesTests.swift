@@ -185,6 +185,12 @@ private func carousel(_ title: String, _ items: [String]) -> String {
         #expect(held.isEmpty)
     }
 
+    @Test func describesEveryShelfForTheSkeleton() {
+        let shelves = YTMusic.homeShelves
+        #expect(shelves.map(\.title) == HomeFeed.shelfOrder)
+        #expect(shelves.map(\.layout) == [.speedDial, nil, .carousel, nil, .carousel, .carousel])
+    }
+
     @Test func isCompleteOnceEveryShelfHasArrived() {
         let all = HomeFeed.shelfOrder.map { $0 == HomeFeed.speedDialTitle ? dial(["a"]) : shelf($0, ["x"]) }
         #expect(HomeFeed.isComplete(all))
