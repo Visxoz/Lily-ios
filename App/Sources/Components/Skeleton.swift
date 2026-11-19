@@ -58,18 +58,57 @@ struct PageSkeleton: View {
     let route: Route
 
     @Environment(AppModel.self) private var app
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var isWide = false
 
     var body: some View {
+        ZStack {
+            if #available(iOS 27.1, *), isSplit {
+                // `PageContent`'s halves: the header at the foot of its own, the tracks beside it.
+                ArrangementView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HeaderBones(art: true)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                } secondary: {
+                    VStack(alignment: .leading, spacing: 0) {
+                        tracks
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .clipped()
+                }
+                .arrangementViewStyle(.split)
+                .skeleton()
+            } else {
+                column
+            }
+        }
+        .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { isWide = $0 }
+    }
+
+    /// Albums' and playlists', whose header has art, the real page puts beside its tracks.
+    private var isSplit: Bool {
+        switch route {
+        case .album, .playlist: Fold.isSplit(sizeClass, isWide: isWide)
+        default: false
+        }
+    }
+
+    @ViewBuilder private var tracks: some View {
+        // Its space only.
+        TrackColumns()
+            .hidden()
+            .padding(.horizontal, Metrics.pagePadding)
+        TrackBones(count: 10, art: !isAlbum)
+    }
+
+    private var column: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 switch route {
                 case .album, .playlist, .history, .librarySongs:
                     HeaderBones(art: true)
-                    // Its space only.
-                    TrackColumns()
-                        .hidden()
-                        .padding(.horizontal, Metrics.pagePadding)
-                    TrackBones(count: 10, art: !isAlbum)
+                    tracks
                 case .artist:
                     BannerBones()
                     SectionBones(layouts: [nil])

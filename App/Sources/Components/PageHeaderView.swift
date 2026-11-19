@@ -8,6 +8,9 @@ struct PageHeaderView: View {
     let canRadio: Bool
     /// The navigation bar's height, which a banner reaches up under.
     let topInset: CGFloat
+    /// Under iPhone Duo's column of tabs; nowhere else, where it would
+    /// mirror the banner up into the space a pull to refresh opens.
+    let extendsBanner: Bool
     let download: DownloadButton?
     let perform: (HeaderAction) -> Void
 
@@ -23,14 +26,17 @@ struct PageHeaderView: View {
             if header.banner {
                 let height = Self.artEdge(header, topInset: topInset)
                 ZStack(alignment: .bottomLeading) {
-                    ArtworkImage(url: header.thumbnail, edge: height, placeholder: false)
-                        .frame(height: height)
-                        .clipped()
-                    LinearGradient(
-                        stops: [.init(color: .clear, location: 0.35), .init(color: theme.bannerShade, location: 1)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                    ZStack {
+                        ArtworkImage(url: header.thumbnail, edge: height, placeholder: false)
+                            .frame(height: height)
+                            .clipped()
+                        LinearGradient(
+                            stops: [.init(color: .clear, location: 0.35), .init(color: theme.bannerShade, location: 1)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                    .backgroundExtensionEffect(isEnabled: extendsBanner)
                     // A banner is darkened behind its text, which stays white in every look.
                     HeaderText(header: header, foreground: theme.onColour, secondary: theme.onColour.opacity(0.7))
                         .padding(.horizontal, Metrics.pagePadding)
