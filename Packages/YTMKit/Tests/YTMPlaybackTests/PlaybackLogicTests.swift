@@ -53,6 +53,37 @@ struct ScrobblerTests {
         #expect(Scrobbler.playedThrough(moved: 0, elapsed: ms(250)) == 0, "paused")
     }
 
+    @Test func aPlayCountsAfterThirtySecondsOrHalfAShortSong() {
+        #expect(!Scrobbler.playCounts(heard: 1, length: 200), "a skip")
+        #expect(!Scrobbler.playCounts(heard: 29, length: 200))
+        #expect(Scrobbler.playCounts(heard: 30, length: 200))
+        #expect(Scrobbler.playCounts(heard: 10, length: 20), "half a short song")
+        #expect(!Scrobbler.playCounts(heard: 0, length: 0), "an unknown length")
+        #expect(Scrobbler.playCounts(heard: 30, length: 0))
+    }
+
+    @Test func aShortSongReachesSpeedDialOnceWithoutAScrobble() {
+        var scrobbler = Scrobbler()
+        scrobbler.start(song("a"))
+        var at = ContinuousClock.now
+        _ = scrobbler.heard(position: 0, length: 20, at: at)
+        at += .milliseconds(250)
+        let sought = scrobbler.heard(position: 9, length: 20, at: at)
+        #expect(sought.heard == nil, "a seek counts nothing")
+        var position = 9.0
+        var heard: [String] = []
+        var scrobbled = 0
+        for _ in 0..<40 {
+            at += .milliseconds(250)
+            position += 0.25
+            let result = scrobbler.heard(position: position, length: 20, at: at)
+            if let track = result.heard { heard.append(track.id) }
+            if result.scrobble != nil { scrobbled += 1 }
+        }
+        #expect(heard == ["a"], "10 s heard of 20, once")
+        #expect(scrobbled == 0, "too short for Last.fm")
+    }
+
     @Test func countsHalfATrackOrFourMinutes() {
         #expect(!Scrobbler.counts(heard: 20, length: 30), "30 seconds is too short")
         #expect(!Scrobbler.counts(heard: 89, length: 180))
@@ -66,16 +97,16 @@ struct ScrobblerTests {
         scrobbler.start(song("a"))
         let start = ContinuousClock.now
         let result1 = scrobbler.heard(position: 0, length: 60, at: start)
-        #expect(result1 == nil)
+        #expect(result1.scrobble == nil)
         let result2 = scrobbler.heard(position: 100, length: 60, at: start + .milliseconds(250))
-        #expect(result2 == nil, "a seek counts nothing")
+        #expect(result2.scrobble == nil, "a seek counts nothing")
         var at = start + .milliseconds(250)
         var position = 100.0
         var scrobbled: [String] = []
         for _ in 0..<130 {
             at += .milliseconds(250)
             position += 0.25
-            if let play = scrobbler.heard(position: position, length: 60, at: at) { scrobbled.append(play.track.id) }
+            if let play = scrobbler.heard(position: position, length: 60, at: at).scrobble { scrobbled.append(play.track.id) }
         }
         #expect(scrobbled == ["a"], "30 s heard of 60, once")
     }

@@ -167,11 +167,11 @@ final class PageModel {
         if latest != shown { phase = .loaded(latest) }
     }
 
-    /// Signed in, Home's Speed dial takes in this phone's recent plays, as
-    /// YouTube's seldom has them.
+    /// Signed in, Home's Speed dial takes in this phone's recent plays heard
+    /// long enough to count, as YouTube's seldom has them.
     private func onScreen(_ page: Page, in app: AppModel) -> Page {
         guard route == .home, app.isSignedIn else { return page }
-        return page.withRecentPlays(app.history.history.tracks)
+        return page.withRecentPlays(app.history.history.heard)
     }
 
     private func show(_ page: Page, for app: AppModel, saved: Bool = false) {

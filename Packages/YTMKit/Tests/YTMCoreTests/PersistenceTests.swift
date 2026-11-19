@@ -46,6 +46,34 @@ import Testing
         #expect(long.tracks.count == 500)
     }
 
+    @Test func onlySongsHeardLongEnoughReachSpeedDial() throws {
+        var history = PlayHistory()
+        history.record(Track(id: "a", title: "a"))
+        history.record(Track(id: "b", title: "b"))
+        history.markHeard("a")
+        #expect(history.heard.map(\.id) == ["a"])
+        #expect(history.tracks.count == 2, "both are in the history")
+        history.record(Track(id: "a", title: "a"))
+        #expect(history.heard.isEmpty, "a skipped replay")
+        let saved = try JSONDecoder().decode(PlayHistory.self, from: JSONEncoder().encode(history))
+        #expect(saved.skipped == ["a", "b"])
+    }
+
+    @Test func aFileFromBeforeSkipsCountsEveryPlayAsHeard() throws {
+        let file = try JSONEncoder().encode(["tracks": [Track(id: "a", title: "a")]])
+        let old = try JSONDecoder().decode(PlayHistory.self, from: file)
+        #expect(old.heard.map(\.id) == ["a"])
+    }
+
+    @Test func aSongPushedOutOfTheHistoryLeavesItsSkip() {
+        var history = PlayHistory()
+        for id in 0...500 { history.record(Track(id: "\(id)", title: "")) }
+        #expect(history.tracks.count == 500)
+        #expect(!history.skipped.contains("0") && history.skipped.count == 500)
+        let trimmed = PlayHistory(tracks: [Track(id: "x", title: "")], skipped: ["x", "gone"])
+        #expect(trimmed.skipped == ["x"])
+    }
+
     @Test func searchesKeepTheNewestFiveOnceEach() throws {
         var searches = RecentSearches()
         for q in ["a", "b", "c", "d", "e", "f"] { searches.record(q) }

@@ -27,8 +27,14 @@ import YTMCore
             loading = Task { [weak self] in
                 let (history, searches) = await Self.read(store)
                 guard let self else { return }
-                // Plays recorded before the file was read come first.
-                if let history { self.history = PlayHistory(tracks: self.history.tracks + history.tracks) }
+                // Plays recorded before the file was read come first, and their heard state wins over the file's.
+                if let history {
+                    let recorded = Set(self.history.tracks.map(\.id))
+                    self.history = PlayHistory(
+                        tracks: self.history.tracks + history.tracks,
+                        skipped: self.history.skipped.union(history.skipped.subtracting(recorded))
+                    )
+                }
                 if let searches { self.searches = searches }
             }
         }
@@ -64,6 +70,16 @@ import YTMCore
     /// Only the player records plays, as each song's sound starts.
     func record(_ track: Track) {
         history.record(track)
+        saveSoon()
+    }
+
+    /// Lets the play into Home's Speed dial, once it has been heard long enough to count.
+    func markHeard(_ id: String) {
+        history.markHeard(id)
+        saveSoon()
+    }
+
+    private func saveSoon() {
         saving.schedule { [weak self] in
             guard let self else { return }
             store.save(history, to: .history)
