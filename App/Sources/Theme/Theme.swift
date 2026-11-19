@@ -5,6 +5,15 @@ import YTMCore
 nonisolated struct Theme: Equatable, Sendable {
     /// Lily's orchid, the accent when nothing else gives one.
     static let lily = RGB(hex: 0xd65db1)
+    /// The icon's orchid-to-violet gradient, as its artwork runs it.
+    static let lilyGradient = LinearGradient(
+        stops: [
+            .init(color: Color(rgb: RGB(hex: 0xf472d0)), location: 0.2),
+            .init(color: Color(rgb: RGB(hex: 0x9b5cff)), location: 0.8),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
 
     static let panelRadius: CGFloat = 8
     /// Every queue row is this tall, so a dragged row's place is arithmetic.
