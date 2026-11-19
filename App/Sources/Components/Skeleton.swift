@@ -138,8 +138,15 @@ struct PageSkeleton: View {
                     Bone(width: 220, height: 28)
                         .padding(.horizontal, Metrics.pagePadding)
                         .frame(height: Metrics.greetingHeight, alignment: .bottom)
-                    // Signed out, the charts.
-                    SectionBones(layouts: app.isSignedIn ? YTMusic.homeShelves.map(\.layout) : [nil, .carousel, .carousel, .chips])
+                    if app.isSignedIn {
+                        SectionBones(layouts: YTMusic.homeShelves.map(\.layout))
+                    } else {
+                        // The charts, as `publicHome` orders them: Trending, New releases, Top artists, genres.
+                        SectionBones(layouts: [nil, .carousel])
+                        SectionTitleBone()
+                        CarouselBones(round: true)
+                        SectionBones(layouts: [.chips])
+                    }
                 }
             }
         }
@@ -197,10 +204,13 @@ struct SectionBones: View {
 }
 
 private struct CarouselBones: View {
+    /// Round art, as `CardView` draws artists.
+    var round = false
+
     var body: some View {
         HStack(spacing: Metrics.cardGap) {
             ForEach(0..<3, id: \.self) { _ in
-                CardBones()
+                CardBones(round: round)
                     .frame(width: Metrics.cardWidth)
             }
         }
@@ -224,9 +234,11 @@ private struct SectionTitleBone: View {
 
 /// As wide as it is given, as `CardView` is.
 private struct CardBones: View {
+    var round = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Bone(radius: Metrics.cardArtRadius)
+            Bone(radius: round ? Metrics.cardWidth / 2 : Metrics.cardArtRadius)
                 .aspectRatio(1, contentMode: .fit)
                 .padding(.bottom, 4)
             Bone(height: 12)
