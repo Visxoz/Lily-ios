@@ -18,6 +18,7 @@ import Testing
         let settings = try decode(#"{"look": "dark", "accent": "artwork", "shuffle": "smart"}"#)
         #expect(settings.look == .dark && settings.accent == .artwork && settings.shuffle == .smart)
         #expect(settings.normalise && !settings.crossfade && settings.quality == .high)
+        #expect(!settings.foldToScrub, "off until asked for")
         let saved = try JSONEncoder().encode(settings)
         #expect(try JSONDecoder().decode(Settings.self, from: saved) == settings)
     }

@@ -78,6 +78,8 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Keeps a pick of the songs this phone plays downloaded, picked afresh each day.
     public var smartDownloads = false
     public var smartDownloadCount = 50
+    /// On iPhone Duo, folding the half-open hinge skips back and opening it skips ahead.
+    public var foldToScrub = false
 
     public init() {}
 
@@ -105,6 +107,7 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&downloadOnWiFiOnly, .downloadOnWiFiOnly)
         file.read(&smartDownloads, .smartDownloads)
         file.read(&smartDownloadCount, .smartDownloadCount) { $0 > 0 }
+        file.read(&foldToScrub, .foldToScrub)
     }
 }
 
