@@ -10,6 +10,9 @@ struct SpeedDial: View {
 
     private static let columns = 3
     private static let perPage = 9
+    /// Past a phone's width, as on iPhone Duo's inner display, a page this
+    /// wide is as tall as the screen, so the next one shows beside it instead.
+    static let maxPageWidth: CGFloat = 420
 
     /// The die ends the first page, as YouTube's does.
     private enum Tile {
@@ -18,7 +21,8 @@ struct SpeedDial: View {
     }
 
     var body: some View {
-        let cell = (width - CGFloat(Self.columns - 1) * Metrics.cardGap) / CGFloat(Self.columns)
+        let pageWidth = min(width, Self.maxPageWidth)
+        let cell = (pageWidth - CGFloat(Self.columns - 1) * Metrics.cardGap) / CGFloat(Self.columns)
         let pages = Self.pages(of: cards)
         // Every page as tall as a full one, so the dots stay put; a lone page as tall as its rows.
         let rows = pages.count > 1 ? 3 : Self.rows(pages.first?.count ?? 0)
@@ -35,7 +39,7 @@ struct SpeedDial: View {
                                 }
                             }
                         }
-                        .frame(width: width, height: CGFloat(rows) * cell + CGFloat(max(rows - 1, 0)) * Metrics.cardGap, alignment: .topLeading)
+                        .frame(width: pageWidth, height: CGFloat(rows) * cell + CGFloat(max(rows - 1, 0)) * Metrics.cardGap, alignment: .topLeading)
                         .id(index)
                     }
                 }
@@ -44,7 +48,9 @@ struct SpeedDial: View {
             .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne))
             .scrollPosition(id: $page)
             .scrollIndicators(.hidden)
-            .contentMargins(.horizontal, Metrics.pagePadding, for: .scrollContent)
+            .contentMargins(.leading, Metrics.pagePadding, for: .scrollContent)
+            // Room after the last page for it to scroll to the front, so its dot can light.
+            .contentMargins(.trailing, Metrics.pagePadding + width - pageWidth, for: .scrollContent)
             .scrollClipDisabled()
             if pages.count > 1 {
                 PageDots(count: pages.count, current: min(page ?? 0, pages.count - 1))

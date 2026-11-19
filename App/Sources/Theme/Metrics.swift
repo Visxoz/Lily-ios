@@ -1,6 +1,7 @@
 import CoreGraphics
 
-/// Sized for a 6.3" portrait screen.
+/// Sized for a 6.3" portrait screen; wider ones, as iPhone Duo's inner
+/// display is, fit more columns rather than larger cards.
 nonisolated enum Metrics {
     /// A 393 pt screen can't spare the desktop's 24 on both sides.
     static let pagePadding: CGFloat = 16

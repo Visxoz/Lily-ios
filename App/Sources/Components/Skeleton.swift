@@ -222,6 +222,8 @@ private struct SpeedDialBones: View {
                         .aspectRatio(1, contentMode: .fit)
                 }
             }
+            .frame(maxWidth: SpeedDial.maxPageWidth)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Metrics.pagePadding)
             HStack(spacing: 8) {
                 ForEach(0..<3, id: \.self) { _ in Bone(width: 8, height: 8, radius: 4) }
