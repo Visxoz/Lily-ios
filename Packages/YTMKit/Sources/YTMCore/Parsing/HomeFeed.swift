@@ -19,9 +19,10 @@ enum HomeFeed {
     ]
     /// Of `shelfOrder`, the song lists; the rest are carousels, but Speed dial.
     static let songShelves: Set = ["Quick picks", "Trending songs for you"]
-    /// The latest plays put before YouTube's Speed dial, which seldom has
-    /// them: few, so its own picks still fill most of the first page.
-    static let recentPlays = 3
+    /// The latest plays mixed into YouTube's Speed dial, which seldom has
+    /// them, one after every `recentEvery` of its own picks, so they never lead it.
+    static let recentPlays = 5
+    static let recentEvery = 3
     /// Plays that make Speed dial when the feed has none: a first page beside the die.
     static let recentShelf = 8
     private static let shelfKinds: Set<String> = [
@@ -116,9 +117,9 @@ enum HomeFeed {
         return release(&held, after: [], done: true)
     }
 
-    /// Puts the newest `recentPlays` of `recent` before Speed dial's picks,
-    /// skipping ones it has; with no Speed dial, makes one of `recentShelf`.
-    static func recentFirst(_ sections: [Section], recent: [Track]) -> [Section] {
+    /// Mixes up to `recentPlays` of `recent` into Speed dial, keeping its length,
+    /// skipping ones it has, which stay where they are; with no Speed dial, makes one of `recentShelf`.
+    static func addingRecent(_ sections: [Section], recent: [Track]) -> [Section] {
         var sections = sections
         guard let index = sections.firstIndex(where: { if case .cards(let s) = $0 { s.layout == .speedDial } else { false } }),
               case .cards(var shelf) = sections[index]
@@ -127,10 +128,14 @@ enum HomeFeed {
             if !cards.isEmpty { sections.insert(.cards(CardSection(title: speedDialTitle, cards: cards, layout: .speedDial)), at: 0) }
             return sections
         }
+        let count = shelf.cards.count
         let picked = Set(shelf.cards.map(\.id))
-        let fresh = recent.prefix(recentPlays).filter { !picked.contains($0.id) }.map(card)
+        let slots = stride(from: recentEvery, to: count, by: recentEvery + 1).prefix(recentPlays)
+        let fresh = Array(zip(slots, recent.lazy.filter { !picked.contains($0.id) }))
         guard !fresh.isEmpty else { return sections }
-        shelf.cards = fresh + shelf.cards
+        // In ascending order, each lands at its final index; YouTube's last picks drop off.
+        for (slot, track) in fresh { shelf.cards.insert(card(track), at: slot) }
+        shelf.cards.removeLast(fresh.count)
         sections[index] = .cards(shelf)
         return sections
     }
@@ -157,8 +162,8 @@ enum HomeFeed {
 
 extension Page {
     /// Applied as Home shows rather than as it loads, so a Home from the cache
-    /// or the disk leads with what played since too, and repeats no list's songs.
-    public func leadingWithRecentPlays(_ recent: [Track]) -> Page {
-        Page(header: header, sections: HomeFeed.recentFirst(HomeFeed.withoutRepeats(sections), recent: recent), more: more)
+    /// or the disk has what played since too, and repeats no list's songs.
+    public func withRecentPlays(_ recent: [Track]) -> Page {
+        Page(header: header, sections: HomeFeed.addingRecent(HomeFeed.withoutRepeats(sections), recent: recent), more: more)
     }
 }

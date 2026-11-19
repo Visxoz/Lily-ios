@@ -23,7 +23,7 @@ final class PageModel {
     @ObservationIgnored private var generation = 0
     /// The account the page shown was loaded for.
     @ObservationIgnored private var shownFor: Int?
-    /// The page as YouTube sent it, before recent plays lead Home's Speed
+    /// The page as YouTube sent it, before recent plays join Home's Speed
     /// dial, so further steps, the cache, the saved feed and change checks use
     /// YouTube's.
     @ObservationIgnored private var source: Page?
@@ -58,7 +58,7 @@ final class PageModel {
     func appear(in app: AppModel, returning: Bool) async {
         guard app.accountGeneration > 0 else { return }
         if shownFor == app.accountGeneration {
-            relead(in: app)
+            mixInRecentPlays(in: app)
             if route != .history, !showsSaved, !isStale(in: app, returning: returning) { return }
         } else {
             clear()
@@ -133,7 +133,7 @@ final class PageModel {
                 phase = .failed(sentence(for: error))
             } else {
                 // What was shown stays and carries on from where it was.
-                relead(in: app)
+                mixInRecentPlays(in: app)
                 app.showToast(sentence(for: error))
                 step += 1
             }
@@ -159,19 +159,19 @@ final class PageModel {
         showsSaved = false
     }
 
-    /// Leads the kept page with what played since it was put on screen. Not
-    /// a new feed, so the reader's place stays.
-    private func relead(in app: AppModel) {
+    /// Mixes what played since into the kept page's Speed dial. Not a new
+    /// feed, so the reader's place stays.
+    private func mixInRecentPlays(in app: AppModel) {
         guard let source, let shown = page else { return }
         let latest = onScreen(source, in: app)
         if latest != shown { phase = .loaded(latest) }
     }
 
-    /// Signed in, Home's Speed dial leads with this phone's recent plays, as
+    /// Signed in, Home's Speed dial takes in this phone's recent plays, as
     /// YouTube's seldom has them.
     private func onScreen(_ page: Page, in app: AppModel) -> Page {
         guard route == .home, app.isSignedIn else { return page }
-        return page.leadingWithRecentPlays(app.history.history.tracks)
+        return page.withRecentPlays(app.history.history.tracks)
     }
 
     private func show(_ page: Page, for app: AppModel, saved: Bool = false) {
