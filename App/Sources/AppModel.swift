@@ -46,6 +46,8 @@ final class AppModel {
     }
     /// Now Playing is on screen or still zooming away, while pages fill past their edges (`PastEdges`).
     var nowPlayingShown = false
+    /// iPhone Duo, which Settings offers fold to scrub on.
+    var hasHinge = false
     /// The playlist picker opened from Now Playing, shown over it so its open panel stays.
     var nowPlayingPicker: Track?
     /// The keyboard is up, so the mini player steps aside rather than ride above it.

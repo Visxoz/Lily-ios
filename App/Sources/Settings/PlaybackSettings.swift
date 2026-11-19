@@ -34,6 +34,13 @@ struct PlaybackSettings: View {
             detail: "Keeps playing similar music when the queue ends.",
             isOn: $settings.value.autoplay
         )
+        if app.hasHinge {
+            ToggleRow(
+                label: "Fold to scrub",
+                detail: "With Now Playing open and the phone half open like a book, rest it a moment, then fold it to skip back or open it to skip ahead, 10 seconds a step.",
+                isOn: $settings.value.foldToScrub
+            )
+        }
         StorageRow()
     }
 

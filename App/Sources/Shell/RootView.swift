@@ -47,6 +47,7 @@ struct RootView: View {
         .task(id: app.player.current?.thumbnail) { await app.followArtwork(of: app.player.current?.thumbnail) }
         .onChange(of: app.player.libraryRevision) { app.libraryChanged() }
         .onChange(of: app.player.downloads.isActive) { _, active in app.keepDownloading(active) }
+        .modifier(HingeCheck())
     }
 
     private func presented(_ shows: @escaping (AppSheet) -> Bool) -> Binding<AppSheet?> {
