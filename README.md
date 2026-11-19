@@ -8,6 +8,7 @@
 [![Downloads](https://img.shields.io/github/downloads/Visxoz/Lily-ios/total?style=flat&labelColor=18181b&color=d65db1&label=downloads)](https://github.com/Visxoz/Lily-ios/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/Visxoz/Lily-ios/ci.yml?branch=main&style=flat&labelColor=18181b&label=CI)](https://github.com/Visxoz/Lily-ios/actions/workflows/ci.yml)
 [![iOS 26](https://img.shields.io/badge/iOS-26-0a84ff?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#install)
+[![iPhone Duo](https://img.shields.io/badge/iPhone%20Duo-made%20for%20the%20fold-d65db1?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#made-for-iphone-duo)
 [![Swift 6.4](https://img.shields.io/badge/Swift-6.4-f05138?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0a84ff?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![Licence](https://img.shields.io/github/license/Visxoz/Lily-ios?style=flat&labelColor=18181b&color=3f3f46&label=licence)](LICENSE)
@@ -68,7 +69,7 @@ Swipe up from the artwork for synced lyrics you can tap to jump to, and a queue 
 <td width="33%" valign="top">
 
 ### At home on iPhone
-The lock screen, Control Center, the volume buttons and your AirPods, Last.fm, and a Liquid Glass tab bar and icon. Reopens on the song you left, at the second you left it.
+The lock screen, Control Center, the volume buttons and your AirPods, Last.fm, a Liquid Glass tab bar and icon, and [layouts of its own](#made-for-iphone-duo) on iPhone Duo. Reopens on the song you left, at the second you left it.
 
 </td>
 </tr>
@@ -145,6 +146,34 @@ Find them behind the download button at the top of Library, and the settings in 
 </tr>
 </table>
 
+## Made for iPhone Duo
+
+<img src="docs/duo.svg" width="100%" alt="Made for iPhone Duo: the player beside the queue, albums in two panes, and a stand mode, each in its own layout">
+
+Folded, iPhone Duo's outer display is a phone like any other, and Lily is the app you know. Open it up and each screen is laid out again for the bigger display and its two halves.
+
+<table>
+<tr>
+<td width="40%"><img src="docs/duo-player.jpg" alt="Now Playing open flat: the player on the left half and the queue on the right"></td>
+<td width="40%"><img src="docs/duo-album.jpg" alt="Discovery's album page open flat: the cover and Play on the left half, the tracks on the right"></td>
+<td width="20%"><img src="docs/duo-stand.jpg" alt="Stood half open like a laptop: the artwork on the upright half, the controls on the flat half"></td>
+</tr>
+<tr>
+<td align="center"><b>Open</b> · the player beside the queue or lyrics</td>
+<td align="center"><b>Albums</b> · the header beside the tracks</td>
+<td align="center"><b>Stood</b> · artwork up, controls down</td>
+</tr>
+</table>
+
+| Feature | What it does |
+| --- | --- |
+| **Player beside the panel** | Open it wide and Now Playing puts the queue or lyrics beside the player, one on each half, with their buttons at the foot where your thumb reaches. |
+| **Two-pane pages** | Albums and playlists put the cover, title and Play button on one half and the tracks on the other. Pages fit more columns, and their colour runs right under the tabs. |
+| **Stand mode** | Half open it like a laptop and the artwork or lyrics face you from the upright half, with every control on the flat half. |
+| **Fold to scrub** | Half open it like a book, rest it a moment, then fold it to skip back or open it to skip ahead, 10 seconds a step. Turn it on in **Settings ▸ Playback**. |
+
+The open layouts need iOS 27.1 or later.
+
 ## Install
 
 On your iPhone, tap **Add to AltStore**, **Add to SideStore** or **Add to Feather** at the top of this page. Your store opens and adds Lily's source; install Lily from it, and new versions show up there as updates.
@@ -177,6 +206,7 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 | Press and hold a song | Play it next, add it to the queue, start a radio, download it, like it, save it to a playlist, or go to its artist or album |
 | Press and hold a card | Play it, start a radio, or download an album or playlist |
 | Tap the shuffle button | Cycle Off, Shuffle and **Smart Shuffle**, which mixes in recommendations |
+| On iPhone Duo, half open with **Fold to scrub** on, fold or open it | Skip back or ahead 10 seconds a step |
 
 ## Your account
 
