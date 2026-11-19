@@ -48,12 +48,33 @@ struct ProgressRing: View {
     }
 }
 
+/// The download buttons' face, the ring just inside the icon.
+private struct DownloadStateIcon: View {
+    let state: DownloadState
+    let size: CGFloat
+    let frame: CGFloat
+
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Group {
+            switch state {
+            case .none: IconView(icon: .download, size: size, colour: theme.textSecondary)
+            case .waiting: ProgressRing(fraction: 0, size: size - 2)
+            case .downloading(let fraction): ProgressRing(fraction: fraction, size: size - 2)
+            case .downloaded: IconView(icon: .downloaded, size: size, colour: theme.accent)
+            }
+        }
+        .frame(width: frame, height: frame)
+        .contentShape(Circle())
+    }
+}
+
 struct DownloadButton: View {
     let route: Route
     let page: Page
 
     @Environment(AppModel.self) private var app
-    @Environment(\.theme) private var theme
     @State private var confirming = false
 
     var body: some View {
@@ -66,16 +87,7 @@ struct DownloadButton: View {
                 confirming = true
             }
         } label: {
-            Group {
-                switch state {
-                case .none: IconView(icon: .download, size: 28, colour: theme.textSecondary)
-                case .waiting: ProgressRing(fraction: 0, size: 26)
-                case .downloading(let fraction): ProgressRing(fraction: fraction, size: 26)
-                case .downloaded: IconView(icon: .downloaded, size: 28, colour: theme.accent)
-                }
-            }
-            .frame(width: 48, height: 48)
-            .contentShape(Circle())
+            DownloadStateIcon(state: state, size: 28, frame: 48)
         }
         .buttonStyle(PressScale(scale: 0.88, animation: .easeOut(duration: 0.09)))
         .accessibilityLabel(state == .none ? "Download" : "Remove download")
@@ -83,6 +95,37 @@ struct DownloadButton: View {
             Button(state == .downloaded ? "Remove download" : "Stop downloading", role: .destructive) { downloads.remove(route) }
         } message: {
             Text("Songs also downloaded on their own stay.")
+        }
+    }
+}
+
+/// Now Playing's, beside the ratings. It never removes: that is in the menu, so a stray tap can't lose the file.
+struct TrackDownloadButton: View {
+    let track: Track
+
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        let downloads = app.player.downloads
+        let state = downloads.state(of: track.id)
+        Button {
+            switch state {
+            case .none: downloads.download(track)
+            case .waiting, .downloading: app.showToast("Already downloading")
+            case .downloaded: app.showToast("Already downloaded")
+            }
+        } label: {
+            DownloadStateIcon(state: state, size: 22, frame: 40)
+        }
+        .buttonStyle(PressScale(scale: 0.88, animation: .easeOut(duration: 0.09)))
+        .accessibilityLabel(label(state))
+    }
+
+    private func label(_ state: DownloadState) -> String {
+        switch state {
+        case .none: "Download"
+        case .waiting, .downloading: "Downloading"
+        case .downloaded: "Downloaded"
         }
     }
 }
@@ -109,7 +152,9 @@ struct CardDownloadItem: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
-        if let route = card.route, Downloads.isDownloadable(route) {
+        if let track = card.track {
+            TrackDownloadItem(track: track)
+        } else if let route = card.route, Downloads.isDownloadable(route) {
             let downloads = app.player.downloads
             if downloads.state(of: route) == .none {
                 Button("Download") { Task { await downloads.download(card) } }
