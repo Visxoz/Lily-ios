@@ -1,7 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// The player loads lyrics only while this shows.
+/// The player loads lyrics only while this shows, which Now Playing tells it.
 struct LyricsPanel: View {
     /// For a pull down past the top of the lines.
     let close: () -> Void
@@ -29,8 +29,6 @@ struct LyricsPanel: View {
         }
         // Each song starts afresh: at the top, following the singing.
         .id(player.current?.id)
-        .onAppear { player.showsLyrics = true }
-        .onDisappear { player.showsLyrics = false }
     }
 }
 

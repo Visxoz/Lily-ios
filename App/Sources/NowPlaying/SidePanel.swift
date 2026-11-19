@@ -10,46 +10,67 @@ struct SidePanel: View {
     let tab: PanelTab
     /// Whether the panel's page is the one on screen.
     let isShown: Bool
-    /// Shows another page, or with nil closes the panel.
-    let show: (PanelTab?) -> Void
+    let select: (PanelTab) -> Void
+    /// None beside the player, where the panel is always open.
+    let close: (() -> Void)?
 
-    private static let fade = LinearGradient(
+    static let fade = LinearGradient(
         stops: [.init(color: .black, location: 0.92), .init(color: .clear, location: 1)],
         startPoint: .top,
         endPoint: .bottom
     )
 
+    /// Beside the player the controls go to the foot, where a thumb reaches on
+    /// an open phone, rather than the top middle, where none does.
+    private var isBeside: Bool { close == nil }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                PillGroup(
-                    titles: ["Up next", "Lyrics"],
-                    selection: Binding { tab.rawValue } set: { show(PanelTab(rawValue: $0)) }
-                )
-                Spacer()
-                IconButton(icon: .close) { show(nil) }
-                    .accessibilityLabel("Close panel")
-            }
-            .frame(height: 48)
-            .padding(.leading, NowPlayingScreen.padding)
-            .padding(.trailing, NowPlayingScreen.padding - 8)
-            Group {
-                switch tab {
-                case .upNext:
-                    UpNextPanel(isShown: isShown) { show(nil) }
-                case .lyrics:
-                    // Only while on screen, as the player loads lyrics then
-                    // and they follow the song many times a second.
-                    if isShown {
-                        LyricsPanel { show(nil) }
-                    } else {
-                        Color.clear
-                    }
-                }
-            }
-            .mask(Self.fade)
+            if !isBeside { tabs }
+            content
+            if isBeside { tabs }
         }
         .frame(maxHeight: .infinity)
+    }
+
+    private var tabs: some View {
+        HStack(spacing: 8) {
+            // Against the outer edge, under the right thumb.
+            if isBeside { Spacer() }
+            PillGroup(
+                titles: ["Up next", "Lyrics"],
+                selection: Binding { tab.rawValue } set: { PanelTab(rawValue: $0).map(select) }
+            )
+            if let close {
+                Spacer()
+                IconButton(icon: .close, action: close)
+                    .accessibilityLabel("Close panel")
+            }
+        }
+        .frame(height: 48)
+        .padding(.leading, NowPlayingScreen.padding)
+        .padding(.trailing, isBeside ? NowPlayingScreen.padding : NowPlayingScreen.padding - 8)
+    }
+
+    private var content: some View {
+        Group {
+            switch tab {
+            case .upNext:
+                UpNextPanel(isShown: isShown, actionsBelow: isBeside) { close?() }
+            case .lyrics:
+                // Only while on screen, as the player loads lyrics then
+                // and they follow the song many times a second.
+                if isShown {
+                    LyricsPanel { close?() }
+                } else {
+                    Color.clear
+                }
+            }
+        }
+        // Beside the player the queue fades its list alone, clear of its actions.
+        .mask {
+            if isBeside, tab == .upNext { Color.black } else { Self.fade }
+        }
     }
 }
 

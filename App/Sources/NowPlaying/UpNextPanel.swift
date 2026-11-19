@@ -9,6 +9,8 @@ struct UpNextPanel: View {
     /// Off screen, the list keeps the song playing at its top, ready for the
     /// swipe up.
     let isShown: Bool
+    /// Beside the player, under the list rather than over it.
+    let actionsBelow: Bool
     /// For a pull down past the top of the list.
     let close: () -> Void
 
@@ -20,8 +22,14 @@ struct UpNextPanel: View {
     var body: some View {
         let queue = app.player.queue
         VStack(spacing: 0) {
-            header(count: queue.count)
-            list(queue)
+            if actionsBelow {
+                // Only the list fades, so the actions under it stay clear.
+                list(queue).mask(SidePanel.fade)
+                header(count: queue.count)
+            } else {
+                header(count: queue.count)
+                list(queue)
+            }
         }
         // Picks stay with their entries through an edit; a new queue, whose
         // entries are all new, lets them go.

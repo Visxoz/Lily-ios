@@ -2,7 +2,10 @@ import SwiftUI
 import YTMCore
 
 /// The two pages scroll natively, so a swipe follows the finger and can't be
-/// lost to the zoom's own close.
+/// lost to the zoom's own close. A regular width, iPhone Duo's inner display,
+/// has room for both at once, as the desktop's player and panel are; stood
+/// half open, the artwork or lyrics face the room from the upright half and
+/// every control sits on the flat one.
 struct NowPlayingScreen: View {
     static let padding: CGFloat = 24
 
@@ -10,69 +13,175 @@ struct NowPlayingScreen: View {
         case artwork, panel
     }
 
+    private enum Layout {
+        case pager, sideBySide, stand
+    }
+
+    private nonisolated struct Shape: Equatable {
+        var isWide = false
+        var isStood = false
+    }
+
     @Environment(AppModel.self) private var app
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var page: Page? = .artwork
     @State private var tab = PanelTab.upNext
+    @State private var shape = Shape()
 
     var body: some View {
         @Bindable var app = app
         VStack(spacing: 0) {
             if let track = app.player.current {
-                NowPlayingTopBar(track: track)
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Each page hidden from VoiceOver while off screen,
-                        // so it reads one set of controls.
-                        artworkPage(track)
-                            .containerRelativeFrame(.vertical)
-                            .accessibilityHidden(page != .artwork)
-                            .id(Page.artwork)
-                        panelPage(track)
-                            .containerRelativeFrame(.vertical)
-                            .accessibilityHidden(page != .panel)
-                            .id(Page.panel)
+                if #available(iOS 27.1, *), layout == .stand {
+                    stand(track)
+                } else {
+                    NowPlayingTopBar(track: track)
+                    if #available(iOS 27.1, *), layout == .sideBySide {
+                        sideBySide(track)
+                    } else {
+                        pager(track)
                     }
-                    .scrollTargetLayout()
-                    .background(PagerBounceOff())
                 }
-                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
-                // The page counts as shown once past halfway, so a swipe
-                // down from the panel stays one page until it settles.
-                .scrollPosition(id: $page, anchor: .center)
-                .scrollIndicators(.hidden)
             }
         }
         .padding(.bottom, 8)
+        .onGeometryChange(for: Shape.self) { proxy in
+            Shape(isWide: proxy.size.width > proxy.size.height, isStood: Fold.isStood(proxy))
+        } action: { shape = $0 }
+        // Each layout starts at the artwork; stood, a tab left on lyrics would open them.
+        .onChange(of: layout) {
+            page = .artwork
+            if $1 == .stand { tab = .upNext }
+        }
         .background { NowPlayingBackground() }
-        // On the panel a pull down, even on the queue at its top, goes back
-        // to the artwork rather than closing the screen.
-        .interactiveDismissDisabled(page == .panel)
+        // On the panel, or stood lyrics, a pull down goes back to the artwork
+        // rather than closing the screen.
+        .interactiveDismissDisabled((page == .panel && layout != .sideBySide) || (layout == .stand && lyricsShown))
         .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0) }
         .onAppear { app.nowPlayingShown = true }
-        .onDisappear { app.nowPlayingShown = false }
+        .onDisappear {
+            app.nowPlayingShown = false
+            app.player.showsLyrics = false
+        }
+        // Set here rather than as the lyrics appear, as opening or closing the
+        // phone swaps one lyrics view for another in no set order.
+        .onChange(of: lyricsShown, initial: true) { app.player.showsLyrics = $1 }
     }
 
-    private func artworkPage(_ track: Track) -> some View {
+    private var layout: Layout {
+        if Fold.isSplit(sizeClass, isWide: shape.isWide) { return .sideBySide }
+        return sizeClass == .regular && shape.isStood ? .stand : .pager
+    }
+
+    private var lyricsShown: Bool {
+        tab == .lyrics && (layout != .pager || page == .panel)
+    }
+
+    private func pager(_ track: Track) -> some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Each page hidden from VoiceOver while off screen,
+                // so it reads one set of controls.
+                artworkPage(track, open: show)
+                    .containerRelativeFrame(.vertical)
+                    .accessibilityHidden(page != .artwork)
+                    .id(Page.artwork)
+                panelPage(track, select: show)
+                    .containerRelativeFrame(.vertical)
+                    .accessibilityHidden(page != .panel)
+                    .id(Page.panel)
+            }
+            .scrollTargetLayout()
+            .background(PagerBounceOff())
+        }
+        .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+        // The page counts as shown once past halfway, so a swipe
+        // down from the panel stays one page until it settles.
+        .scrollPosition(id: $page, anchor: .center)
+        .scrollIndicators(.hidden)
+    }
+
+    /// Either side of the fold, where there is one.
+    @available(iOS 27.1, *)
+    private func sideBySide(_ track: Track) -> some View {
+        ArrangementView {
+            artworkPage(track, open: select)
+        } secondary: {
+            SidePanel(tab: tab, isShown: true, select: select, close: nil)
+        }
+        .arrangementViewStyle(.split)
+    }
+
+    /// Stood, the upright half is out of reach, so every control is on the flat one.
+    @available(iOS 27.1, *)
+    private func stand(_ track: Track) -> some View {
+        ArrangementView {
+            if lyricsShown {
+                LyricsPanel { standSelect(.lyrics) }
+            } else {
+                LargeArtwork(url: track.thumbnail)
+                    .padding(Self.padding)
+            }
+        } secondary: {
+            // On the queue alone, even for the frame before a change of layout resets the tab.
+            if page == .panel, tab == .upNext {
+                panelPage(track, select: standSelect)
+            } else {
+                VStack(spacing: 0) {
+                    NowPlayingTopBar(track: track)
+                    Spacer(minLength: 0)
+                    controls(track, open: standSelect)
+                }
+            }
+        }
+        .arrangementViewStyle(.split)
+    }
+
+    /// Lyrics swap in for the artwork above, and back again; the queue opens below.
+    private func standSelect(_ next: PanelTab) {
+        withAnimation(Theme.normal) {
+            if next == .lyrics {
+                tab = lyricsShown ? .upNext : .lyrics
+                page = .artwork
+            } else {
+                tab = .upNext
+                page = .panel
+            }
+        }
+    }
+
+    private func artworkPage(_ track: Track, open: @escaping (PanelTab) -> Void) -> some View {
         VStack(spacing: 0) {
             LargeArtwork(url: track.thumbnail)
-                .accessibilityAction(named: "Up next") { show(.upNext) }
+                .accessibilityAction(named: "Up next") { open(.upNext) }
                 .padding(.vertical, 12)
+                .padding(.horizontal, Self.padding)
+            controls(track, open: open)
+        }
+    }
+
+    private func controls(_ track: Track, open: @escaping (PanelTab) -> Void) -> some View {
+        VStack(spacing: 0) {
             TrackTitle(track: track, compact: false)
             Scrubber()
                 .padding(.top, 12)
             TransportControls()
-            PlayerOptions(open: show)
+            PlayerOptions(open: open)
         }
         .padding(.horizontal, Self.padding)
     }
 
-    private func panelPage(_ track: Track) -> some View {
+    private func panelPage(_ track: Track, select: @escaping (PanelTab) -> Void) -> some View {
         VStack(spacing: 0) {
             CompactControls(track: track)
-            SidePanel(tab: tab, isShown: page == .panel) { next in
-                if let next { show(next) } else { withAnimation(Theme.normal) { page = .artwork } }
+            SidePanel(tab: tab, isShown: page == .panel, select: select) {
+                withAnimation(Theme.normal) { page = .artwork }
             }
         }
+    }
+
+    private func select(_ next: PanelTab) {
+        withAnimation(Theme.normal) { tab = next }
     }
 
     private func show(_ next: PanelTab) {
