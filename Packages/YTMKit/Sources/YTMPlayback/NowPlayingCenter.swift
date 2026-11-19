@@ -20,6 +20,8 @@ import AppKit
     private var trackID: String?
     private var artwork: Task<Void, Never>?
     private var published: (elapsed: Double, rate: Double, at: ContinuousClock.Instant)?
+    /// The system runs the position on at this rate; times stay in the song's own.
+    var speed = 1.0
 
     init(player: PlayerController) {
         commands.playCommand.addTarget(on: player) { $0.setPaused(false) }
@@ -80,7 +82,7 @@ import AppKit
     /// the system run the position on by itself.
     func setPlayback(playing: Bool, advancing: Bool, elapsed: Double) {
         guard trackID != nil else { return }
-        let rate = advancing ? 1.0 : 0
+        let rate = advancing ? speed : 0
         metadata[MPNowPlayingInfoPropertyElapsedPlaybackTime] = max(elapsed, 0)
         metadata[MPNowPlayingInfoPropertyPlaybackRate] = rate
         published = (elapsed, rate, .now)

@@ -20,6 +20,17 @@ struct PlaybackClockTests {
         #expect(clock.position(at: now - second) == 30)
     }
 
+    @Test func runsOnAtTheSpeed() {
+        let clock = PlaybackClock()
+        let now = mach_absolute_time()
+        clock.pin(30, since: now)
+        clock.setSpeed(1.5, at: now + second)
+        #expect(abs(clock.position(at: now + second) - 31) < 1e-6, "the speed counts from its change")
+        #expect(abs(clock.position(at: now + 3 * second) - 34) < 1e-6)
+        clock.pin(10, since: now)
+        #expect(abs(clock.position(at: now + 2 * second) - 13) < 1e-6, "a pin keeps the speed")
+    }
+
     @Test func keepsTheDurationAndDownload() {
         let clock = PlaybackClock()
         #expect(clock.duration == nil && clock.buffered == 0)

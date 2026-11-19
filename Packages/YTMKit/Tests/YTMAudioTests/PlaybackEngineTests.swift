@@ -100,6 +100,20 @@ struct PlaybackEngineTests {
         #expect(playback.events == [.buffering(true), .started(id: "one"), .buffering(false), .advanced(id: "two"), .finished])
     }
 
+    @Test func playsFasterAtASpeed() async throws {
+        let file = try Fixtures.opusWebM(Fixtures.signal(frames: 144_000))
+        let playback = OfflinePlayback(files: ["one": file])
+        let item = try AudioItem.fixture("one", length: file.count)
+        playback.engine.send { $0.setSpeed(2) }
+        playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
+        _ = await playback.render(seconds: 0.5)
+        // The clock is pinned to the player's frame, so that must run at the speed too.
+        let sample = await playback.state { $0.graph.renderedSample()?.sample ?? 0 }
+        #expect(abs(Double(sample) - 48_000) < 6_000, "a second of the song in half a second")
+        _ = await playback.render(seconds: 1.75)
+        #expect(playback.events.contains(.finished), "three seconds of the song in one and a half")
+    }
+
     @Test func seeksToTheExactFrame() async throws {
         let file = try Fixtures.opusWebM(Fixtures.signal(frames: 144_000))
         let playback = OfflinePlayback(files: ["one": file])

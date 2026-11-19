@@ -36,8 +36,8 @@ import YTMCore
 
     /// Lets the song into Speed dial, then scrobbles it, once enough of its
     /// `length` seconds has been heard.
-    func heard(position: Double, length: Double) {
-        let (heard, scrobble) = scrobbler.heard(position: position, length: length)
+    func heard(position: Double, length: Double, speed: Double) {
+        let (heard, scrobble) = scrobbler.heard(position: position, length: length, speed: speed)
         if let heard { history.markHeard(heard.id) }
         guard let play = scrobble else { return }
         let lastFM = lastFM

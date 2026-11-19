@@ -39,6 +39,7 @@ extension YTMusic: MusicService {
     var normalise: Bool { get set }
     var isMuted: Bool { get set }
     var crossfadeSeconds: Double { get }
+    var speed: Double { get set }
     func play(_ item: AudioItem, from seconds: Double, paused: Bool)
     func setNext(_ item: AudioItem?, crossfade: Bool)
     func warm(_ item: AudioItem)

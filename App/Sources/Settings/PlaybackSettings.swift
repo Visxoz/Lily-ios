@@ -23,6 +23,9 @@ struct PlaybackSettings: View {
             detail: "Fades each track into the next. Tracks of an album played in order still run straight on.",
             isOn: $settings.value.crossfade
         )
+        SettingRow(label: "Speed", detail: "Faster or slower, the pitch moving with it as on a record.", stacked: true) {
+            ChoicePills(choices: Settings.speeds.map { ($0, "\($0.formatted())×") }, selection: $settings.value.speed)
+        }
         SettingRow(label: "Equaliser", detail: EqualiserScreen.summary(settings.value)) {
             NavigationLink(value: SettingsPage.equaliser) {
                 PillLabel(title: "Adjust", small: true)

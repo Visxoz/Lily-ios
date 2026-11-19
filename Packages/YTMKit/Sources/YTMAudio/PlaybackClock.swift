@@ -2,7 +2,7 @@ import AVFoundation
 import Synchronization
 
 /// Readable from the main actor at any time without waiting on the engine. Between pins it runs on with
-/// the host clock, never past the sound scheduled, so a stall holds it still.
+/// the host clock times the speed, never past the sound scheduled, so a stall holds it still.
 final class PlaybackClock: Sendable {
     private struct State {
         /// The position at `since`, or for good while it is not running.
@@ -12,16 +12,19 @@ final class PlaybackClock: Sendable {
         var limit: Double = .infinity
         var duration: Double?
         var buffered: Double = 0
+        var speed = 1.0
+
+        func position(at hostTime: UInt64) -> Double {
+            guard let since, hostTime > since else { return seconds }
+            let elapsed = AVAudioTime.seconds(forHostTime: hostTime) - AVAudioTime.seconds(forHostTime: since)
+            return min(seconds + elapsed * speed, max(limit, seconds))
+        }
     }
 
     private let state = Mutex(State())
 
     func position(at hostTime: UInt64 = mach_absolute_time()) -> Double {
-        state.withLock { state in
-            guard let since = state.since, hostTime > since else { return state.seconds }
-            let elapsed = AVAudioTime.seconds(forHostTime: hostTime) - AVAudioTime.seconds(forHostTime: since)
-            return min(state.seconds + elapsed, max(state.limit, state.seconds))
-        }
+        state.withLock { $0.position(at: hostTime) }
     }
 
     var duration: Double? {
@@ -39,6 +42,17 @@ final class PlaybackClock: Sendable {
             state.seconds = seconds
             state.since = since
             state.limit = limit
+        }
+    }
+
+    /// Pins where it has got to at the old speed, so the new one counts only from `hostTime`.
+    func setSpeed(_ speed: Double, at hostTime: UInt64 = mach_absolute_time()) {
+        state.withLock { state in
+            if let since = state.since, hostTime > since {
+                state.seconds = state.position(at: hostTime)
+                state.since = hostTime
+            }
+            state.speed = speed
         }
     }
 

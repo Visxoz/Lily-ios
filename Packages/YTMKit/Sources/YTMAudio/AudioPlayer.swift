@@ -27,6 +27,14 @@ import Foundation
 
     public var crossfadeSeconds = 6.0
 
+    /// Record-style, the pitch moving with it. Positions, lengths and fades stay in the song's own time.
+    public var speed = 1.0 {
+        didSet {
+            let speed = speed
+            engine.send { $0.setSpeed(speed) }
+        }
+    }
+
     /// A change reaches the item playing once the few seconds already scheduled have played.
     public var normalise = true {
         didSet {
@@ -107,7 +115,7 @@ import Foundation
         engine.send { $0.stop(session: session, keepingOutput: keepingOutput) }
     }
 
-    /// For a media services reset, which takes the old graph with it. Mute and equaliser carry over.
+    /// For a media services reset, which takes the old graph with it. Mute, equaliser and speed carry over.
     public func rebuild() {
         stop()
         engine.send { $0.rebuildGraph() }

@@ -51,12 +51,15 @@ public enum Accent: String, Codable, CaseIterable, Sendable {
 public struct Settings: Codable, Equatable, Sendable {
     /// YTMCore cannot see YTMAudio's EqualiserBands, so its band count is repeated here and checked by a test.
     static let equaliserBands = 6
+    /// In the order Settings offers them.
+    public static let speeds = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]
 
     public var muted = false
     public var quality: AudioQuality = .high
     public var normalise = true
     /// Fade each track into the next, rather than playing them gaplessly.
     public var crossfade = false
+    public var speed = 1.0
     public var autoplay = true
     public var shuffle: ShuffleMode = .off
     public var repeatMode: RepeatMode = .off
@@ -92,6 +95,7 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&quality, .quality)
         file.read(&normalise, .normalise)
         file.read(&crossfade, .crossfade)
+        file.read(&speed, .speed) { Self.speeds.contains($0) }
         file.read(&autoplay, .autoplay)
         file.read(&shuffle, .shuffle)
         file.read(&repeatMode, .repeatMode)

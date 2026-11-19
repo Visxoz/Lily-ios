@@ -24,15 +24,16 @@ struct GaplessTests {
     }
 
     @Test func queuesEarlierByTheFadeAndTheSilenceItMayCut() {
-        #expect(GaplessScheduler.lead(crossfade: 0) == 15)
-        #expect(GaplessScheduler.lead(crossfade: 6) == 25)
+        #expect(GaplessScheduler.lead(crossfade: 0, speed: 1) == 15)
+        #expect(GaplessScheduler.lead(crossfade: 6, speed: 1) == 25)
+        #expect(abs(GaplessScheduler.lead(crossfade: 6, speed: 1.2) - 28) < 1e-9, "only opening the next takes clock time")
     }
 
     @Test func queuesTheNextSongOnceNearTheEnd() {
         var scheduler = GaplessScheduler()
         let (a, b) = (song("a"), song("b"))
         func plan(at position: Double) -> (stale: Bool, due: (id: String, crossfade: Double)?) {
-            scheduler.plan(position: position, duration: 200, started: true, current: a, next: b, crossfadeSeconds: 6)
+            scheduler.plan(position: position, duration: 200, started: true, current: a, next: b, crossfadeSeconds: 6, speed: 1)
         }
         #expect(plan(at: 170).due == nil, "too early, even with a fade")
         #expect(plan(at: 176).due?.id == "b")
@@ -46,11 +47,13 @@ struct ScrobblerTests {
     private let ms = Duration.milliseconds
 
     @Test func countsOnlyTimePlayedThrough() {
-        #expect(Scrobbler.playedThrough(moved: 0.25, elapsed: ms(250)) == 0.25, "a tick")
-        #expect(Scrobbler.playedThrough(moved: 5, elapsed: ms(5000)) == 5, "a tick held up by the main actor")
-        #expect(Scrobbler.playedThrough(moved: 30, elapsed: ms(250)) == 0, "a seek")
-        #expect(Scrobbler.playedThrough(moved: -30, elapsed: ms(250)) == 0, "back")
-        #expect(Scrobbler.playedThrough(moved: 0, elapsed: ms(250)) == 0, "paused")
+        #expect(Scrobbler.playedThrough(moved: 0.25, elapsed: ms(250), speed: 1) == 0.25, "a tick")
+        #expect(Scrobbler.playedThrough(moved: 5, elapsed: ms(5000), speed: 1) == 5, "a tick held up by the main actor")
+        #expect(Scrobbler.playedThrough(moved: 30, elapsed: ms(250), speed: 1) == 0, "a seek")
+        #expect(Scrobbler.playedThrough(moved: -30, elapsed: ms(250), speed: 1) == 0, "back")
+        #expect(Scrobbler.playedThrough(moved: 0, elapsed: ms(250), speed: 1) == 0, "paused")
+        #expect(Scrobbler.playedThrough(moved: 6.5, elapsed: ms(5000), speed: 1.3) == 6.5, "a held-up tick at a faster speed")
+        #expect(Scrobbler.playedThrough(moved: 6.5, elapsed: ms(5000), speed: 1) == 0, "too far for the time at 1x")
     }
 
     @Test func aPlayCountsAfterThirtySecondsOrHalfAShortSong() {
@@ -66,9 +69,9 @@ struct ScrobblerTests {
         var scrobbler = Scrobbler()
         scrobbler.start(song("a"))
         var at = ContinuousClock.now
-        _ = scrobbler.heard(position: 0, length: 20, at: at)
+        _ = scrobbler.heard(position: 0, length: 20, speed: 1, at: at)
         at += .milliseconds(250)
-        let sought = scrobbler.heard(position: 9, length: 20, at: at)
+        let sought = scrobbler.heard(position: 9, length: 20, speed: 1, at: at)
         #expect(sought.heard == nil, "a seek counts nothing")
         var position = 9.0
         var heard: [String] = []
@@ -76,7 +79,7 @@ struct ScrobblerTests {
         for _ in 0..<40 {
             at += .milliseconds(250)
             position += 0.25
-            let result = scrobbler.heard(position: position, length: 20, at: at)
+            let result = scrobbler.heard(position: position, length: 20, speed: 1, at: at)
             if let track = result.heard { heard.append(track.id) }
             if result.scrobble != nil { scrobbled += 1 }
         }
@@ -96,9 +99,9 @@ struct ScrobblerTests {
         var scrobbler = Scrobbler()
         scrobbler.start(song("a"))
         let start = ContinuousClock.now
-        let result1 = scrobbler.heard(position: 0, length: 60, at: start)
+        let result1 = scrobbler.heard(position: 0, length: 60, speed: 1, at: start)
         #expect(result1.scrobble == nil)
-        let result2 = scrobbler.heard(position: 100, length: 60, at: start + .milliseconds(250))
+        let result2 = scrobbler.heard(position: 100, length: 60, speed: 1, at: start + .milliseconds(250))
         #expect(result2.scrobble == nil, "a seek counts nothing")
         var at = start + .milliseconds(250)
         var position = 100.0
@@ -106,7 +109,7 @@ struct ScrobblerTests {
         for _ in 0..<130 {
             at += .milliseconds(250)
             position += 0.25
-            if let play = scrobbler.heard(position: position, length: 60, at: at).scrobble { scrobbled.append(play.track.id) }
+            if let play = scrobbler.heard(position: position, length: 60, speed: 1, at: at).scrobble { scrobbled.append(play.track.id) }
         }
         #expect(scrobbled == ["a"], "30 s heard of 60, once")
     }

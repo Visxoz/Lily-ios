@@ -6,8 +6,8 @@ import YTMCore
 /// Queues the next song in the engine shortly before the current one ends,
 /// so it follows without a gap or fades in.
 struct GaplessScheduler {
-    /// Time for the next stream to start downloading and its decoder to open. A
-    /// crossfade adds its length and the silence it may cut, which the engine holds back.
+    /// Wall time for the next stream to start downloading and its decoder to open. A crossfade
+    /// adds its length and the silence it may cut, which the engine holds back, both in song time.
     static let leadSeconds = 15.0
 
     struct Queued {
@@ -31,17 +31,19 @@ struct GaplessScheduler {
         return a < .max && a + 1 == b
     }
 
-    static func lead(crossfade: Double) -> Double {
-        crossfade > 0 ? leadSeconds + crossfade + AudioPlayer.silenceTrimSeconds : leadSeconds
+    /// In song time, which passes `speed` times as fast as wall time.
+    static func lead(crossfade: Double, speed: Double) -> Double {
+        let open = leadSeconds * speed
+        return crossfade > 0 ? open + crossfade + AudioPlayer.silenceTrimSeconds : open
     }
 
     /// `stale`: the queued song is no longer next; `due`: the song to queue now, with its fade.
     func plan(
-        position: Double, duration: Double, started: Bool, current: Track?, next: Track?, crossfadeSeconds: Double?
+        position: Double, duration: Double, started: Bool, current: Track?, next: Track?, crossfadeSeconds: Double?, speed: Double
     ) -> (stale: Bool, due: (id: String, crossfade: Double)?) {
         let fade = if let crossfadeSeconds, let next, !Self.inAlbumOrder(current, next) { crossfadeSeconds } else { 0.0 }
         let stale = queued.map { $0.trackID != next?.id } ?? false
-        let nearEnd = started && duration > 0 && duration - position <= Self.lead(crossfade: fade) && (queued == nil || stale)
+        let nearEnd = started && duration > 0 && duration - position <= Self.lead(crossfade: fade, speed: speed) && (queued == nil || stale)
         guard nearEnd, let next, tried != next.id else { return (stale, nil) }
         return (stale, (next.id, fade))
     }
@@ -78,7 +80,8 @@ extension PlayerController {
         let next = queue.peekNext(repeat: repeatMode)
         let plan = gapless.plan(
             position: position, duration: playback.duration, started: playback.started,
-            current: queue.current, next: next, crossfadeSeconds: settings.value.crossfade ? audio.crossfadeSeconds : nil
+            current: queue.current, next: next, crossfadeSeconds: settings.value.crossfade ? audio.crossfadeSeconds : nil,
+            speed: audio.speed
         )
         if plan.stale { dropQueuedNext() }
         guard let (nextID, fade) = plan.due, let next else { return }

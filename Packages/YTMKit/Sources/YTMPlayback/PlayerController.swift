@@ -276,7 +276,7 @@ import YTMCore
         syncPremiumStatus()
         guard playback.started else { return }
         let position = audio.currentTime
-        recorder.heard(position: position, length: playback.duration)
+        recorder.heard(position: position, length: playback.duration, speed: audio.speed)
         updateGapless(at: position)
         nowPlaying?.keep(elapsed: position, advancing: isAdvancing)
     }

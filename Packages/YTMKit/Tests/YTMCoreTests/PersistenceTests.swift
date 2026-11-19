@@ -23,6 +23,12 @@ import Testing
         #expect(try JSONDecoder().decode(Settings.self, from: saved) == settings)
     }
 
+    @Test func keepsOnlyASpeedSettingsOffers() throws {
+        #expect(Settings().speed == 1)
+        #expect(try decode(#"{"speed": 1.2}"#).speed == 1.2)
+        #expect(try decode(#"{"speed": 1.7}"#).speed == 1, "not offered")
+    }
+
     @Test func defaultsToLilysOrchidOnBlack() {
         let settings = Settings()
         #expect(settings.accent == .lily && settings.look == .black)

@@ -15,10 +15,11 @@ struct Scrobbler {
 
     private var playing: Listening?
 
-    /// Forward by no more than `elapsed` allows, so a seek adds nothing while
-    /// a delayed tick loses nothing, as the sound plays on its own thread.
-    static func playedThrough(moved: Double, elapsed: Duration) -> Double {
-        moved > 0 && moved <= (elapsed + PlayerController.tick).seconds ? moved : 0
+    /// Forward by no more than the song time `elapsed` plays at `speed`, so a
+    /// seek adds nothing while a delayed tick loses nothing, as the sound plays
+    /// on its own thread.
+    static func playedThrough(moved: Double, elapsed: Duration, speed: Double) -> Double {
+        moved > 0 && moved <= (elapsed + PlayerController.tick).seconds * speed ? moved : 0
     }
 
     /// Speed dial's rule: 30 seconds, or half of a song under a minute; an
@@ -41,11 +42,11 @@ struct Scrobbler {
     /// play once it counts for Last.fm, each only that once. Last.fm's rule is
     /// never met before Speed dial's, so ending the listening there loses nothing.
     mutating func heard(
-        position: Double, length: Double, at now: ContinuousClock.Instant = .now
+        position: Double, length: Double, speed: Double, at now: ContinuousClock.Instant = .now
     ) -> (heard: Track?, scrobble: (track: Track, startedAt: Date)?) {
         guard var listening = playing else { return (nil, nil) }
         if let last = listening.lastTick {
-            listening.heard += Self.playedThrough(moved: position - last.position, elapsed: now - last.at)
+            listening.heard += Self.playedThrough(moved: position - last.position, elapsed: now - last.at, speed: speed)
         }
         listening.lastTick = (position, now)
         var heard: Track?

@@ -3,7 +3,7 @@ import Observation
 import YTMCore
 
 /// Settings changes take effect as made: normalisation within the few seconds the
-/// engine has scheduled, quality and crossfade from the next song queued.
+/// engine has scheduled, quality and crossfade from the next song queued, speed at once.
 extension PlayerController {
     public func toggleMute() {
         settings.value.muted.toggle()
@@ -57,6 +57,11 @@ extension PlayerController {
         applied = new
         if audio.isMuted != new.muted { audio.isMuted = new.muted }
         if audio.normalise != new.normalise { audio.normalise = new.normalise }
+        if audio.speed != new.speed {
+            audio.speed = new.speed
+            nowPlaying?.speed = new.speed
+            publishPlayback()
+        }
         if old?.equaliserEnabled != new.equaliserEnabled || old?.equaliserGains != new.equaliserGains {
             audio.equaliser = (new.equaliserEnabled, new.equaliserGains)
         }

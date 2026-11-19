@@ -191,6 +191,7 @@ final class FakeMusic: MusicService {
     var normalise = true
     var isMuted = false
     let crossfadeSeconds = 6.0
+    var speed = 1.0
     private(set) var played: [(item: AudioItem, from: Double, paused: Bool)] = []
     private(set) var next: AudioItem?
     private(set) var warmed: [AudioItem] = []

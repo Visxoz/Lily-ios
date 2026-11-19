@@ -6,19 +6,21 @@ final class AudioGraph {
     let engine = AVAudioEngine()
     let player = AVAudioPlayerNode()
     private let mixer = AVAudioMixerNode()
+    private let varispeed = AVAudioUnitVarispeed()
     private let equaliser = AVAudioUnitEQ(numberOfBands: EqualiserBands.frequencies.count)
     private(set) var playerFormat: AVAudioFormat?
     private var outputRate = 48_000.0
     private var level: Float = 1
     private var silenced = false
     private var equaliserSetting: (enabled: Bool, gains: [Float]) = (false, [])
+    private var speed = 1.0
 
     /// Renders into `offlineFormat` on demand rather than to the device, for tests.
     init(offlineFormat: AVAudioFormat? = nil) {
         if let offlineFormat {
             try? engine.enableManualRenderingMode(.offline, format: offlineFormat, maximumFrameCount: 4_096)
         }
-        for node in [player, mixer, equaliser] {
+        for node in [player, mixer, varispeed, equaliser] {
             engine.attach(node)
         }
         for (band, frequency) in zip(equaliser.bands, EqualiserBands.frequencies) {
@@ -36,8 +38,14 @@ final class AudioGraph {
         let rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
         outputRate = rate > 0 ? rate : 48_000
         let format = AVAudioFormat(standardFormatWithSampleRate: outputRate, channels: 2)
-        // Plain nodes at a standard format: the engine has no reason to refuse.
-        _ = connect(mixer, to: equaliser, format: format)
+        // Plain nodes at a standard format: the engine has no reason to refuse. At 1x the varispeed
+        // stays out of the path, so the sound is exactly the decoder's.
+        if speed == 1 {
+            _ = connect(mixer, to: equaliser, format: format)
+        } else {
+            _ = connect(mixer, to: varispeed, format: format)
+            _ = connect(varispeed, to: equaliser, format: format)
+        }
         _ = connect(equaliser, to: engine.outputNode, format: format)
         applyEqualiser()
     }
@@ -99,9 +107,21 @@ final class AudioGraph {
         applyEqualiser()
     }
 
+    /// True if the varispeed joined or left the path, which stops the engine to reconnect it.
+    func setSpeed(_ speed: Double) -> Bool {
+        let rewired = (speed == 1) != (self.speed == 1)
+        self.speed = speed
+        varispeed.rate = Float(speed)
+        guard rewired else { return false }
+        engine.stop()
+        connectOutput()
+        return true
+    }
+
     func adoptSettings(of old: AudioGraph) {
         setLevel(old.level)
         setEqualiser(enabled: old.equaliserSetting.enabled, gains: old.equaliserSetting.gains)
+        _ = setSpeed(old.speed)
     }
 
     /// The host time is nil when the device gives none.

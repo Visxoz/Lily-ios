@@ -194,6 +194,14 @@ actor PlaybackEngine {
         graph.setEqualiser(enabled: enabled, gains: gains)
     }
 
+    /// Between two speeds other than 1x the change is live; to or from 1x the output is reconnected,
+    /// so the sound carries on from where it was, as after a device change. Paused, `resume` does that.
+    func setSpeed(_ speed: Double) {
+        clock.setSpeed(speed)
+        guard graph.setSpeed(speed), heard != nil, !paused else { return }
+        seek(to: clock.position(), session: session)
+    }
+
     func cacheSize() -> Int64 {
         cache.size()
     }
@@ -203,7 +211,7 @@ actor PlaybackEngine {
     }
 
     /// For after a media services reset, when the old graph no longer reaches the device.
-    /// Drops anything playing; the mute and equaliser carry over.
+    /// Drops anything playing; the mute, equaliser and speed carry over.
     func rebuildGraph() {
         clear()
         if let observer {
