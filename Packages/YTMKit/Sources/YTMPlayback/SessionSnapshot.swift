@@ -13,6 +13,13 @@ struct SessionSnapshot: Codable, Equatable, Sendable {
     var duration: Double
     /// Queue entries Smart Shuffle put in.
     var recommended: [Int]
+    /// The current song's stream, so a play soon after launch needn't ask YouTube again.
+    var stream: KeptStream? = nil
+
+    struct KeptStream: Codable, Equatable, Sendable {
+        var stream: ResolvedStream
+        var resolved: Date
+    }
 
     /// All of the queue, or the window around `index` if it is long.
     static func window(count: Int, index: Int) -> Range<Int> {
@@ -57,7 +64,10 @@ extension PlayerController {
     private func writeSession() {
         let position = if let resume = playback.resume, resume.id == current?.id { resume.position }
             else if playback.started { audio.currentTime } else { 0.0 }
-        guard let snapshot = SessionSnapshot(queue, position: position, duration: playback.duration) else { return }
+        guard var snapshot = SessionSnapshot(queue, position: position, duration: playback.duration) else { return }
+        if let id = current?.id, let kept = prefetcher.kept(id) {
+            snapshot.stream = .init(stream: kept.stream, resolved: .now.addingTimeInterval(-(ContinuousClock.now - kept.resolvedAt).seconds))
+        }
         store.save(snapshot, to: .session)
     }
 
@@ -70,6 +80,12 @@ extension PlayerController {
         playback.resume = (track.id, session.position)
         playback.duration = track.duration.map(Double.init) ?? session.duration
         playback.heldPosition = session.position
+        if let saved = session.stream {
+            let age = Duration.seconds(Date.now.timeIntervalSince(saved.resolved))
+            // Only with half its hour left, so it still covers a play well after launch; not if the
+            // clock was set back, which would keep it fresh for ever.
+            if age >= .zero, age < StreamPrefetcher.freshFor / 2 { prefetcher.store(track.id, .init(stream: saved.stream, resolvedAt: .now - age, epoch: prefetcher.epoch)) }
+        }
         current = track
         duration = playback.duration
         nowPlaying?.show(track, duration: duration)

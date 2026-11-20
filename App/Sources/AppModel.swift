@@ -57,7 +57,8 @@ final class AppModel {
     private(set) var isSignedIn = false
     private(set) var account: Account?
     /// Bumped whenever the account changes, so results asked for by the last account are
-    /// dropped. Zero until the stored sign-in has been read, before which pages don't load.
+    /// dropped. Zero until the stored sign-in has been read, before which pages don't load, bar
+    /// Home's launch request, which the first load of Home takes over under the generation it is in.
     private(set) var accountGeneration = 0
 
     private(set) var theme: Theme
@@ -72,6 +73,8 @@ final class AppModel {
     @ObservationIgnored var pageCache: [Route: CachedPage] = [:]
     /// Shared by every screen asking for the same route.
     @ObservationIgnored var pageLoads: [Route: Task<Page, any Error>] = [:]
+    /// The launch's Home request, which the first load of Home takes over.
+    @ObservationIgnored var homeAhead: Task<Page, any Error>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// The wait for Last.fm access, which outlives Settings.
     private var lastFMWait: Task<Void, Never>?
@@ -84,6 +87,8 @@ final class AppModel {
         audio = AudioPlayer()
         player = PlayerController(api: api, settings: settings, history: history, audio: audio)
         theme = Theme(settings: settings.value, artworkAccent: nil)
+        // Detached, as the main actor builds the first frame before any task of its own runs.
+        homeAhead = Task.detached(priority: .userInitiated) { [api] in try await api.page(.home) }
         // Read here, for the app's life: a view's task would be cancelled by a scene teardown,
         // ending the one-consumer stream.
         Task { [weak self, toasts = player.toasts] in
@@ -95,9 +100,10 @@ final class AppModel {
     /// (two seconds at most), so they don't slow it.
     func start() async {
         isSignedIn = await api.auth.isSignedIn
-        // Before the request, which belongs to the generation it starts in.
+        // Before the load, which belongs to the generation it starts in.
         accountGeneration += 1
         let home = isSignedIn ? Task { try await fetchPage(.home) } : nil
+        Task { await ImagePipeline.preconnect() }
         let homeSettled = Task { await Self.settled(home, within: .seconds(2)) }
         await player.start { await homeSettled.value }
         await homeSettled.value
@@ -123,8 +129,8 @@ final class AppModel {
         }
     }
 
-    /// The colours are sampled from any copy in memory, else the small one, as the palette reads
-    /// only 16 pixels square, so they never wait for the large one.
+    /// The colours are sampled from the small copy, else any other in memory, as the palette reads
+    /// only 16 pixels square, so they never wait for or draw down the large one.
     func followArtwork(of url: String?) async {
         // Without artwork, the last song's colour would linger.
         guard let url else {
@@ -133,7 +139,7 @@ final class AppModel {
         }
         let colours: ArtworkColours?
         // At 3x, the scale the shared pixel sizes are set for, so the card a song started from is found.
-        if let image = ArtworkImage.cachedAnySize(url, scale: 3) {
+        if let image = ArtworkImage.cachedAnySize(url, preferring: ImagePipeline.smallEdge, scale: 3) {
             colours = await ArtworkColours.of(image)
         } else {
             colours = await ArtworkColours.of(url: url, pixelEdge: ImagePipeline.smallEdge)
@@ -177,6 +183,7 @@ final class AppModel {
         // A request the last account made must not be shared with the next.
         pageLoads.values.forEach { $0.cancel() }
         pageLoads.removeAll()
+        homeAhead.take()?.cancel()
         accountGeneration += 1
         if !quietly {
             sheet = nil

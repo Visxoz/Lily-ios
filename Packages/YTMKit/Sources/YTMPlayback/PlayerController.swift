@@ -185,6 +185,7 @@ import YTMCore
         Task { [weak self] in
             await launchLoad()
             self?.warmUp(restored, rating: rating)
+            self?.downloads.release()
         }
     }
 

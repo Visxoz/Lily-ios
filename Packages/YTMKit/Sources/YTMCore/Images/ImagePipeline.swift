@@ -19,8 +19,8 @@ public final class ImagePipeline: Sendable {
     /// Decoded artwork kept, in bytes: enough for a Home feed's cards and the
     /// player's 1080-pixel copy to outlast a scroll.
     private static let memoryLimit = 96 << 20
-    /// Prefetches at once: few, so the artwork a view asks for itself never
-    /// queues behind a page's worth for the media host's connections.
+    /// Prefetches at once per page, besides any its last run left finishing: few, so the
+    /// artwork a view asks for itself never queues behind a page's worth for the media host's connections.
     private static let prefetchWidth = 4
     private static let log = Logger(subsystem: "Lily", category: "ImagePipeline")
     /// Downloaded songs' artwork, at the player's size, which serves every smaller one.
@@ -66,6 +66,19 @@ public final class ImagePipeline: Sendable {
                     await downloads.prefetch(key) { await Self.download(url, edge: pixelEdge) }
                 }
                 running += 1
+            }
+        }
+    }
+
+    /// Opens the artwork hosts' connections while YouTube builds Home, so its first art needn't.
+    @concurrent
+    public static func preconnect() async {
+        await withTaskGroup(of: Void.self) { group in
+            for host in ["lh3.googleusercontent.com", "i.ytimg.com"] {
+                guard let url = URL(string: "https://\(host)/") else { continue }
+                var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+                request.httpMethod = "HEAD"
+                group.addTask { _ = try? await HTTP.data(for: request, session: HTTP.media) }
             }
         }
     }
@@ -240,16 +253,13 @@ actor Downloads {
     }
 
     /// Runs `download`, a prefetch of `key`'s image, unless the image is on
-    /// its way already. It stops with its caller.
+    /// its way already. Once started it outlives its caller, as the page's next
+    /// prefetch, or a view waiting on it, wants the same bytes.
     func prefetch(_ key: String, download: @escaping @Sendable () async -> Void) async {
         guard downloads[key] == nil, prefetches[key] == nil else { return }
         let task = Task { await download() }
         prefetches[key] = task
-        await withTaskCancellationHandler {
-            await task.value
-        } onCancel: {
-            task.cancel()
-        }
+        await task.value
         prefetches[key] = nil
     }
 

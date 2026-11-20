@@ -143,7 +143,11 @@ extension PlayerController {
         let source = streamSource(for: track.id)
         let generation = playback.generation
         resolving = Task { [weak self] in
-            let result = await Result { try await source() }
+            async let resolved = Result { try await source() }
+            // The session starts while the stream resolves off the main actor, not after it. Not
+            // offline, where a song not downloaded fails and would only silence other apps.
+            if let self, isPlaying, downloads.online != false { activateAudioSession() }
+            let result = await resolved
             guard let self, !Task.isCancelled, playback.generation == generation else { return }
             switch result {
             case .success(let prefetched): load(track, prefetched)

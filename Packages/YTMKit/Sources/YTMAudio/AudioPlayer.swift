@@ -59,6 +59,8 @@ import Foundation
         (events, continuation) = AsyncStream.makeStream(of: AudioEvent.self)
         let (stamped, sink) = AsyncStream.makeStream(of: PlaybackEngine.Stamped.self)
         engine = PlaybackEngine(output: output, source: source, cache: cache, events: sink)
+        // Trimmed now, on the engine's queue, rather than in front of the first song's download.
+        engine.send { _ = $0.cache }
         relay = Task { [weak self] in
             for await event in stamped {
                 self?.deliver(event)

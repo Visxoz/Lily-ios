@@ -44,9 +44,7 @@ struct RootView: View {
         .preferredColorScheme(app.theme.colorScheme)
         .tint(app.theme.accent)
         .task { await app.followTheme() }
-        .task(id: app.player.current?.thumbnail) { await app.followArtwork(of: app.player.current?.thumbnail) }
-        .onChange(of: app.player.libraryRevision) { app.libraryChanged() }
-        .onChange(of: app.player.downloads.isActive) { _, active in app.keepDownloading(active) }
+        .modifier(FollowPlayer())
         .modifier(HingeCheck())
     }
 
@@ -56,6 +54,18 @@ struct RootView: View {
         } set: { sheet in
             if sheet == nil, let current = app.sheet, shows(current) { app.sheet = nil }
         }
+    }
+}
+
+/// Apart from RootView, so a song change re-runs this rather than the whole tab tree.
+private struct FollowPlayer: ViewModifier {
+    @Environment(AppModel.self) private var app
+
+    func body(content: Content) -> some View {
+        content
+            .task(id: app.player.current?.thumbnail) { await app.followArtwork(of: app.player.current?.thumbnail) }
+            .onChange(of: app.player.libraryRevision) { app.libraryChanged() }
+            .onChange(of: app.player.downloads.isActive) { _, active in app.keepDownloading(active) }
     }
 }
 

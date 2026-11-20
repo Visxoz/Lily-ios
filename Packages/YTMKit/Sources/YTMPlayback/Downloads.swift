@@ -50,6 +50,8 @@ import YTMCore
     @ObservationIgnored private var resting: Task<Void, Never>?
     @ObservationIgnored var refreshing: Task<Void, Never>?
     @ObservationIgnored private var watching: Task<Void, Never>?
+    /// Until the launch's own requests settle, so downloads don't slow Home or the first song.
+    @ObservationIgnored private(set) var held = true
 
     @ObservationIgnored let music: any MusicService
     @ObservationIgnored let settings: SettingsStore
@@ -127,6 +129,12 @@ import YTMCore
         index.songs.values.reduce(0) { $0 + $1.stream.contentLength }
     }
 
+    /// Lets downloads start, once the launch has settled.
+    func release() {
+        held = false
+        resume()
+    }
+
     /// Retries failed songs and a full phone, and refreshes collections and smart picks when due.
     public func resume() {
         if !failed.isEmpty { failed.removeAll() }
@@ -198,7 +206,7 @@ import YTMCore
             }
         }
         if saving || !unwanted.isEmpty { store.save(index, to: .downloads) }
-        guard canDownload, !outOfRoom, resting == nil else { return }
+        guard canDownload, !held, !outOfRoom, resting == nil else { return }
         for track in wanted {
             guard active.count < Self.simultaneous else { break }
             if index.songs[track.id] == nil, active[track.id] == nil, !failed.contains(track.id) { start(track) }

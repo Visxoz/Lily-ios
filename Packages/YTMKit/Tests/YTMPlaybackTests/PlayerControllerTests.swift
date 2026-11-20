@@ -167,12 +167,25 @@ struct PlayerControllerTests {
         #expect(!second.player.isPlaying)
         #expect(second.audio.played.isEmpty, "nothing loads until played")
         await second.settle()
-        #expect(second.music.calls.contains("stream b"), "resolved ahead at launch")
         second.player.togglePlayPause()
         await second.settle()
         let resumed = try #require(second.audio.played.last)
         #expect(resumed.item.id.hasPrefix("b#") && resumed.from == 42)
-        #expect(second.music.calls.filter { $0 == "stream b" }.count == 1, "the play takes it rather than asking again")
+        #expect(!second.music.calls.contains("stream b"), "the last launch's stream plays without asking again")
+    }
+
+    @Test func asksAgainForAStaleOrFutureDatedSavedStream() async throws {
+        var queue = Queue<Track>(seed: 1)
+        queue.set(items: songs("a"), start: 0, shuffle: false)
+        for resolved in [Date.now.addingTimeInterval(-2 * 60 * 60), .now.addingTimeInterval(60)] {
+            let rig = Rig()
+            var snapshot = try #require(SessionSnapshot(queue, position: 0, duration: 200))
+            snapshot.stream = .init(stream: FakeMusic.stream("a"), resolved: resolved)
+            rig.store.save(snapshot, to: .session)
+            await rig.player.start()
+            await rig.settle()
+            #expect(rig.music.calls.contains("stream a"), "resolved ahead at launch")
+        }
     }
 
     @Test func seeksBeforeLoadingStartThere() async throws {

@@ -9,6 +9,14 @@ struct DownloadsTests {
         DownloadedSong(track: track, stream: FakeMusic.stream(track.id), added: .now)
     }
 
+    @Test func waitForTheLaunchToSettle() async {
+        let rig = Rig()
+        #expect(rig.player.downloads.held, "not competing with Home")
+        await rig.player.start()
+        await rig.yieldToTasks()
+        #expect(!rig.player.downloads.held)
+    }
+
     @Test func removingAPlaylistKeepsTheSongsSomethingElseHolds() {
         let downloads = Rig().player.downloads
         let (a, b) = (song("a"), song("b"))

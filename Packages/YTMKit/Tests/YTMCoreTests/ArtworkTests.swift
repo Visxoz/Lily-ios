@@ -140,6 +140,26 @@ private actor DownloadLog {
         #expect(await log.events.count == 3, "a finished prefetch no longer blocks another")
     }
 
+    @Test func aStartedPrefetchOutlivesItsCaller() async {
+        let downloads = Downloads()
+        let log = DownloadLog()
+        let (started, didStart) = AsyncStream.makeStream(of: Void.self)
+        let prefetch = Task {
+            await downloads.prefetch("art") {
+                didStart.yield()
+                try? await Task.sleep(for: .milliseconds(50))
+                if !Task.isCancelled { await log.add("prefetched") }
+            }
+        }
+        for await _ in started { break }
+        prefetch.cancel()
+        _ = await downloads.image(for: "art") {
+            await log.add("loaded")
+            return nil
+        }
+        #expect(await log.events == ["prefetched", "loaded"], "the request reads what the prefetch went on to download")
+    }
+
     @Test func decodesWithTheShorterSideAtTheEdge() throws {
         let data = NSMutableData()
         let destination = try #require(CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))

@@ -83,7 +83,7 @@ extension Downloads {
 
     /// Syncs albums and playlists with YouTube and picks smart downloads afresh, each when due.
     func refreshIfDue() {
-        guard canDownload, refreshing == nil else { return }
+        guard canDownload, !held, refreshing == nil else { return }
         let syncing = !index.collections.isEmpty && Self.isDue(index.collectionsSynced)
         let picking = settings.value.smartDownloads && Self.isDue(index.smartRefreshed)
         guard syncing || picking else { return }

@@ -21,11 +21,16 @@ extension AppModel {
     func fetchPage(_ route: Route) async throws -> Page {
         if let load = pageLoads[route] { return try await load.value }
         let generation = accountGeneration
+        let ahead = route == .home ? homeAhead.take() : nil
         let load = Task<Page, any Error> { [api] in
             defer { if generation == self.accountGeneration { self.pageLoads[route] = nil } }
             let page: Page
             do {
-                page = try await api.page(route)
+                if let ahead {
+                    page = try await withTaskCancellationHandler { try await ahead.value } onCancel: { ahead.cancel() }
+                } else {
+                    page = try await api.page(route)
+                }
             } catch {
                 if !Task.isCancelled, let local = self.player.downloads.page(for: route) { return local }
                 throw error
