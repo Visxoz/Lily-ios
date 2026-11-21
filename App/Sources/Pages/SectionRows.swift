@@ -57,6 +57,7 @@ private struct SectionTrack: View {
             number: section.numbered ? track.trackNumber ?? index + 1 : index + 1,
             numbered: section.numbered
         ) { app.player.play(section, at: index) }
+        .modifier(EntryDrag(track: track, index: index))
         .padding(.horizontal, Metrics.pagePadding)
     }
 }

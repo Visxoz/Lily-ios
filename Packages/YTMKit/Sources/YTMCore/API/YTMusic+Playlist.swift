@@ -25,12 +25,13 @@ extension YTMusic {
         return tracks
     }
 
-    /// Nil when the batch failed for any reason but cancellation.
-    func playlistBatch(after token: String, asOwner: Bool) async throws -> (tracks: [Track], next: String?)? {
+    /// Nil when the batch failed for any reason but cancellation. `entries` keeps each song's entry ID, for the
+    /// account's own playlist.
+    func playlistBatch(after token: String, asOwner: Bool, entries: Bool = false) async throws -> (tracks: [Track], next: String?)? {
         do {
-            let response = try await asAccount(asOwner) { try await self.innerTube.continuation(token, authenticated: $0) }
+            let response = try await asAccount(asOwner) { try await self.innerTube.continuation(token, authenticated: $0) }.response
             let (items, next) = Renderers.continuationItems(in: response)
-            return (Renderers.tracks(items), next)
+            return (Renderers.tracks(items, context: ItemContext(entries: entries)), next)
         } catch {
             try Task.checkCancellation()
             return nil
@@ -38,20 +39,23 @@ extension YTMusic {
     }
 
     private func playlistResponse(_ id: String, asOwner: Bool) async throws -> JSON {
-        try await asAccount(asOwner) { try await self.innerTube.browse("VL" + id, authenticated: $0) }
+        try await asAccount(asOwner) { try await self.innerTube.browse("VL" + id, authenticated: $0) }.response
     }
 
-    /// Private playlists, Liked music and their radios exist only for their
-    /// owner; with a stale cookie, public ones still open signed out. The
-    /// first failure is the one reported.
-    private func asAccount(_ asOwner: Bool, _ request: (Bool) async throws -> JSON) async throws -> JSON {
-        guard asOwner else { return try await request(false) }
+    /// Private playlists, Liked music and their radios exist only for their owner, and only the account's own
+    /// requests say what is in its library; with a stale cookie, public pages still open signed out. The first
+    /// failure is the one reported. `signedIn` says whether the answer was the account's, which a request without
+    /// a cookie, the signed-out fallback and an answer YouTube served signed out are not.
+    func asAccount(_ asOwner: Bool, _ request: (Bool) async throws -> JSON) async throws -> (response: JSON, signedIn: Bool) {
+        guard asOwner else { return (try await request(false), false) }
+        let signedIn = await auth.isSignedIn
         do {
-            return try await request(true)
+            let response = try await request(true)
+            return (response, signedIn && !Renderers.answeredSignedOut(response))
         } catch {
             try Task.checkCancellation()
             guard await auth.isSignedIn, let signedOut = try? await request(false) else { throw error }
-            return signedOut
+            return (signedOut, false)
         }
     }
 }
@@ -63,11 +67,14 @@ extension Renderers {
         guard header.exists || shelf.exists else {
             throw YTMError(.notFound, "This playlist isn't available.")
         }
-        let tracks = tracks(shelf["contents"].array)
+        let ownership = ownership(in: response)
+        // Only those the account made take edits, not Liked music or the mixes.
+        let own = ownership.editable && id.hasPrefix("PL")
+        let tracks = tracks(shelf["contents"].array, context: ItemContext(entries: own))
         let token = continuation(shelf)
         // The whole list's count is worth reading only when this batch isn't all of it.
         let count = token == nil ? tracks.count : trackCount(header)
-        let pageHeader = PageHeader(
+        var pageHeader = PageHeader(
             label: "Playlist",
             // Album playlists can come without a header; their tracks name the album.
             title: header["title"].text ?? tracks.first?.album?.name ?? "",
@@ -78,6 +85,13 @@ extension Renderers {
             radioId: YTMusic.radioId(forPlaylist: id),
             playlistId: id
         )
+        pageHeader.count = count
+        if own {
+            pageHeader.editable = true
+            pageHeader.privacy = ownership.privacy
+        }
+        pageHeader.saved = saved(header)
+        pageHeader.saveId = pageHeader.saved.map { _ in id }
         return Page(
             header: pageHeader,
             sections: [Section.tracks("", tracks, mode: .section)].compactMap(\.self),

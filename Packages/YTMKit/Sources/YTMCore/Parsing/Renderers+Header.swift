@@ -13,6 +13,41 @@ extension Renderers {
         return .missing
     }
 
+    /// Whether the header comes in the wrapper the account's own playlists have, and who can see it, read leniently
+    /// so an odd privacy still leaves it editable.
+    static func ownership(in response: JSON) -> (editable: Bool, privacy: PlaylistPrivacy?) {
+        let tab = response["contents", "twoColumnBrowseResultsRenderer", "tabs"][0]["tabRenderer", "content", "sectionListRenderer", "contents"][0]
+        for wrapper in [tab, response["header"]] {
+            let editable = wrapper["musicEditablePlaylistDetailHeaderRenderer"]
+            guard editable.exists else { continue }
+            let privacy = editable["editHeader", "musicPlaylistEditHeaderRenderer", "privacy"].string
+            return (true, privacy.flatMap(PlaylistPrivacy.init(rawValue:)))
+        }
+        return (false, nil)
+    }
+
+    /// Whether the album or playlist is in the library, from its save button, which only signed-in requests get:
+    /// saved should a press remove the like that saved it.
+    static func saved(_ header: JSON) -> Bool? {
+        for button in header["buttons"].array {
+            let toggle = button["toggleButtonRenderer"]
+            let pressed = toggle["isToggled"].bool ?? false
+            let off = toggle["defaultServiceEndpoint", "likeEndpoint", "status"].string
+            let on = toggle["toggledServiceEndpoint", "likeEndpoint", "status"].string
+            // Signed out, the button only asks to sign in.
+            guard let off, let on else { continue }
+            return (pressed ? on : off) == "INDIFFERENT"
+        }
+        return nil
+    }
+
+    /// Whether a signed-in request was answered signed out, as YouTube answers one whose session has ended.
+    static func answeredSignedOut(_ response: JSON) -> Bool {
+        response["responseContext", "serviceTrackingParams"].array.contains { service in
+            service["params"].array.contains { $0["key"].string == "logged_in" && $0["value"].string == "0" }
+        }
+    }
+
     static func trackShelf(in response: JSON) -> JSON {
         sectionList(in: response)["contents"].array.lazy
             .map { $0.first("musicShelfRenderer", "musicPlaylistShelfRenderer") }

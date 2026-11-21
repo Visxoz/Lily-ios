@@ -34,7 +34,8 @@ private func track(_ id: String, _ title: String, _ artists: [(id: String, name:
 private let editablePlaylist = #"""
 {"contents":{"twoColumnBrowseResultsRenderer":{
   "tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[
-    {"musicEditablePlaylistDetailHeaderRenderer":{"header":{"musicResponsiveHeaderRenderer":{
+    {"musicEditablePlaylistDetailHeaderRenderer":{"editHeader":{"musicPlaylistEditHeaderRenderer":{"privacy":"PRIVATE"}},
+      "header":{"musicResponsiveHeaderRenderer":{
       "title":{"runs":[{"text":"Road trip"}]},
       "secondSubtitle":{"runs":[{"text":"1.2K views"},{"text":" • "},{"text":"1,204 songs"},{"text":" • "},{"text":"70+ hours"}]},
       "description":{"musicDescriptionShelfRenderer":{"description":{"runs":[{"text":"For the car"}]}}},
@@ -65,6 +66,59 @@ private let editablePlaylist = #"""
         #expect(page.more == .tracks(token: "NEXT"))
         let tracks = page.headerTracks
         #expect(tracks.count == 1 && tracks[0].artistNames == "Band")
+        #expect(header.editable == true && header.privacy == .private && header.count == 1204)
+        #expect(header.saved == nil && header.saveId == nil, "own playlists have no save button")
+        #expect(tracks[0].setVideoId == "S1")
+    }
+
+    @Test func keepsEntryIdsOnlyFromOwnPlaylists() throws {
+        // Liked music and the mixes come in the editable wrapper too, but take no edits.
+        let liked = try Renderers.playlistPage(try json(editablePlaylist), id: "LM")
+        #expect(liked.header?.editable == nil && liked.header?.privacy == nil)
+        #expect(liked.headerTracks.allSatisfy { $0.setVideoId == nil })
+        let other = editablePlaylist.replacingOccurrences(of: "musicEditablePlaylistDetailHeaderRenderer", with: "unwrapped")
+        let shared = try Renderers.playlistPage(try json(other), id: "PLroad")
+        #expect(shared.header?.editable == nil && shared.headerTracks.allSatisfy { $0.setVideoId == nil })
+        // Saved queues and history never carry it.
+        let own = try Renderers.playlistPage(try json(editablePlaylist), id: "PLroad").headerTracks[0]
+        #expect(!String(decoding: try JSONEncoder().encode(own), as: UTF8.self).contains("S1"))
+    }
+
+    @Test func readsAnOwnPlaylistsTitleRunsAndOddPrivacy() throws {
+        let page = try Renderers.playlistPage(try json(#"""
+            {"contents":{"twoColumnBrowseResultsRenderer":{
+              "tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[
+                {"musicEditablePlaylistDetailHeaderRenderer":{"editHeader":{"musicPlaylistEditHeaderRenderer":{"privacy":"SOMETIMES"}},
+                  "header":{"musicResponsiveHeaderRenderer":{"title":{"runs":[{"text":"03 Jan "},{"text":"12:09"}]}}}}}]}}}}]}}}
+            """#), id: "PLaZPMsuQNCsWn0iVMtGbaUXO6z-EdZaZm")
+        #expect(page.header?.title == "03 Jan 12:09")
+        #expect(page.header?.editable == true && page.header?.privacy == nil, "an odd privacy still leaves it editable")
+    }
+
+    @Test func readsLibraryStateFromHeaderButtons() throws {
+        func saved(_ buttons: String) throws -> Bool? {
+            Renderers.saved(try json(#"{"title":{"runs":[{"text":"Revival"}]},"buttons":\#(buttons)}"#))
+        }
+        #expect(try saved(libraryToggle(toggled: false, "LIKE", "INDIFFERENT")) == false)
+        #expect(try saved(libraryToggle(toggled: true, "LIKE", "INDIFFERENT")) == true)
+        #expect(try saved(libraryToggle(toggled: false, "INDIFFERENT", "LIKE")) == true)
+        // Signed out, the button only asks to sign in.
+        #expect(try saved(#"[{"toggleButtonRenderer":{"isToggled":false,"defaultNavigationEndpoint":{"modalEndpoint":{"modal":{}}}}}]"#) == nil)
+    }
+
+    @Test func entryIdsFollowInLaterBatchesOfEitherShape() throws {
+        let row = #"""
+            {"musicResponsiveListItemRenderer":{"playlistItemData":{"playlistSetVideoId":"56B44F6D10557CC6","videoId":"3_R4ulvg8OY"},
+              "flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"I Hate Everything"}]}}}]}}
+            """#
+        for response in [
+            #"{"continuationContents":{"musicPlaylistShelfContinuation":{"contents":[\#(row)]}}}"#,
+            #"{"onResponseReceivedActions":[{"appendContinuationItemsAction":{"continuationItems":[\#(row)]}}]}"#,
+        ] {
+            let items = Renderers.continuationItems(in: try json(response)).items
+            #expect(Renderers.tracks(items, context: ItemContext(entries: true)).map(\.setVideoId) == ["56B44F6D10557CC6"])
+            #expect(Renderers.tracks(items).map(\.setVideoId) == [nil])
+        }
     }
 
     @Test func countsTracksFromEitherSubtitleShape() throws {
@@ -109,6 +163,14 @@ private let album = #"""
   ]}}}}}
 """#
 
+/// An album or playlist's save button, which signed-in pages put before the others.
+private func libraryToggle(toggled: Bool, _ off: String, _ on: String) -> String {
+    func like(_ status: String) -> String {
+        #"{"likeEndpoint":{"status":"\#(status)","target":{"playlistId":"OLAK5uy_nMr9h2VlS-2PULNz3M3XVXQj_P3C2bqaY"}}}"#
+    }
+    return #"[{"toggleButtonRenderer":{"isToggled":\#(toggled),"defaultServiceEndpoint":\#(like(off)),"toggledServiceEndpoint":\#(like(on))}}]"#
+}
+
 @Suite struct AlbumPageTests {
     @Test func readsAnAlbum() throws {
         let details = try Renderers.album(try json(album), id: "MPREb_ok")
@@ -132,6 +194,23 @@ private let album = #"""
         #expect(list.tracks.allSatisfy { $0.thumbnail == "https://lh3.googleusercontent.com/c=w120-h120-l90-rj" && $0.album?.id == "MPREb_ok" })
         #expect(page.sections.count == 2, "only other versions follow the tracks")
         #expect(versions.title == "Other versions" && versions.cards.map(\.subtitle) == ["Album • Radiohead"])
+    }
+
+    @Test func readsASavedAlbumAndFindsItsPlaylistBehindTheButton() throws {
+        let toggle = libraryToggle(toggled: true, "LIKE", "INDIFFERENT").dropFirst().dropLast()
+        let response = try json(#"""
+            {"contents":{"twoColumnBrowseResultsRenderer":{
+              "tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[
+                {"musicResponsiveHeaderRenderer":{"title":{"runs":[{"text":"Revival"}]},
+                  "subtitle":{"runs":[{"text":"Album"},{"text":" • "},{"text":"2017"}]},
+                  "buttons":[\#(toggle),{"musicPlayButtonRenderer":{}},
+                    {"menuRenderer":{"items":[{"menuNavigationItemRenderer":{"text":{"runs":[{"text":"Shuffle play"}]},
+                      "navigationEndpoint":{"watchPlaylistEndpoint":{"playlistId":"OLAK5uy_nMr9h2VlS-2PULNz3M3XVXQj_P3C2bqaY"}}}}]}}]}}]}}}}],
+              "secondaryContents":{"sectionListRenderer":{"contents":[{"musicShelfRenderer":{"contents":[]}}]}}}}}
+            """#)
+        let header = try #require(try Renderers.album(response, id: "MPREb_bHfHGoy7vuv").page.header)
+        #expect(header.saved == true)
+        #expect(header.saveId == "OLAK5uy_nMr9h2VlS-2PULNz3M3XVXQj_P3C2bqaY", "the menu is still found behind the save button")
     }
 
     @Test func adoptsSongsFromTheAlbumsPlaylist() throws {
@@ -185,7 +264,7 @@ private let artist = #"""
     }
 
     @Test func readsAnArtist() throws {
-        let details = try Renderers.artist(try json(artist), id: "UCalias")
+        let details = try Renderers.artist(try json(artist), id: "UCalias", signedIn: false)
         #expect(details.id == "UCr_iyUANcn9OX_yy9piYoLw", "an alias names the artist's own ID")
         let page = details.page
         let header = try #require(page.header)
@@ -205,6 +284,35 @@ private let artist = #"""
         #expect(albums.cards.map(\.title) == ["I Might Be Wrong"], "a tile's own label beats its shelf's")
         #expect(singles.cards.map(\.subtitle) == ["Single • Radiohead • 2019"])
         #expect(singles.more == .browse(id: "MPADUCr", params: "SINGLES"))
+        #expect(header.subscribed == nil && header.channelId == nil)
+    }
+
+    @Test func readsTheSubscriptionOnlyWhenServedSignedIn() throws {
+        func artist(subscribed: Bool, signedIn: Bool) throws -> PageHeader? {
+            let response = try json(#"""
+                {"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[]}}}}]}},
+                 "header":{"musicImmersiveHeaderRenderer":{"title":{"runs":[{"text":"Ed Sheeran"}]},
+                   "subscriptionButton":{"subscribeButtonRenderer":{"channelId":"UC0C-w0YjGpqDXGB8IHb662A","subscribed":\#(subscribed),
+                     "subscriberCountText":{"runs":[{"text":"55.3M"}]}}}}}}
+                """#)
+            return try Renderers.artist(response, id: "UC0C-w0YjGpqDXGB8IHb662A", signedIn: signedIn).page.header
+        }
+        let signedIn = try #require(try artist(subscribed: true, signedIn: true))
+        #expect(signedIn.subscribed == true && signedIn.channelId == "UC0C-w0YjGpqDXGB8IHb662A")
+        #expect(signedIn.subtitle == "55.3M subscribers")
+        #expect(try artist(subscribed: false, signedIn: true)?.subscribed == false)
+        // Signed out, YouTube says false whatever the account does.
+        let signedOut = try artist(subscribed: false, signedIn: false)
+        #expect(signedOut?.subscribed == nil && signedOut?.channelId == "UC0C-w0YjGpqDXGB8IHb662A")
+    }
+
+    @Test func readsWhetherAnAnswerWasServedSignedOut() throws {
+        func answer(_ loggedIn: String) throws -> JSON {
+            try json(#"{"responseContext":{"serviceTrackingParams":[{"service":"GFEEDBACK","params":[{"key":"logged_in","value":"\#(loggedIn)"}]}]}}"#)
+        }
+        #expect(Renderers.answeredSignedOut(try answer("0")))
+        #expect(!Renderers.answeredSignedOut(try answer("1")))
+        #expect(!Renderers.answeredSignedOut(try json("{}")))
     }
 }
 

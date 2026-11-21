@@ -2,7 +2,9 @@ import Foundation
 
 extension YTMusic {
     func albumPage(_ id: String) async throws -> Page {
-        var album = try Renderers.album(try await innerTube.browse(id, authenticated: false), id: id)
+        // As the account sees it, for whether it is saved.
+        let response = try await asAccount(true) { try await self.innerTube.browse(id, authenticated: $0) }.response
+        var album = try Renderers.album(response, id: id)
         // YouTube Music lists some album tracks by their music videos and
         // cuts long albums short; the album's playlist has the songs and the rest.
         if let playlistId = album.playlistId, album.needsPlaylist,
@@ -22,6 +24,8 @@ struct AlbumDetails {
     var description: String?
     var cover: JSON
     var playlistId: String?
+    /// Whether the account has it in its library; unknown signed out.
+    var saved: Bool?
     /// How many tracks the header says the album has.
     var trackCount: Int
     var tracks: [Track]
@@ -59,7 +63,7 @@ struct AlbumDetails {
             return track
         }
         let meta = [year.map(String.init), Formatting.songs(tracks.count), Formatting.totalTime(tracks)]
-        let header = PageHeader(
+        var header = PageHeader(
             label: type.label,
             title: ref.name,
             subtitle: ArtistRef.joined(artists),
@@ -69,6 +73,8 @@ struct AlbumDetails {
             radioId: playlistId.map(YTMusic.radioId(forPlaylist:)),
             playlistId: playlistId
         )
+        header.saved = saved
+        header.saveId = playlistId
         let list = Section.tracks(TrackSection(title: "", tracks: tracks, mode: .section, numbered: true))
         return Page(header: header, sections: [list] + [versions].compactMap(\.self))
     }
@@ -127,6 +133,7 @@ extension Renderers {
             description: description(header),
             cover: Thumbnail.list(in: header),
             playlistId: albumPlaylistId(response, header: header),
+            saved: saved(header),
             trackCount: trackCount(header) ?? tracks.count,
             tracks: tracks,
             versions: sectionList(in: response)["contents"].array.lazy

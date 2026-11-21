@@ -30,7 +30,7 @@ extension Renderers {
         let first = thumbnails[0]
         let isVideo = isVideo(watch, context: context) ?? (context.album == nil && first.exists && first["width"].int != first["height"].int)
 
-        return Track(
+        var track = Track(
             id: id,
             title: title,
             artists: artists,
@@ -40,6 +40,8 @@ extension Renderers {
             trackNumber: renderer["index"].text.flatMap { Int($0) },
             isVideo: isVideo
         )
+        if context.entries { track.setVideoId = renderer["playlistItemData", "playlistSetVideoId"].string }
+        return track
     }
 
     static func columnText(_ column: JSON) -> JSON {

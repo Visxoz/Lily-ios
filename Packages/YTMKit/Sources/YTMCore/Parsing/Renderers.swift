@@ -51,6 +51,8 @@ struct ItemContext: Sendable {
     /// Home: only official music videos count as videos, as uploads have no
     /// song version to look up.
     var musicVideosOnly = false
+    /// The account's own playlist: each row keeps its entry ID, which edits take.
+    var entries = false
 }
 
 enum CardSubtitles: Sendable {

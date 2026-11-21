@@ -42,16 +42,18 @@ extension YTMusic {
         case .tracks(let token)?:
             page.more = nil
             guard case .tracks(var section)? = page.sections.first else { return (page, whole) }
-            guard let batch = try await playlistBatch(after: token, asOwner: true) else { return (page, false) }
+            let entries = page.header?.editable == true
+            guard let batch = try await playlistBatch(after: token, asOwner: true, entries: entries) else { return (page, false) }
             section.tracks += batch.tracks
             page.sections[0] = .tracks(section)
             if let next = batch.next, !batch.tracks.isEmpty, section.tracks.count < Self.playlistLimit {
                 page.more = .tracks(token: next)
             }
-            if let meta = page.header?.meta {
+            if page.header != nil {
                 // The header counts the whole playlist when YouTube said how
                 // long it is, else the tracks loaded.
-                let count = max(Formatting.number(meta) ?? 0, section.tracks.count)
+                let count = max(page.header?.count ?? 0, section.tracks.count)
+                page.header?.count = count
                 page.header?.meta = Formatting.playlistMeta(count: count, tracks: section.tracks)
             }
         case .shelves(let token, let pagesLeft, var held)?:

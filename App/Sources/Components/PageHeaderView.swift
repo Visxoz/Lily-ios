@@ -14,6 +14,10 @@ struct PageHeaderView: View {
     let download: DownloadButton?
     /// The page's address, which a menu at the end of the buttons copies.
     let link: String?
+    /// The page from YouTube, which saves and subscribes; nil for one held on the device.
+    let model: PageModel?
+    /// Opens the rename or delete dialog of the account's own playlist; nil for any other page.
+    let edit: ((PlaylistDialog) -> Void)?
     let perform: (HeaderAction) -> Void
 
     @Environment(AppModel.self) private var app
@@ -63,35 +67,81 @@ struct PageHeaderView: View {
                 .padding(.bottom, 24)
             }
 
-            if canPlay || canRadio || link != nil {
-                HStack(spacing: 20) {
-                    if canPlay {
-                        PlayButton(size: 56) { perform(.play) }
-                    }
-                    if canShuffle {
-                        IconButton(icon: .shuffle, size: 48, iconSize: 30) { perform(.shuffle) }
-                            .accessibilityLabel("Shuffle")
-                    }
-                    if canRadio {
-                        IconButton(icon: .radio, size: 48, iconSize: 28) { perform(.radio) }
-                            .accessibilityLabel("Start radio")
-                    }
-                    download
-                    if let link {
-                        Menu {
-                            Button("Copy link") { app.copyLink(link) }
-                        } label: {
-                            IconView(icon: .more, size: 28, colour: theme.textSecondary)
-                                .frame(width: 48, height: 48)
-                                .contentShape(Circle())
-                        }
-                        .accessibilityLabel("More")
-                    }
+            if canPlay || canRadio || link != nil || canSave || canSubscribe {
+                // Closer together where they would run off the screen, as an artist's or a saved playlist's can.
+                ViewThatFits(in: .horizontal) {
+                    actions(spacing: 20)
+                    actions(spacing: 8)
                 }
                 .padding(.horizontal, Metrics.pagePadding)
                 .frame(height: Metrics.actionsHeight)
             }
         }
+    }
+
+    private var canSave: Bool {
+        model != nil && header.saved != nil && header.saveId != nil && header.editable != true
+    }
+
+    private var canSubscribe: Bool {
+        model != nil && header.subscribed != nil && header.channelId != nil
+    }
+
+    private func actions(spacing: CGFloat) -> some View {
+        HStack(spacing: spacing) {
+            if canPlay {
+                PlayButton(size: 56) { perform(.play) }
+            }
+            if canShuffle {
+                IconButton(icon: .shuffle, size: 48, iconSize: 30) { perform(.shuffle) }
+                    .accessibilityLabel("Shuffle")
+            }
+            if canRadio {
+                IconButton(icon: .radio, size: 48, iconSize: 28) { perform(.radio) }
+                    .accessibilityLabel("Start radio")
+            }
+            download
+            if canSave, let model {
+                let saved = header.saved == true
+                IconButton(icon: saved ? .inLibrary : .saveToPlaylist, size: 48, iconSize: 28, active: saved) {
+                    app.toggleInLibrary(subscribe: false, in: model)
+                }
+                .accessibilityLabel(saved ? "Remove from library" : "Save to library")
+            }
+            if canSubscribe, let model {
+                let subscribed = header.subscribed == true
+                PillButton(title: subscribed ? "Subscribed" : "Subscribe", primary: !subscribed) {
+                    app.toggleInLibrary(subscribe: true, in: model)
+                }
+            }
+            if let link {
+                Menu {
+                    Button("Copy link") { app.copyLink(link) }
+                    if let edit {
+                        Button("Rename") { edit(.rename) }
+                        Divider()
+                        Picker("Who can see it", selection: privacy) {
+                            ForEach(PlaylistPrivacy.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.inline)
+                        Divider()
+                        Button("Delete playlist", role: .destructive) { edit(.delete) }
+                    }
+                } label: {
+                    IconView(icon: .more, size: 28, colour: theme.textSecondary)
+                        .frame(width: 48, height: 48)
+                        .contentShape(Circle())
+                }
+                .accessibilityLabel("More")
+            }
+        }
+    }
+
+    /// Unknown shows as Private, as YouTube makes playlists.
+    private var privacy: Binding<PlaylistPrivacy> {
+        Binding(get: { header.privacy ?? .private }, set: { privacy in
+            if let model { app.setPrivacy(privacy, in: model) }
+        })
     }
 }
 

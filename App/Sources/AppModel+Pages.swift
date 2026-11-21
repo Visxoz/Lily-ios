@@ -4,7 +4,7 @@ import YTMCore
 
 struct CachedPage {
     var page: Page
-    let at: ContinuousClock.Instant
+    var at: ContinuousClock.Instant
 
     var isFresh: Bool { at.duration(to: .now) < AppModel.pageFreshFor }
 }
@@ -27,6 +27,7 @@ extension AppModel {
     func fetchPage(_ route: Route) async throws -> Page {
         if let load = pageLoads[route] { return try await load.value }
         let generation = accountGeneration
+        let edits = pageEdits[route]
         let ahead = route == .home ? homeAhead.take() : nil
         let load = Task<Page, any Error> { [api] in
             defer { if generation == self.accountGeneration { self.pageLoads[route] = nil } }
@@ -41,6 +42,9 @@ extension AppModel {
                 if !Task.isCancelled, let local = self.player.downloads.page(for: route) { return local }
                 throw error
             }
+            // Edited meanwhile, as Library is by a rename, the copy fetched is older than the edit: the cached one,
+            // edited alike, stands instead, and with none it is left uncached.
+            if edits != self.pageEdits[route] { return self.pageCache[route]?.page ?? page }
             if generation == self.accountGeneration, route != .history {
                 self.cache(page, for: route)
             }
@@ -52,13 +56,16 @@ extension AppModel {
 
     /// The whole of the expired page cached at `since`, to swap in should it differ; nil once it fails, in part too,
     /// and the copy stays. Shared by the screens asking, and it outlives them: still the copy it replaces, it is
-    /// cached once they have gone. Forgotten meanwhile, as after a like or a sign-out, it is the next visit's to load.
+    /// cached once they have gone. Forgotten meanwhile, as after a like or a sign-out, it is the next visit's to load;
+    /// edited meanwhile, the copy is newer. Saved or subscribed to meanwhile, it keeps what that set.
     func refreshPage(_ route: Route, since: ContinuousClock.Instant) async -> Page? {
         if let refresh = pageRefreshes[route] { return await refresh.value }
         let generation = accountGeneration
+        let edits = pageEdits[route]
+        let revision = libraryRevisions[route]
         let refresh = Task<Page?, Never> { [api] in
             defer { if generation == self.accountGeneration { self.pageRefreshes[route] = nil } }
-            let fresh: Page
+            var fresh: Page
             do {
                 var page = try await api.page(route)
                 while page.more != nil {
@@ -72,7 +79,9 @@ extension AppModel {
                 if !Task.isCancelled { Self.log.warning("could not refresh the page: \(sentence(for: error), privacy: .public)") }
                 return nil
             }
-            guard generation == self.accountGeneration, let entry = self.pageCache[route] else { return nil }
+            guard generation == self.accountGeneration, let entry = self.pageCache[route], edits == self.pageEdits[route]
+            else { return nil }
+            if revision != self.libraryRevisions[route] { fresh = fresh.keepingLibraryState(of: entry.page) }
             if entry.at == since { self.cache(fresh, for: route) }
             return fresh
         }
@@ -86,8 +95,8 @@ extension AppModel {
         let generation = accountGeneration
         let since = pageCache[route]?.at
         let step = try await Task { [api] in try await api.loadStep(page) }.value
-        if generation == accountGeneration, pageCache[route]?.at == since {
-            if step.whole { pageCache[route]?.page = step.page } else { pageCache[route] = nil }
+        if generation == accountGeneration, let kept = pageCache[route], kept.at == since {
+            if step.whole { pageCache[route]?.page = step.page.keepingLibraryState(of: kept.page) } else { pageCache[route] = nil }
         }
         return step
     }

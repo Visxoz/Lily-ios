@@ -31,9 +31,9 @@ extension AppModel {
         Task {
             await player.play(card, page: cardPage(card), whole: { [self] whole in
                 // Only over a copy still half-loaded, as one completed meanwhile may be newer, and for this account.
-                guard generation == accountGeneration, let route = card.route, pageCache[route]?.page.more != nil
+                guard generation == accountGeneration, let route = card.route, let kept = pageCache[route], kept.page.more != nil
                 else { return }
-                pageCache[route]?.page = whole
+                pageCache[route]?.page = whole.keepingLibraryState(of: kept.page)
             })
         }
     }

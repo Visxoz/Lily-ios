@@ -38,6 +38,7 @@ struct TrackLibraryMenu: View {
     let track: Track
 
     @Environment(AppModel.self) private var app
+    @Environment(\.ownPlaylist) private var ownPlaylist
 
     var body: some View {
         if app.isSignedIn {
@@ -50,6 +51,9 @@ struct TrackLibraryMenu: View {
                 Button("Remove rating") { app.rate(track, .none) }
             }
             Button("Save to playlist") { app.addToPlaylist(track) }
+            if let ownPlaylist {
+                Button("Remove from playlist") { app.removeFromPlaylist(track, in: ownPlaylist) }
+            }
         }
     }
 }

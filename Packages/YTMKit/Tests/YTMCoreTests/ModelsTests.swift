@@ -30,3 +30,9 @@ import Testing
     #expect(Route.home.link == nil)
     #expect(Route.search("x").link == nil)
 }
+
+@Test func decodesAPageHeaderSavedBeforeItReadOwnershipAndLibraryState() throws {
+    let saved = Data(#"{"label":"Playlist","title":"Road trip","subtitle":"","meta":"12 songs","banner":false}"#.utf8)
+    let header = try JSONDecoder().decode(PageHeader.self, from: saved)
+    #expect(header.title == "Road trip" && header.editable == nil && header.saved == nil && header.count == nil)
+}

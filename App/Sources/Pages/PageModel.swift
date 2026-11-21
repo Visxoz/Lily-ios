@@ -36,6 +36,8 @@ final class PageModel {
     /// since shows on the next visit.
     @ObservationIgnored private var shownAt: ContinuousClock.Instant?
     @ObservationIgnored private var loadingMore = false
+    /// The entry of the account's own playlist being dragged, which the rows it passes over mark the side of.
+    @ObservationIgnored var dragged: String?
 
     /// Shows a page the cache still holds at once, so a page returned to has
     /// no skeleton or fade; one over five minutes old reloads behind it.
@@ -87,13 +89,27 @@ final class PageModel {
         loadingMore = true
         defer { if generation == self.generation { loadingMore = false } }
         guard let step = try? await app.fetchMore(of: source, for: route), isCurrent(generation, account, in: app) else { return }
-        show(step.page, for: app, saved: !step.whole)
+        // Saved or subscribed to meanwhile, the page shown has it.
+        show(step.page.keepingLibraryState(of: self.source), for: app, saved: !step.whole)
+    }
+
+    /// Shows an edit made to the page where the reader is, answering what `change` gave; nil, changing nothing,
+    /// when it gives nothing or no page shows. `cachedAt` is when the cache took its copy, edited alike, which
+    /// is then no newer to adopt on a return.
+    func edit<R>(in app: AppModel, cachedAt: ContinuousClock.Instant? = nil, _ change: (inout Page) -> R?) -> R? {
+        guard var page = source, let result = change(&page) else { return nil }
+        source = page
+        phase = .loaded(onScreen(page, in: app))
+        if let cachedAt { shownAt = cachedAt }
+        return result
     }
 
     private func load(in app: AppModel, cached: Bool) async {
         generation += 1
         let generation = generation
         let account = app.accountGeneration
+        let revision = app.libraryRevisions[route]
+        let edits = app.pageEdits[route]
         // No step of the page shown starts meanwhile, as it would land over
         // the page this load brings. Cleared before what this load shows asks
         // for its own next step.
@@ -125,8 +141,15 @@ final class PageModel {
             return
         }
         do {
-            let page = try await app.fetchPage(route)
-            guard isCurrent(generation, account, in: app) else { return }
+            var page = try await app.fetchPage(route)
+            // Edited while it loaded, as by removing a song during a pull to refresh, the page shown is newer.
+            guard isCurrent(generation, account, in: app), edits == app.pageEdits[route] || self.page == nil else { return }
+            if revision != app.libraryRevisions[route] {
+                // Saved or subscribed to while it loaded, as on the page it replaces, and so in the copy cached.
+                let kept = page.keepingLibraryState(of: source)
+                if app.pageCache[route]?.page == page { app.pageCache[route]?.page = kept }
+                page = kept
+            }
             present(page)
         } catch {
             // A change of account cancels the last account's requests, whose

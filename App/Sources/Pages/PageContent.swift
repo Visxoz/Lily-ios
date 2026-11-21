@@ -17,6 +17,8 @@ struct PageContent: View {
     @State private var titleShown = false
     @State private var artworkTint: RGB?
     @State private var isWide = false
+    @State private var dialog: PlaylistDialog?
+    @State private var newName = ""
 
     /// So a page opened again starts in its colour. Keyed by URL alone: the
     /// size isn't known until the header is measured, and doesn't change it.
@@ -88,6 +90,7 @@ struct PageContent: View {
         // scrolls in, and stops once it is left.
         .task(id: [cardCount, model?.replacements ?? 0]) { await prefetchArt() }
         .environment(\.pinsPlaylists, route == .library || route == .libraryPlaylists)
+        .modifier(PlaylistDialogs(dialog: $dialog, name: $newName, title: page.header?.title ?? "", model: model))
     }
 
     /// An album's or playlist's header, beside its tracks rather than over them.
@@ -114,7 +117,12 @@ struct PageContent: View {
             topInset: frame.top,
             extendsBanner: frame.side > 0,
             download: canPlay && Downloads.isDownloadable(route) ? DownloadButton(route: route, page: page) : nil,
-            link: route.link
+            link: route.link,
+            model: model,
+            edit: app.ownPlaylist(model) == nil ? nil : { which in
+                newName = header.title
+                dialog = which
+            }
         ) { app.perform($0, on: page) }
     }
 
@@ -128,8 +136,11 @@ struct PageContent: View {
                 if !isSplit, let header = page.header {
                     headerView(header)
                 }
+                let ownPlaylist = app.ownPlaylist(model) == nil ? nil : model
                 ForEach(page.sections.indices, id: \.self) { index in
                     SectionRows(section: page.sections[index], width: frame.width - 2 * Metrics.pagePadding)
+                        // Its own songs are the first section's; any after are YouTube's suggestions.
+                        .environment(\.ownPlaylist, index == 0 ? ownPlaylist : nil)
                 }
                 // The rest loads while the page is on screen (`PageScreen`).
                 if let more = page.more {

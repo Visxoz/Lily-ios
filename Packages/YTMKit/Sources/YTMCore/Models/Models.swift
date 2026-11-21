@@ -36,6 +36,13 @@ public struct Track: Codable, Hashable, Sendable, Identifiable {
     /// A music video, which may have an audio-only song version YouTube Music
     /// plays instead.
     public var isVideo: Bool
+    /// The entry's own ID in the account's playlist it was read from, which removing or moving it takes. Never
+    /// saved, as it means nothing away from that playlist's page.
+    public var setVideoId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, artists, album, duration, thumbnail, trackNumber, isVideo
+    }
 
     public init(
         id: String, title: String, artists: [ArtistRef] = [], album: AlbumRef? = nil,
@@ -198,6 +205,21 @@ public struct PageHeader: Codable, Hashable, Sendable {
     public var radioId: String?
     /// The playlist holding the page's songs, whose rest Play and Shuffle load when the page's are unfinished.
     public var playlistId: String?
+    // Optional, as are those below, so a page saved before they were read still decodes.
+    /// A playlist's song count, counting those not loaded.
+    public var count: Int?
+    /// True for one of the account's own playlists, which it can edit.
+    public var editable: Bool?
+    /// Who can see the account's own playlist.
+    public var privacy: PlaylistPrivacy?
+    /// Whether the album or playlist is in the library; unknown signed out and on the account's own playlists.
+    public var saved: Bool?
+    /// The playlist saving it targets, an album's being its audio playlist.
+    public var saveId: String?
+    /// Whether the account is subscribed to the artist; unknown signed out.
+    public var subscribed: Bool?
+    /// The channel subscribing to the artist takes.
+    public var channelId: String?
 
     public init(
         label: String = "", title: String, subtitle: String = "", meta: String = "",

@@ -17,11 +17,14 @@ extension YTMusic {
         return artist.page
     }
 
-    /// Asked again by the artist's own ID when `id` is an alias.
+    /// Asked again by the artist's own ID when `id` is an alias; as the account sees it, for whether it is subscribed.
     func artist(_ id: String) async throws -> ArtistDetails {
-        let artist = try Renderers.artist(try await innerTube.browse(id, authenticated: false), id: id)
-        guard artist.id != id else { return artist }
-        return try Renderers.artist(try await innerTube.browse(artist.id, authenticated: false), id: artist.id)
+        func fetch(_ id: String) async throws -> ArtistDetails {
+            let (response, signedIn) = try await asAccount(true) { try await self.innerTube.browse(id, authenticated: $0) }
+            return try Renderers.artist(response, id: id, signedIn: signedIn)
+        }
+        let artist = try await fetch(id)
+        return artist.id == id ? artist : try await fetch(artist.id)
     }
 
     private func releases(of artistId: String) async throws -> [ArtistRelease] {
@@ -75,15 +78,17 @@ struct ArtistDetails {
 }
 
 extension Renderers {
-    static func artist(_ response: JSON, id: String) throws -> ArtistDetails {
+    /// `signedIn` when the account's own request was answered as its, as only then does the subscribe button say
+    /// whether it is subscribed.
+    static func artist(_ response: JSON, id: String, signedIn: Bool) throws -> ArtistDetails {
         let header = response["header"].first("musicImmersiveHeaderRenderer", "musicVisualHeaderRenderer")
         guard let name = header["title"].text, !name.isEmpty else {
             throw YTMError(.notFound, "This artist isn't available.")
         }
         let ownId = header["shareEndpoint", "shareEntityEndpoint", "serializedShareEntity"].string
             .flatMap(sharedChannelId) ?? id
-        let subscribers = header["subscriptionButton", "subscribeButtonRenderer", "subscriberCountText"].text
-            .flatMap(Formatting.count)
+        let subscription = header["subscriptionButton", "subscribeButtonRenderer"]
+        let subscribers = subscription["subscriberCountText"].text.flatMap(Formatting.count)
         // Wide banners must keep their aspect, so the largest is taken as is.
         let banner = Thumbnail.list(in: header).array
             .max { ($0["width"].int ?? 0) < ($1["width"].int ?? 0) }?["url"].string
@@ -96,6 +101,9 @@ extension Renderers {
             banner: true,
             radioId: header["startRadioButton", "buttonRenderer", "navigationEndpoint", "watchEndpoint", "playlistId"].string
         ))
+        // Signed out, YouTube says false whatever the account does.
+        if subscription.exists, signedIn { artist.header.subscribed = subscription["subscribed"].bool ?? false }
+        artist.header.channelId = subscription["channelId"].string
 
         var context = ItemContext(artists: [ArtistRef(id: ownId, name: name)])
         for wrapped in sectionList(in: response)["contents"].array {

@@ -26,6 +26,32 @@ import Testing
         #expect(!YTMusic.succeeded(try json("{}")))
     }
 
+    @Test func readsWhetherAChangeWasMade() throws {
+        #expect(throws: Never.self) { try YTMusic.performed(try json(#"{"responseContext":{},"actions":[{"addToToastAction":{}}]}"#)) }
+        #expect(throws: Never.self) { try YTMusic.performed(try json(#"{"responseContext":{}}"#)) }
+        let held = try json(#"{"actions":[{"showEngagementPanelEndpoint":{"identifier":{"tag":"x"}}}]}"#)
+        #expect(throws: YTMError.self) { try YTMusic.performed(held) }
+    }
+
+    @Test func saysWhenSharingAPlaylistNeedsAChannel() throws {
+        let asked = try json(#"{"status":"STATUS_FAILED","actions":[{"openPopupAction":{"popup":{"channelCreationFormEndpoint":{}}}}]}"#)
+        #expect(YTMusic.playlistRefusal(asked).message == "The account needs a YouTube channel to share playlists.")
+        #expect(YTMusic.playlistRefusal(try json(#"{"status":"STATUS_FAILED"}"#)).message == "YouTube didn't change the playlist.")
+    }
+
+    @Test func takesOnlyYouTubeIds() throws {
+        for id in ["PLaZPMsuQNCsWn0iVMtGbaUXO6z-EdZaZm", "UC0C-w0YjGpqDXGB8IHb662A", "56B44F6D10557CC6"] {
+            #expect(try YTMusic.youtubeId(id) == id)
+        }
+        for id in ["", #"C:\Music\song.mp3"#, #"PL1","x"#, "PL 1", String(repeating: "a", count: 65)] {
+            #expect(throws: YTMError.self, "\(id)") { try YTMusic.youtubeId(id) }
+        }
+        #expect(try YTMusic.videoId("dQw4w9WgXcQ") == "dQw4w9WgXcQ")
+        for id in ["", "dQw4w9WgXc", "dQw4w9WgXcQQ", "dQw4w9WgXc/", "PLaZPMsuQNCsWn0iVMtGbaUXO6z-EdZaZm"] {
+            #expect(throws: YTMError.self, "\(id)") { try YTMusic.videoId(id) }
+        }
+    }
+
     @Test func listsOwnPlaylists() throws {
         let reply = try json(#"""
             {"contents":[{"addToPlaylistRenderer":{"playlists":[

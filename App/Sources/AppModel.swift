@@ -13,7 +13,7 @@ enum AppSheet: Identifiable, Hashable {
     var id: Self { self }
 }
 
-enum AppTab: Hashable {
+enum AppTab: Hashable, CaseIterable {
     case home, explore, library, history, search
 }
 
@@ -84,6 +84,12 @@ final class AppModel {
     @ObservationIgnored var pageLoads: [Route: Task<Page, any Error>] = [:]
     /// Expired pages being fetched whole, shared by every screen showing the copy.
     @ObservationIgnored var pageRefreshes: [Route: Task<Page?, Never>] = [:]
+    /// Bumped by each edit to a page, by its route, so a load asked for before one never puts back what it changed.
+    @ObservationIgnored var pageEdits: [Route: Int] = [:]
+    /// Bumped by each save or subscribe shown, by the route of its page, so a copy fetched before one keeps what it set.
+    @ObservationIgnored var libraryRevisions: [Route: Int] = [:]
+    /// What a save or subscribe still being answered changes, so a second press is ignored.
+    @ObservationIgnored var libraryEdits: Set<String> = []
     /// The launch's Home request, which the first load of Home takes over.
     @ObservationIgnored var homeAhead: Task<Page, any Error>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
