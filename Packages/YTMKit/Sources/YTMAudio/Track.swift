@@ -24,6 +24,12 @@ final class Track {
     /// The file's first bytes, until there are enough to tell its container.
     private var head = Data()
     private var parsed: Int64 = 0
+    /// Lists packets from a seek point past those listed from the file's start, so a seek ahead plays
+    /// once its own bytes arrive rather than every byte before them.
+    private var seekRun: (source: any PacketSource, start: Int64, parsed: Int64)?
+    /// A seek run failed to parse, so later seeks wait for the bytes from the start.
+    private var runsFail = false
+    private static let pullLength = 256 << 10
 
     init(item: AudioItem, loader: StreamLoader, startAt: Double, announcesStart: Bool) {
         self.item = item
@@ -31,6 +37,8 @@ final class Track {
         self.loader = loader
         self.startAt = startAt
         self.announcesStart = announcesStart
+        // A warmed or kept loader may have followed another track's seek.
+        loader.readPosition = 0
     }
 
     var sampleRate: Double? { decoder?.sampleRate }
@@ -45,8 +53,9 @@ final class Track {
         return Double(length) / rate
     }
 
+    /// Where the bytes held from the read position run to, as a fraction of the file.
     var bufferedFraction: Double {
-        loader.isComplete ? 1 : loader.total > 0 ? Double(loader.available) / Double(loader.total) : 0
+        loader.isComplete ? 1 : loader.total > 0 ? Double(loader.runEnd(from: loader.readPosition)) / Double(loader.total) : 0
     }
 
     func cancel() {
@@ -102,8 +111,9 @@ final class Track {
     /// A failed download ends the item where its bytes ran out.
     func supply() -> PacketDecoder.Supply {
         guard let decoder, !finished else { return .ended }
+        aim()
         do {
-            let supply = try decoder.supply(state)
+            let supply = try decoder.supply(decodingState)
             if supply == .ended || (supply == .waiting && failure != nil) {
                 finished = true
                 return .ended
@@ -160,6 +170,64 @@ final class Track {
             scanner.consume(count)
         }
         return end
+    }
+
+    /// Starts a seek run when the decoder seeks past the packets listed from the start and the file's index
+    /// has a point before it, reads what has arrived of the run, and ends it once the bytes from the start
+    /// catch up, so length, padding and sound end still wait for every byte.
+    private func aim() {
+        guard let source, let decoder else { return }
+        if let from = decoder.seekingFrom {
+            // The first point is the first packet's, which the bytes from the start reach first anyway.
+            if from >= source.packets.frames, !runsFail, !loader.isComplete,
+               let point = source.seekPoints.dropFirst().last(where: { $0.frame <= from }), point.offset > parsed,
+               point.offset < loader.total {
+                if seekRun?.start != point.offset {
+                    seekRun = (source.resumed(at: point), point.offset, point.offset)
+                    loader.readPosition = point.offset
+                }
+            } else {
+                leaveRun()
+            }
+        }
+        guard let run = seekRun else { return }
+        guard parsed < run.parsed else {
+            leaveRun()
+            return
+        }
+        let end = loader.runEnd(from: run.parsed)
+        var at = run.parsed
+        do {
+            while at < end {
+                guard let bytes = loader.bytes(at: at, count: Int(min(end - at, Int64(Self.pullLength)))) else {
+                    throw AudioFailure.damaged
+                }
+                try bytes.withUnsafeBytes { try run.source.parse($0) }
+                at += Int64(bytes.count)
+            }
+            seekRun?.parsed = at
+        } catch {
+            runsFail = true
+            leaveRun()
+        }
+    }
+
+    /// Hands the decoder back to the packets listed from the start.
+    private func leaveRun() {
+        guard let run = seekRun else { return }
+        seekRun = nil
+        loader.readPosition = 0
+        if let source {
+            decoder?.follow(source.packets, from: run.source.packets)
+        }
+    }
+
+    /// A seek run's packets lie in the bytes held from its start, and its padding is never known.
+    private var decodingState: PacketDecoder.SourceState {
+        guard let run = seekRun else { return state }
+        return PacketDecoder.SourceState(
+            packets: run.source.packets, available: loader.runEnd(from: run.start), complete: false, trailingFrames: 0
+        )
     }
 
     /// Complete once every byte has been both downloaded and read by the container.

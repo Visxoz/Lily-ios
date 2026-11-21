@@ -9,6 +9,7 @@ final class MP4Demuxer: PacketSource {
 
     private(set) var format: SourceFormat?
     private(set) var packets = PacketIndex()
+    private(set) var seekPoints: [SeekPoint] = []
     private var walker = ElementWalker(maxHeaderLength: 16, header: MP4.header)
     private var trackID: UInt64 = 0
     private var framesPerPacket = 0
@@ -26,14 +27,60 @@ final class MP4Demuxer: PacketSource {
         try walker.walk(bytes, action: Self.action) { header, body, offset in
             switch header.id {
             case MP4.moov: try readMovie(body)
+            case MP4.sidx: readIndex(body, end: offset + Int64(body.count))
             case MP4.moof: try readFragment(body, start: offset - Int64(header.length))
             default: break
             }
         }
     }
 
-    private static func action(_ header: ElementWalker.Header) -> ElementWalker.Action {
-        header.id == MP4.moov || header.id == MP4.moof ? .read : .skip
+    private static func action(_ header: ElementWalker.Header, _: Int64) -> ElementWalker.Action {
+        [MP4.moov, MP4.sidx, MP4.moof].contains(header.id) ? .read : .skip
+    }
+
+    func resumed(at point: SeekPoint) -> any PacketSource {
+        let source = MP4Demuxer()
+        source.format = format
+        source.trackID = trackID
+        source.framesPerPacket = framesPerPacket
+        source.defaultSize = defaultSize
+        source.editedFrames = editedFrames
+        source.walker = ElementWalker(maxHeaderLength: 16, startingAt: point.offset, header: MP4.header)
+        source.packets = PacketIndex(firstFrame: point.frame)
+        return source
+    }
+
+    /// Each fragment's start and time from the segment index (ISO 14496-12 8.16.3), whose offsets count
+    /// from its own end. Only an index of fragments is used, and a damaged one is ignored, as only seeks
+    /// ahead need it.
+    private func readIndex(_ body: UnsafeRawBufferPointer, end: Int64) {
+        guard let rate = format?.sampleRate, seekPoints.isEmpty else { return }
+        var reader = ByteReader(body)
+        var points: [SeekPoint] = []
+        do {
+            let wide = try reader.uint(1) == 1
+            try reader.skip(3)
+            guard try reader.uint(4) == trackID else { return }
+            let scale = try reader.uint(4)
+            var time = try reader.uint(wide ? 8 : 4)
+            let first = try reader.uint(wide ? 8 : 4)
+            try reader.skip(2)
+            guard scale > 0, first <= UInt64(UInt32.max) else { return }
+            var offset = end + Int64(first)
+            for _ in 0..<(try reader.uint(2)) {
+                let reference = try reader.uint(4)
+                let duration = try reader.uint(4)
+                try reader.skip(4)
+                // A reference to another index rather than to media.
+                guard reference >> 31 == 0 else { return }
+                points.append(SeekPoint(frame: try Self.frames(time, scale: scale, rate: rate), offset: offset))
+                time += duration
+                offset += Int64(reference & 0x7FFF_FFFF)
+            }
+        } catch {
+            return
+        }
+        seekPoints = SeekPoint.ordered(points)
     }
 
     private func readMovie(_ movie: UnsafeRawBufferPointer) throws {
@@ -211,7 +258,7 @@ enum MP4 {
     static let elst = code("elst"), mdia = code("mdia"), mdhd = code("mdhd"), hdlr = code("hdlr")
     static let minf = code("minf"), stbl = code("stbl"), stsd = code("stsd"), mp4a = code("mp4a")
     static let esds = code("esds"), traf = code("traf"), tfhd = code("tfhd"), trun = code("trun")
-    static let soun = code("soun")
+    static let soun = code("soun"), sidx = code("sidx")
 
     static func code(_ name: String) -> UInt32 {
         name.utf8.reduce(0) { $0 << 8 | UInt32($1) }

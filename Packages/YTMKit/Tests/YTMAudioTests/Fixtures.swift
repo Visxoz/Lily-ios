@@ -1,4 +1,5 @@
 import AVFoundation
+import Synchronization
 import Testing
 @testable import YTMAudio
 
@@ -79,37 +80,64 @@ enum Fixtures {
 
     /// The signal as Opus in WebM, its length set by DiscardPadding on the
     /// last block. `chunked` writes a Segment and Clusters of unknown size, as a live encoder does.
-    static func opusWebM(_ samples: [Float], chunked: Bool = false) throws -> Data {
+    /// `cues` writes a Cluster a second, each led by `filler` bytes of Void to span blocks, and Cues
+    /// before them a millisecond late, as YouTube's are.
+    static func opusWebM(_ samples: [Float], chunked: Bool = false, cues: Bool = false, filler: Int = 0) throws -> Data {
         let encoded = try encode(samples, format: kAudioFormatOpus)
         let padding = encoded.packets.count * 960 - encoded.leadingFrames - samples.count
         var head = Array("OpusHead".utf8) + [1, 2]
         head += [UInt8(encoded.leadingFrames & 0xFF), UInt8(encoded.leadingFrames >> 8), 0x80, 0xBB, 0, 0, 0, 0, 0]
-        var clusters: [UInt8] = []
+        var blocks: [[UInt8]] = []
         for (index, packet) in encoded.packets.enumerated() {
-            let block = EBMLWriter.block(timecode: index * 20, packets: [packet])
+            let block = EBMLWriter.block(timecode: cues ? index % 50 * 20 : index * 20, packets: [packet])
             if index == encoded.packets.count - 1 {
                 let nanoseconds = UInt64(Double(padding) / rate * 1e9)
-                clusters += EBMLWriter.element(EBML.blockGroup, EBMLWriter.uint(EBML.discardPadding, nanoseconds) + EBMLWriter.element(EBML.block, block))
+                blocks.append(EBMLWriter.element(EBML.blockGroup, EBMLWriter.uint(EBML.discardPadding, nanoseconds) + EBMLWriter.element(EBML.block, block)))
             } else {
-                clusters += EBMLWriter.element(EBML.simpleBlock, block)
+                blocks.append(EBMLWriter.element(EBML.simpleBlock, block))
             }
         }
+        let clusters = blocks.flatMap { $0 }
         let info = EBMLWriter.element(EBML.info, EBMLWriter.uint(EBML.timecodeScale, 1_000_000)
             + EBMLWriter.float(EBML.duration, Double(samples.count) / rate * 1_000))
         let entry = EBMLWriter.uint(EBML.trackNumber, 1) + EBMLWriter.element(EBML.codecID, Array("A_OPUS".utf8))
             + EBMLWriter.element(EBML.codecPrivate, head)
         let tracks = EBMLWriter.element(EBML.tracks, EBMLWriter.element(EBML.trackEntry, entry))
+        let header = EBMLWriter.element(0x1A45_DFA3, EBMLWriter.element(0x4282, Array("webm".utf8)))
+        if cues {
+            let seconds = stride(from: 0, to: blocks.count, by: 50).map { first in
+                EBMLWriter.element(EBML.cluster, EBMLWriter.uint(0xE7, UInt64(first * 20)) + EBMLWriter.element(0xEC, Array(repeating: 0, count: filler))
+                    + blocks[first..<min(first + 50, blocks.count)].flatMap { $0 })
+            }
+            // Every number takes eight bytes, so the Cues' own size never depends on the positions in them.
+            func index(_ positions: [Int]) -> [UInt8] {
+                EBMLWriter.element(EBML.cues, positions.enumerated().flatMap { second, position in
+                    EBMLWriter.element(EBML.cuePoint, EBMLWriter.uint(EBML.cueTime, UInt64(second * 1_000 + 1))
+                        + EBMLWriter.element(EBML.cueTrackPositions, EBMLWriter.uint(0xF7, 1) + EBMLWriter.uint(EBML.cueClusterPosition, UInt64(position))))
+                })
+            }
+            var position = info.count + tracks.count + index(seconds.map { _ in 0 }).count
+            let positions = seconds.map { cluster in
+                defer { position += cluster.count }
+                return position
+            }
+            return Data(header + EBMLWriter.element(EBML.segment, info + tracks + index(positions) + seconds.flatMap { $0 }))
+        }
         let cluster = EBMLWriter.uint(0xE7, 0) + clusters
         let segment = info + tracks + (chunked ? EBMLWriter.unknown(EBML.cluster) + cluster : EBMLWriter.element(EBML.cluster, cluster))
-        let header = EBMLWriter.element(0x1A45_DFA3, EBMLWriter.element(0x4282, Array("webm".utf8)))
         return Data(header + (chunked ? EBMLWriter.unknown(EBML.segment) + segment : EBMLWriter.element(EBML.segment, segment)))
     }
 
     // MARK: AAC in fragmented MP4
 
     /// YouTube's DASH files have no edit list; `edited` adds one giving the
-    /// length and the priming, or `editStart` in its place.
-    static func aacMP4(_ samples: [Float], rate: Double = 44_100, edited: Bool = false, editStart: UInt64? = nil) throws -> Data {
+    /// length and the priming, or `editStart` in its place. `indexed` adds a sidx before the fragments
+    /// whose first duration is 1,600 frames short, as YouTube's often are. `filler` ends each fragment with that
+    /// many bytes of free space, to span blocks.
+    static func aacMP4(
+        _ samples: [Float], rate: Double = 44_100, edited: Bool = false, editStart: UInt64? = nil, indexed: Bool = false,
+        filler: Int = 0
+    ) throws -> Data {
         let encoded = try encode(samples, format: kAudioFormatMPEG4AAC, rate: rate)
         let cookie = try #require(encoded.cookie)
         let scale = UInt32(rate)
@@ -130,10 +158,15 @@ enum Fixtures {
             + MP4Writer.u32(1) + MP4Writer.u32(1_024) + MP4Writer.u32(0) + MP4Writer.u32(0))) + track)
         var file = MP4Writer.box("ftyp", Array("dash".utf8) + [0, 0, 0, 0] + Array("iso6mp41".utf8)) + movie
         let half = encoded.packets.count / 2
-        for packets in [encoded.packets[..<half], encoded.packets[half...]] {
-            file += MP4Writer.fragment(Array(packets))
+        let free = filler > 0 ? MP4Writer.box("free", [UInt8](repeating: 0, count: filler)) : []
+        let fragments = [encoded.packets[..<half], encoded.packets[half...]].map { MP4Writer.fragment(Array($0)) + free }
+        if indexed {
+            let durations = [half * 1_024 - 1_600, (encoded.packets.count - half) * 1_024]
+            let references = zip(fragments, durations).flatMap { MP4Writer.u32(UInt32($0.count)) + MP4Writer.u32(UInt32($1)) + MP4Writer.u32(0x9000_0000) }
+            file += MP4Writer.box("sidx", [0, 0, 0, 0] + MP4Writer.u32(1) + MP4Writer.u32(scale) + MP4Writer.u32(0) + MP4Writer.u32(0)
+                + MP4Writer.u16(0) + MP4Writer.u16(2) + references)
         }
-        return Data(file)
+        return Data(file + fragments.flatMap { $0 })
     }
 }
 
@@ -225,6 +258,23 @@ struct MemoryByteSource: ByteSource {
             }
             continuation.finish()
         }
+    }
+}
+
+/// Serves as `MemoryByteSource` does, noting each range asked for.
+final class RecordingByteSource: ByteSource {
+    private let served: MemoryByteSource
+    private let asked = Mutex<[Range<Int64>]>([])
+
+    init(files: [String: Data]) {
+        served = MemoryByteSource(files: files)
+    }
+
+    var ranges: [Range<Int64>] { asked.withLock { $0 } }
+
+    func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
+        asked.withLock { $0.append(range) }
+        return served.bytes(of: url, headers: headers, range: range)
     }
 }
 

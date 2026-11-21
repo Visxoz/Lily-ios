@@ -119,6 +119,25 @@ final class PacketDecoder {
         ended = false
     }
 
+    /// The codec frame a pending seek needs its first packet from.
+    var seekingFrom: Int64? { seeking?.from }
+
+    /// Carries on in `packets`, which list the file from its start, from the packet `old` would have given
+    /// next. A seek point's index time is rounded, so the frames are counted afresh from `packets`, which
+    /// may move the position by a few milliseconds but keeps the end's trim exact.
+    func follow(_ packets: PacketIndex, from old: PacketIndex) {
+        guard seeking == nil else { return }
+        guard nextPacket < old.count, let index = packets.index(ofOffset: old[nextPacket].offset) else {
+            seek(to: position)
+            return
+        }
+        let shift = packets.start(of: index) - old.start(of: nextPacket)
+        nextPacket = index
+        outputFrame += shift
+        dropBefore += shift
+        position += shift
+    }
+
     /// Valid until the next call.
     func samples(_ channel: Int) -> UnsafePointer<Float> {
         UnsafePointer(channels[min(channel, channelCount - 1)] + carry.lowerBound)

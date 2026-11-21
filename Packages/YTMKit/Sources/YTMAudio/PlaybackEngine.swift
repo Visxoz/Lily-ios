@@ -253,6 +253,8 @@ actor PlaybackEngine {
                 guard !track.isCancelled else { return }
                 track.receive(data)
                 progressed(track)
+            } onElsewhere: {
+                if !track.isCancelled { progressed(track) }
             }
             guard !track.isCancelled else { return }
             if let failure {

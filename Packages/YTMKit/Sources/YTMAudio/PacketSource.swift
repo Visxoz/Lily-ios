@@ -9,8 +9,29 @@ protocol PacketSource: AnyObject {
     var packets: PacketIndex { get }
     /// Codec frames of padding after the music, known once the last packet is read.
     var trailingFrames: Int64 { get }
+    /// Where a seek can start listing packets without the bytes before, from the container's index:
+    /// WebM's Cues or MP4's sidx, which YouTube puts before the first packet.
+    var seekPoints: [SeekPoint] { get }
     /// Reads the next bytes of the file; every byte comes once, in order.
     func parse(_ bytes: UnsafeRawBufferPointer) throws
+    /// A source that lists packets from `point` on, given the bytes from its offset. Its padding is never known,
+    /// so only this one, fed from the file's start, ever gives the length.
+    func resumed(at point: SeekPoint) -> any PacketSource
+}
+
+/// A Cluster or fragment's start, and the codec frame of its first packet.
+struct SeekPoint {
+    let frame: Int64
+    let offset: Int64
+
+    /// Only points that move on in both time and place, as a damaged index could send a seek anywhere.
+    static func ordered(_ points: [SeekPoint]) -> [SeekPoint] {
+        var kept: [SeekPoint] = []
+        for point in points where kept.last.map({ point.frame > $0.frame && point.offset > $0.offset }) ?? (point.frame >= 0) {
+            kept.append(point)
+        }
+        return kept
+    }
 }
 
 struct SourceFormat {
@@ -41,8 +62,14 @@ struct PacketIndex {
     static let capacity = Int(SourceFormat.longestSeconds) * 50
 
     private(set) var entries: ContiguousArray<Entry> = []
+    /// The codec frame the first packet starts on: 0, unless the list starts at a seek point.
+    let firstFrame: Int64
     /// Codec frames in every packet listed.
     private(set) var frames: Int64 = 0
+
+    init(firstFrame: Int64 = 0) {
+        self.firstFrame = firstFrame
+    }
 
     var count: Int { entries.count }
     subscript(index: Int) -> Entry { entries[index] }
@@ -57,7 +84,8 @@ struct PacketIndex {
 
     /// Nil past the packets listed so far.
     func packet(holding frame: Int64) -> (index: Int, start: Int64)? {
-        var start: Int64 = 0
+        guard frame >= firstFrame else { return nil }
+        var start = firstFrame
         for (index, entry) in entries.enumerated() {
             let end = start + Int64(entry.frames)
             if frame < end {
@@ -69,7 +97,11 @@ struct PacketIndex {
     }
 
     func start(of index: Int) -> Int64 {
-        entries.prefix(index).reduce(0) { $0 + Int64($1.frames) }
+        entries.prefix(index).reduce(firstFrame) { $0 + Int64($1.frames) }
+    }
+
+    func index(ofOffset offset: UInt32) -> Int? {
+        entries.firstIndex { $0.offset == offset }
     }
 }
 

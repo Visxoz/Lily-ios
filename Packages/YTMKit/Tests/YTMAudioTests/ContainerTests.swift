@@ -63,6 +63,27 @@ struct ContainerTests {
         }
     }
 
+    /// A source resumed at each point lists the packets the whole file does from there on; the index's
+    /// times are rounded, so its frames may be a little off theirs.
+    @Test func resumesAtEachSeekPointOfCuesAndSidx() throws {
+        let samples = Fixtures.signal(frames: 150_000)
+        let files = [try Fixtures.opusWebM(samples, cues: true), try Fixtures.aacMP4(samples, indexed: true)]
+        let frames: [[Int64]] = [[48, 48_048, 96_048, 144_048], [0, Int64((try Fixtures.encode(samples, format: kAudioFormatMPEG4AAC, rate: 44_100)
+            .packets.count / 2) * 1_024 - 1_600)]]
+        for (file, expected) in zip(files, frames) {
+            let whole = try parse(file, piece: 333)
+            #expect(whole.seekPoints.map(\.frame) == expected)
+            for point in whole.seekPoints {
+                let resumed = whole.resumed(at: point)
+                try file[Int(point.offset)...].withUnsafeBytes { try resumed.parse($0) }
+                let first = try #require(whole.packets.entries.firstIndex { Int64($0.offset) >= point.offset })
+                #expect(entries(resumed) == Array(entries(whole)[first...]), "from \(point.offset)")
+                #expect(resumed.packets.firstFrame == point.frame && abs(whole.packets.start(of: first) - point.frame) <= 1_600)
+            }
+        }
+        #expect(try parse(Fixtures.opusWebM(samples), piece: 333).seekPoints.isEmpty, "no Cues")
+    }
+
     @Test func countsOpusFramesFromTheTableOfContents() throws {
         let cases: [([UInt8], Int)] = [
             ([0x00], 480), ([0x08], 960), ([0x18], 2_880), ([0x60], 480), ([0x68], 960),

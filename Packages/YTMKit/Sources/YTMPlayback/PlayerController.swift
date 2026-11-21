@@ -56,7 +56,7 @@ import YTMCore
         playback.itemID != nil ? audio.currentTime : playback.heldPosition
     }
 
-    /// How much of the song has downloaded, from 0 to 1. Not observed, so
+    /// How far the song has downloaded from where it plays, from 0 to 1. Not observed, so
     /// pull it as `currentTime` is.
     public var bufferedFraction: Double {
         playback.itemID != nil ? audio.bufferedFraction : 0

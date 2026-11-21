@@ -32,15 +32,18 @@ struct ElementWalker {
     /// The file offset of the next byte to arrive.
     private var position: Int64 = 0
 
-    init(maxHeaderLength: Int, header: @escaping HeaderReader) {
+    /// `position` is where the first byte walked lies in the file, at an element's start.
+    init(maxHeaderLength: Int, startingAt position: Int64 = 0, header: @escaping HeaderReader) {
         self.maxHeaderLength = maxHeaderLength
+        self.position = position
         readHeader = header
     }
 
-    /// `element` gets each element read whole, with its body and the body's offset in the file.
+    /// `action` gets each element's header and its body's offset in the file; `element` gets each element
+    /// read whole, with its body and the body's offset.
     mutating func walk(
         _ bytes: UnsafeRawBufferPointer,
-        action: (Header) -> Action,
+        action: (Header, Int64) -> Action,
         element: (Header, UnsafeRawBufferPointer, Int64) throws -> Void
     ) throws {
         var index = 0
@@ -91,10 +94,10 @@ struct ElementWalker {
     private mutating func begin(
         _ header: Header,
         at offset: Int64,
-        action: (Header) -> Action,
+        action: (Header, Int64) -> Action,
         element: (Header, UnsafeRawBufferPointer, Int64) throws -> Void
     ) throws {
-        switch action(header) {
+        switch action(header, offset) {
         case .enter:
             break
         case .skip:

@@ -79,6 +79,27 @@ struct StreamLoaderTests {
         #expect(failure == nil && received == file && loader.isComplete && loader.available == Int64(file.count))
     }
 
+    @Test func fetchesTheReadPositionFirstAndHandsOnBytesInOrder() async throws {
+        let megabyte = StreamLoader.rangeLength
+        let file = Data((0..<Int(5 * megabyte + 100)).map { UInt8(truncatingIfNeeded: $0 &* 31) })
+        let item = try AudioItem.fixture("song", length: file.count)
+        let source = RecordingByteSource(files: ["song": file])
+        // Room for the file, which is past this suite's cap.
+        let cache = AudioCache(.init(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), limit: 64 << 20))
+        let loader = try StreamLoader(item: item, cache: cache)
+        loader.readPosition = 3 * megabyte + 10
+        var received = Data()
+        var elsewhere = 0
+        let failure = await loader.run(source: source) { received.append($0) } onElsewhere: {
+            elsewhere += 1
+        }
+        let ranges = [3, 4, 5, 0, 1, 2].map { $0 * megabyte..<min(($0 + 1) * megabyte, Int64(file.count)) }
+        #expect(failure == nil && source.ranges == ranges, "the read position's block on to the end, then the gap")
+        #expect(received == file && elsewhere > 0, "the bytes past the gap wait for it")
+        let cached = try #require(cache.completeFile(for: item.cacheKey, length: Int64(file.count)))
+        #expect(try Data(contentsOf: cached) == file)
+    }
+
     @Test func rangesEndOnAMegabyte() {
         #expect(StreamLoader.rangeEnd(from: 65_536, total: 4_171_552) == 1_048_576, "the range after a warm-up")
         #expect(StreamLoader.rangeEnd(from: 1_048_576, total: 4_171_552) == 2_097_152)

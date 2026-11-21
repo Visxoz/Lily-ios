@@ -257,22 +257,6 @@ struct PlaybackEngineTests {
     }
 }
 
-private final class RecordingByteSource: ByteSource {
-    private let served: MemoryByteSource
-    private let asked = Mutex<[Range<Int64>]>([])
-
-    init(files: [String: Data]) {
-        served = MemoryByteSource(files: files)
-    }
-
-    var ranges: [Range<Int64>] { asked.withLock { $0 } }
-
-    func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
-        asked.withLock { $0.append(range) }
-        return served.bytes(of: url, headers: headers, range: range)
-    }
-}
-
 /// Holds the first request for `stalling` open after `after` bytes, as a
 /// slow network does.
 private final class StallingByteSource: ByteSource {

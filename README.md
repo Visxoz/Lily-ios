@@ -268,7 +268,7 @@ flowchart LR
 
 Most YouTube clients get stream URLs that YouTube's player JavaScript has to unscramble. The visionOS client gets plain ones, so the app asks as that client and needs no JavaScript engine, falling back to Android VR and iOS if YouTube changes it. A client whose streams are cut off partway is asked last from then on, and the song carries on from the same byte with another client's copy. With Premium, the app unscrambles the web player's URLs itself, in a short-lived JavaScriptCore context with a cut-down copy of the player.
 
-Apple's AudioToolbox decodes Opus, but can't read the WebM files YouTube keeps it in, so the app reads them itself and hands AudioToolbox the packets as they download.
+Apple's AudioToolbox decodes Opus, but can't read the WebM files YouTube keeps it in, so the app reads them itself and hands AudioToolbox the packets as they download. A seek past what has arrived is fetched first, found through the file's own index, and the gap before it after.
 
 The app talks only to YouTube's hosts, plus Last.fm if you connect it, each checked against an allowlist. It follows the proxy set in iOS, or an HTTP or SOCKS5 proxy of your own entered in **Settings ▸ Account ▸ Proxy**, kept in the Keychain and used from the app's next start.
 

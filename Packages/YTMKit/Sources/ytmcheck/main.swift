@@ -18,6 +18,7 @@ let usage = """
     usage: ytmcheck <command>
       all | \(groups.map(\.name).joined(separator: " | "))   run checks and print a pass/fail report
       search <query>                              print a search page in full
+      index [videoId]                             hold each file's seek index against its packets
       page <route>                                print a page in full: home, explore, charts,
                                                   new-releases, moods, album:<id>, artist:<id>,
                                                   playlist:<id>, genre:<params>, browse:<id>[:<params>],
@@ -47,6 +48,15 @@ if !selected.isEmpty {
         await group.run(report)
     }
     finish(report.summarise() ? 0 : 1)
+}
+
+if command == "index" {
+    do {
+        finish(try await IndexInspect.show(rest) ? 0 : 1)
+    } catch {
+        print("error: \(error)")
+        finish(1)
+    }
 }
 
 let route: Route? = switch command {

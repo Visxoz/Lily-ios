@@ -147,4 +147,34 @@ struct PacketDecoderTests {
         #expect(frames == 48_000)
         #expect(try decoder.supply(file.state) == .ended)
     }
+
+    /// A seek run's next packet missing from the whole file's list, as a damaged index gives, starts again
+    /// where the run had got to.
+    @Test func followsAListWithoutTheRunsPacketFromWhereItGotTo() throws {
+        let data = try Fixtures.opusWebM(Fixtures.signal(frames: 144_000), cues: true)
+        let file = try DecodableFile(data)
+        // The Cluster at one second, as the last holds only the final packet.
+        let point = try #require(file.source.seekPoints.dropFirst().first)
+        let run = file.source.resumed(at: point)
+        try data.withUnsafeBytes { try run.parse(UnsafeRawBufferPointer(rebasing: $0[Int(point.offset)...])) }
+        let decoder = try PacketDecoder(source: try #require(file.source.format), file: file.file)
+        decoder.seek(to: point.frame + 4_800)
+        var partial = file.state
+        partial.packets = run.packets
+        partial.complete = false
+        if case .frames(let count) = try decoder.supply(partial) {
+            decoder.consume(count)
+        }
+        let reached = decoder.position
+        #expect(reached > point.frame + 4_800)
+        decoder.follow(PacketIndex(), from: run.packets)
+        var out: [Float] = []
+        while case .frames(let count) = try decoder.supply(file.state) {
+            out += UnsafeBufferPointer(start: decoder.samples(0), count: count)
+            decoder.consume(count)
+        }
+        let whole = try file.decode(from: reached)
+        #expect(out.count == whole.count && reached + Int64(out.count) == 144_000, "to the exact end")
+        #expect((zip(out, whole).map { abs($0 - $1) }.max() ?? .infinity) < 1e-6)
+    }
 }

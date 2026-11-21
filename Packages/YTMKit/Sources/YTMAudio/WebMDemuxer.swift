@@ -6,7 +6,10 @@ import Foundation
 final class WebMDemuxer: PacketSource {
     private(set) var format: SourceFormat?
     private(set) var packets = PacketIndex()
+    private(set) var seekPoints: [SeekPoint] = []
     private var walker = ElementWalker(maxHeaderLength: 12, header: EBML.header)
+    /// Where the Segment's body starts, which Cues count their Cluster positions from.
+    private var segmentStart: Int64 = 0
     private var trackNumber: UInt64?
     /// Nanoseconds a tick of the segment's timestamps lasts.
     private var timecodeScale = 1_000_000.0
@@ -22,10 +25,17 @@ final class WebMDemuxer: PacketSource {
     }
 
     func parse(_ bytes: UnsafeRawBufferPointer) throws {
-        try walker.walk(bytes, action: Self.action) { header, body, offset in
+        let action = { [unowned self] (header: ElementWalker.Header, offset: Int64) in
+            if header.id == EBML.segment {
+                segmentStart = offset
+            }
+            return Self.action(header)
+        }
+        try walker.walk(bytes, action: action) { header, body, offset in
             switch header.id {
             case EBML.info: try readInfo(body)
             case EBML.tracks: try readTracks(body)
+            case EBML.cues: try readCues(body)
             case EBML.simpleBlock: try readBlock(body, at: offset)
             case EBML.blockGroup: try readGroup(body, at: offset)
             default: break
@@ -36,7 +46,7 @@ final class WebMDemuxer: PacketSource {
     private static func action(_ header: ElementWalker.Header) -> ElementWalker.Action {
         switch header.id {
         case EBML.segment, EBML.cluster: .enter
-        case EBML.info, EBML.tracks, EBML.simpleBlock, EBML.blockGroup: .read
+        case EBML.info, EBML.tracks, EBML.cues, EBML.simpleBlock, EBML.blockGroup: .read
         default: .skip
         }
     }
@@ -71,6 +81,50 @@ final class WebMDemuxer: PacketSource {
             format = try Self.opusFormat(head, duration: duration)
         }
         guard format != nil else { throw AudioFailure.unsupported }
+    }
+
+    func resumed(at point: SeekPoint) -> any PacketSource {
+        let source = WebMDemuxer()
+        source.format = format
+        source.trackNumber = trackNumber
+        source.timecodeScale = timecodeScale
+        source.walker = ElementWalker(maxHeaderLength: 12, startingAt: point.offset, header: EBML.header)
+        source.packets = PacketIndex(firstFrame: point.frame)
+        return source
+    }
+
+    /// Each CuePoint's time, in ticks from the first packet's frame, and its Cluster. A damaged index is
+    /// ignored rather than failing the file, as only seeks ahead need it.
+    private func readCues(_ body: UnsafeRawBufferPointer) throws {
+        var points: [SeekPoint] = []
+        do {
+            try ElementWalker.forEach(in: body, header: EBML.header) { header, point, _ in
+                guard header.id == EBML.cuePoint else { return }
+                var time: UInt64?
+                var position: UInt64?
+                try ElementWalker.forEach(in: point, header: EBML.header) { header, value, _ in
+                    switch header.id {
+                    case EBML.cueTime: time = try EBML.uint(value)
+                    case EBML.cueTrackPositions:
+                        try ElementWalker.forEach(in: value, header: EBML.header) { header, value, _ in
+                            if header.id == EBML.cueClusterPosition, position == nil {
+                                position = try EBML.uint(value)
+                            }
+                        }
+                    default: break
+                    }
+                }
+                // The packet index holds 32-bit offsets, so a position past them is damage.
+                guard let time, let position, position <= UInt64(UInt32.max) else { return }
+                let offset = Int64(position)
+                let frame = Double(time) * timecodeScale * Self.rate / 1e9
+                guard frame <= Self.rate * SourceFormat.longestSeconds else { return }
+                points.append(SeekPoint(frame: Int64(frame.rounded()), offset: segmentStart + offset))
+            }
+        } catch {
+            return
+        }
+        seekPoints = SeekPoint.ordered(points)
     }
 
     private var duration: Double? {
@@ -183,6 +237,11 @@ enum EBML {
     static let trackNumber: UInt32 = 0xD7
     static let codecID: UInt32 = 0x86
     static let codecPrivate: UInt32 = 0x63A2
+    static let cues: UInt32 = 0x1C53_BB6B
+    static let cuePoint: UInt32 = 0xBB
+    static let cueTime: UInt32 = 0xB3
+    static let cueTrackPositions: UInt32 = 0xB7
+    static let cueClusterPosition: UInt32 = 0xF1
     static let cluster: UInt32 = 0x1F43_B675
     static let simpleBlock: UInt32 = 0xA3
     static let blockGroup: UInt32 = 0xA0
