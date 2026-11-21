@@ -8,7 +8,7 @@ public actor GoogleAuth {
     public static let shared = GoogleAuth()
 
     private static let keychainKey = "google.cookie"
-    private static let log = Logger(subsystem: "Lily", category: "GoogleAuth")
+    static let log = Logger(subsystem: "Lily", category: "GoogleAuth")
     /// The cookies the Authorization hashes are made from, in the order
     /// YouTube's web client sends the schemes.
     private static let sessionCookies = ["SAPISID", "__Secure-1PAPISID", "__Secure-3PAPISID"]
@@ -55,9 +55,10 @@ public actor GoogleAuth {
     }
 
     /// Takes in the `Set-Cookie`s of an answer to a request that sent `sent`, as a browser does,
-    /// so the stored session keeps up with Google rotating it. Answers for another login are left out.
+    /// so the stored session keeps up with Google rotating it. Answers for another login, or from off
+    /// youtube.com after a redirect, are left out.
     func take(_ response: HTTPURLResponse, sent: String) {
-        guard let setCookie = response.value(forHTTPHeaderField: "Set-Cookie"), let url = response.url,
+        guard let setCookie = response.value(forHTTPHeaderField: "Set-Cookie"), let url = response.url, HTTP.isYouTube(url.host()),
               let stored = cookie, let login = Self.login(sent), Self.login(stored) == login
         else { return }
         // Foundation splits the joined header, whose Expires dates hold commas too.
@@ -67,17 +68,10 @@ public actor GoogleAuth {
         Keychain.set(Data(merged.utf8), for: Self.keychainKey)
     }
 
-    /// Takes in the body of a successful answer to a signed-in request.
-    nonisolated func checkSignedIn(_ body: Data) {
-        guard Self.answeredSignedOut(body) else { return }
+    /// Called when a signed-in request is answered as signed out.
+    nonisolated func lostSignIn() {
         Self.log.warning("YouTube answered a signed-in request as signed out")
         lost.yield()
-    }
-
-    /// Whether an answer says it was served signed out, as YouTube answers a request whose
-    /// cookie belongs to a session that has ended.
-    static func answeredSignedOut(_ body: Data) -> Bool {
-        body.range(of: Data(#""key":"logged_in","value":"0""#.utf8)) != nil
     }
 
     /// Unexpired youtube.com and google.com cookies, each name once with
@@ -110,15 +104,13 @@ public actor GoogleAuth {
             let domainWide = new.domain.lowercased().trimmingPrefix(".") == "youtube.com"
             let deleted = new.value.isEmpty || new.expiresDate.map { $0 <= now } == true
             guard domainWide, !deleted, !new.name.isEmpty else { continue }
-            let same = jar.indices.filter { jar[$0].name == new.name }
-            for index in same where jar[index].value != new.value {
+            if let index = jar.firstIndex(where: { $0.name == new.name }) {
+                guard jar[index].value != new.value else { continue }
                 jar[index].value = new.value
-                changed = true
-            }
-            if same.isEmpty {
+            } else {
                 jar.append((new.name, new.value))
-                changed = true
             }
+            changed = true
         }
         return changed ? jar.map { "\($0.name)=\($0.value)" }.joined(separator: "; ") : nil
     }

@@ -26,8 +26,7 @@ struct PlaybackSettings: View {
                             Button(Self.length(seconds)) { settings.value.crossfadeSeconds = seconds }
                         }
                     } label: {
-                        let seconds = settings.value.crossfadeSeconds
-                        PillLabel(title: Settings.crossfadeLengths.contains(seconds) ? Self.length(seconds) : "Custom", small: true)
+                        PillLabel(title: Self.length(settings.value.crossfadeSeconds), small: true)
                     }
                 }
                 Toggle("Crossfade", isOn: $settings.value.crossfade)
@@ -64,7 +63,7 @@ struct PlaybackSettings: View {
     }
 
     private static func length(_ seconds: Double) -> String {
-        "\(Int(seconds)) s"
+        "\(seconds.formatted()) s"
     }
 
     private func qualityDetail(_ quality: AudioQuality) -> String {

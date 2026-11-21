@@ -82,7 +82,7 @@ import Testing
     @Test func carriesTheLibraryStateOntoAnOlderCopy() {
         var live = PageHeader(title: "Revival")
         live.saved = true
-        live.saveId = "OLAK"
+        live.playlistId = "OLAK"
         var fetched = live
         fetched.saved = false
         let carried = Page(header: fetched, sections: []).keepingLibraryState(of: Page(header: live, sections: []))

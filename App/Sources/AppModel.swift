@@ -165,9 +165,9 @@ final class AppModel {
 
     /// Pins a playlist after those pinned already, or unpins it.
     func togglePin(_ card: Card) {
-        let pinning = !settings.value.pinned.contains(card.id)
-        settings.value.pinned.removeAll { $0 == card.id }
-        if pinning { settings.value.pinned.append(card.id) }
+        var pinned = settings.value.pinned
+        if pinned.contains(card.id) { pinned.removeAll { $0 == card.id } } else { pinned.append(card.id) }
+        settings.value.pinned = pinned
     }
 
     /// Replaces `theme` only when it changes, so views reading it redraw only then.
@@ -240,7 +240,7 @@ final class AppModel {
         }
         // A renewed session has its name and picture back.
         if account == nil { await refreshAccount() }
-        // Otherwise the cookie isn't checked again at every answer.
+        // Answers arriving meanwhile wait, so the cookie isn't checked at each.
         try? await Task.sleep(for: Self.signInRecheckAfter)
     }
 

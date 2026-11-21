@@ -7,7 +7,7 @@ extension YTMusic {
     @concurrent
     public func rating(videoId: String) async throws -> Rating {
         guard await auth.isSignedIn else { return .none }
-        return Rating(next: try await innerTube.post("next", body: ["videoId": videoId]))
+        return Rating(next: try await innerTube.post("next", body: ["videoId": try Self.videoId(videoId)]))
     }
 
     @concurrent
@@ -17,12 +17,12 @@ extension YTMusic {
         case .dislike: "like/dislike"
         case .none: "like/removelike"
         }
-        _ = try await edit(endpoint, ["target": ["videoId": videoId]])
+        _ = try await edit(endpoint, ["target": ["videoId": try Self.videoId(videoId)]])
     }
 
     @concurrent
     public func playlists(adding videoId: String) async throws -> [PlaylistOption] {
-        let reply = try await edit("playlist/get_add_to_playlist", ["videoIds": [videoId]])
+        let reply = try await edit("playlist/get_add_to_playlist", ["videoIds": [try Self.videoId(videoId)]])
         guard let options = PlaylistOption.list(in: reply) else {
             throw YTMError(.parse, "YouTube didn't list your playlists.")
         }
@@ -115,13 +115,7 @@ extension YTMusic {
 
     /// An account without a channel is asked to make one before it can share a playlist.
     static func playlistRefusal(_ reply: JSON) -> YTMError {
-        func asksForChannel(_ value: JSON) -> Bool {
-            if let object = value.raw as? NSDictionary {
-                return object["channelCreationFormEndpoint"] != nil || object.allValues.contains { asksForChannel(JSON($0)) }
-            }
-            return value.array.contains(where: asksForChannel)
-        }
-        return asksForChannel(reply)
+        reply.contains(key: "channelCreationFormEndpoint")
             ? YTMError(.refused, "The account needs a YouTube channel to share playlists.")
             : YTMError(.refused, "YouTube didn't change the playlist.")
     }
@@ -134,8 +128,7 @@ extension YTMusic {
         }
     }
 
-    /// `id`, should it be in the shape of a playlist's, channel's or playlist entry's, so nothing else ever goes
-    /// into a request that edits the account.
+    /// Throws unless `id` looks like a playlist, channel or entry ID, so nothing else reaches an edit request.
     static func youtubeId(_ id: String) throws -> String {
         guard (1...64).contains(id.utf8.count), isIdText(id) else { throw YTMError(.parse, "That isn't a YouTube ID.") }
         return id

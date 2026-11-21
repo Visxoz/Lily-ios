@@ -68,11 +68,13 @@ final class FakeMusic: MusicService {
     }
 
     static func stream(_ videoId: String, premium: Bool = false) -> ResolvedStream {
-        ResolvedStream(
+        var stream = ResolvedStream(
             url: URL(string: "https://rr1.googlevideo.com/videoplayback?id=\(videoId)") ?? URL(filePath: "/"),
             headers: [:], itag: premium ? 774 : 251, codec: .opus, contentLength: 1000, bitrate: 160_000,
-            duration: 200, loudnessDb: 3, isPremium: premium, client: premium ? nil : "VISIONOS"
+            duration: 200, loudnessDb: 3, isPremium: premium
         )
+        stream.client = premium ? nil : "VISIONOS"
+        return stream
     }
 
     private func waitWhileHeld(_ id: String) async {

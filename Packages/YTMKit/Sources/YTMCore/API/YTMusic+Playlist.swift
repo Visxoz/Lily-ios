@@ -42,10 +42,8 @@ extension YTMusic {
         try await asAccount(asOwner) { try await self.innerTube.browse("VL" + id, authenticated: $0) }.response
     }
 
-    /// Private playlists, Liked music and their radios exist only for their owner, and only the account's own
-    /// requests say what is in its library; with a stale cookie, public pages still open signed out. The first
-    /// failure is the one reported. `signedIn` says whether the answer was the account's, which a request without
-    /// a cookie, the signed-out fallback and an answer YouTube served signed out are not.
+    /// With `asOwner`, asks as the account, then signed out should that fail, so a stale cookie still opens public
+    /// pages; the first failure is reported. `signedIn` says whether the answer really was the account's.
     func asAccount(_ asOwner: Bool, _ request: (Bool) async throws -> JSON) async throws -> (response: JSON, signedIn: Bool) {
         guard asOwner else { return (try await request(false), false) }
         let signedIn = await auth.isSignedIn
@@ -91,7 +89,6 @@ extension Renderers {
             pageHeader.privacy = ownership.privacy
         }
         pageHeader.saved = saved(header)
-        pageHeader.saveId = pageHeader.saved.map { _ in id }
         return Page(
             header: pageHeader,
             sections: [Section.tracks("", tracks, mode: .section)].compactMap(\.self),

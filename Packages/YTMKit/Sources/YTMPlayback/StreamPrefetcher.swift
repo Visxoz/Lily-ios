@@ -39,23 +39,23 @@ struct StreamPrefetcher {
     }
 
     /// Drops stale streams too. One asked for before a `clear` is not kept.
-    /// Nor is a downloaded file's, as it may be removed before it plays.
-    mutating func store(_ id: String, _ prefetched: Prefetched, at now: ContinuousClock.Instant = .now) {
-        guard prefetched.epoch == epoch, !prefetched.stream.url.isFileURL else { return }
+    /// Nor is a downloaded file's, as it may be removed before it plays. Returns whether it was kept.
+    @discardableResult
+    mutating func store(_ id: String, _ prefetched: Prefetched, at now: ContinuousClock.Instant = .now) -> Bool {
+        guard prefetched.epoch == epoch, !prefetched.stream.url.isFileURL else { return false }
         streams = streams.filter { now - $0.value.resolvedAt < Self.freshFor }
         streams[id] = prefetched
+        return true
     }
 
     /// As `store`, and kept as the playing song's.
     mutating func storePlaying(_ id: String, _ prefetched: Prefetched, at now: ContinuousClock.Instant = .now) {
-        store(id, prefetched, at: now)
-        playing = prefetched.epoch == epoch && !prefetched.stream.url.isFileURL ? (id, prefetched) : nil
+        playing = store(id, prefetched, at: now) ? (id, prefetched) : nil
     }
 
-    /// The playing song's stream, for `whole` files only: of one partly cached, the rest needs a URL that works.
-    func held(_ id: String, whole: Bool) -> Prefetched? {
-        guard whole, let playing, playing.id == id else { return nil }
-        return playing.prefetched
+    /// The playing song's stream, however old.
+    func held(_ id: String) -> Prefetched? {
+        playing?.id == id ? playing?.prefetched : nil
     }
 
     mutating func remove(_ id: String) {
@@ -169,9 +169,10 @@ extension PlayerController {
         return { .init(stream: try await resolve(), resolvedAt: .now, epoch: epoch) }
     }
 
-    /// The playing song's stream, however old, while the engine holds all of it, as on repeat-one or a restart.
+    /// The playing song's stream, however old, while the engine holds all of it, as on repeat-one or a restart:
+    /// of a file partly cached, the rest needs a URL that works.
     func heldStream(_ id: String) -> StreamPrefetcher.Prefetched? {
-        prefetcher.held(id, whole: id == current?.id && audio.bufferedFraction >= 1)
+        id == current?.id && audio.bufferedFraction >= 1 ? prefetcher.held(id) : nil
     }
 
     /// Only while `track` is still next: the engine warms one song, and a

@@ -23,9 +23,8 @@ final class InnerTube: Sendable {
 
     /// Keys `body` gives in `context.client` override the client's own.
     /// `authenticated` only affects web clients; `visitorData` tries an ID
-    /// before keeping it. Requests with a fallback of their own pass `retries: 0`. Unless
-    /// `watchesSession` is false, signed-in requests wait out and count refusals, take in the
-    /// cookies their answers set and watch them for a sign-out.
+    /// before keeping it. Requests with a fallback of their own pass `retries: 0`. With `watchesSession`,
+    /// signed-in requests wait out refusal pauses, take in Set-Cookies and notice a lost session.
     @concurrent
     func post(
         _ endpoint: String, body: [String: Any] = [:], client: ClientProfile = .webRemix,
@@ -56,8 +55,7 @@ final class InnerTube: Sendable {
         var sent: String?
         let (data, _) = try await HTTP.data(
             for: request, retries: retries, refusals: counted ? refusals : nil,
-            // Signed for each attempt, as the header carries the time, and a pause may have seen the cookie
-            // renewed or removed: signed out meanwhile, the attempt goes as a signed-out one.
+            // Signed per attempt: the hash carries the time, and a pause may see the cookie renewed or removed.
             sign: { request in
                 sent = nil
                 guard client.isWeb else { return }
@@ -73,8 +71,9 @@ final class InnerTube: Sendable {
                 if watched, let sent { await auth.take(response, sent: sent) }
             }
         )
-        if watched, sent != nil { auth.checkSignedIn(data) }
-        return try JSON(data: data)
+        let json = try JSON(data: data)
+        if watched, sent != nil, Renderers.answeredSignedOut(json) { auth.lostSignIn() }
+        return json
     }
 
     func browse(_ browseId: String, params: String? = nil, authenticated: Bool = true) async throws -> JSON {

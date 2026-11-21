@@ -63,8 +63,7 @@ struct PremiumResolver: Sendable {
     /// Quotes the player's signature timestamp so the URLs match its scrambling.
     func request(videoId: String, as client: ClientProfile) async throws -> JSON {
         // Not retried: the next client is the retry, so a broken one costs a request rather than the song.
-        // Nor held by a run of refusals, nor taken in or watched for a sign-out, as Windows sends it
-        // outside rustypipe: a song never waits 40 s.
+        // Nor paused by a run of refusals or watched for a sign-out: a song never waits 40 s.
         try await innerTube.post("player", body: [
             "playbackContext": [
                 "contentPlaybackContext": [

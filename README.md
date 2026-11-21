@@ -206,17 +206,17 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 | **Select** in the queue | Pick several songs, then play them next or remove them |
 | Press and hold a song | Play it next, add it to the queue, start a radio, download it, like it, save it to a playlist or remove it from your own playlist, go to its artist or album, or copy its link |
 | Press and hold a card | Play it, start a radio, download an album or playlist, or copy its link. In Library, pin a playlist to the top of its playlists |
-| Tap **More** beside an album's, playlist's or artist's buttons | Copy its link, or rename, share or delete your own playlist |
+| Tap **More** beside an album's, playlist's or artist's buttons | Copy its link, or rename your own playlist, change who can see it, or delete it |
 | Tap the shuffle button | Cycle Off, Shuffle and **Smart Shuffle**, which mixes in recommendations. Shuffling keeps an artist's or an album's songs apart |
 | On iPhone Duo, half open with **Fold to scrub** on, fold or open it | Skip back or ahead 10 seconds a step |
 
 ## Your account
 
-Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, where pressing and holding a playlist pins it to the top, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations, with the time you listened, as on the web, unless you turn off **YouTube history** in **Settings ▸ Account**.
+Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, where a playlist's menu can pin it to the top, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations, with the time you listened, as on the web, unless you turn off **YouTube history** in **Settings ▸ Account**.
 
-Your own playlists can be edited from their page: press and hold a song, then drag it into a new order, remove songs from their menu, or rename, share or delete the playlist from **More** in its header (making one public or unlisted needs a YouTube channel on the account). Any other album or playlist can be saved to your library from its header, and artists subscribed to. Every song, album, playlist and artist has **Copy link** in its menu.
+Your own playlists can be edited from their page: press and hold a song, then drag it into a new order, remove songs from their menu, or rename it, change who can see it, or delete it from **More** in its header (making one public or unlisted needs a YouTube channel on the account). Any other album or playlist can be saved to your library from its header, and artists subscribed to. Every song, album, playlist and artist has **Copy link** in its menu.
 
-The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews it every 10 minutes, as an open YouTube tab does, and should YouTube sign you out, it says so.
+The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews the sign-in every 10 minutes, as an open YouTube tab does, and should YouTube sign you out, it says so.
 
 <details>
 <summary><b>Connecting Last.fm</b></summary>

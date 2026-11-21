@@ -74,7 +74,6 @@ struct AlbumDetails {
             playlistId: playlistId
         )
         header.saved = saved
-        header.saveId = playlistId
         let list = Section.tracks(TrackSection(title: "", tracks: tracks, mode: .section, numbered: true))
         return Page(header: header, sections: [list] + [versions].compactMap(\.self))
     }

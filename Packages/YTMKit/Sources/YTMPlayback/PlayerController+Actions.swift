@@ -44,8 +44,8 @@ extension PlayerController {
         case .song:
             if let track = card.track { startRadio(from: track) }
         case .album, .playlist:
+            guard let route = card.route else { return }
             let music = music
-            let route = card.kind == .album ? Route.album(card.id) : .playlist(card.id)
             await load({
                 do {
                     if let page { return try await page() }

@@ -72,6 +72,14 @@ struct JSON: @unchecked Sendable {
         }
         return .missing
     }
+
+    /// Whether `key` is set anywhere within, at any depth.
+    func contains(key: String) -> Bool {
+        if let dict = raw as? NSDictionary {
+            return dict[key] != nil || dict.allValues.contains { JSON($0).contains(key: key) }
+        }
+        return array.contains { $0.contains(key: key) }
+    }
 }
 
 // MARK: - Text

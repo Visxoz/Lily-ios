@@ -85,7 +85,7 @@ enum CatalogueChecks {
             }
             findings.audit(page, "long playlist")
             let total = page.headerTracks.count
-            let stated = page.header.flatMap { Formatting.number($0.meta) } ?? 0
+            let stated = page.header?.count ?? 0
             findings.expect(page.more == nil, "loadMore didn't finish in \(steps) steps")
             findings.expect(first == 100 && steps >= 1, "first batch \(first), \(steps) steps")
             findings.expect(total == min(stated, YTMusic.playlistLimit), "\(total) tracks loaded, the header says \(stated)")

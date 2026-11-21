@@ -101,7 +101,7 @@ final class StreamChooser: Sendable {
 
     /// `wantPremium` means signed in at High quality. Downloads pass `counting` false: a
     /// playlist of music videos, which have no Premium formats, says nothing of the account.
-    /// `reopening` a song whose connection dropped, its failures say nothing of Premium either.
+    /// With `reopening`, a song opened again after a drop, its failures say nothing of Premium either.
     @concurrent
     func resolve(
         videoId: String, wantPremium: Bool, signedIn: Bool, quality: AudioQuality, counting: Bool = true, reopening: Bool = false

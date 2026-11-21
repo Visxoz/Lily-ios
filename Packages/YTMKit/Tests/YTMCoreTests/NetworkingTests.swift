@@ -164,16 +164,12 @@ private final class FlakyServer: URLProtocol {
     }
 
     @Test func retriesAsRustypipeDoes() {
-        let transient = { (status: Int, message: String) in
-            HTTP.isTransient(status: status, body: Data(#"{"error":{"message":"\#(message)"}}"#.utf8))
-        }
-        #expect(transient(429, "") && transient(500, "") && transient(503, ""))
-        #expect(!transient(400, "") && !transient(404, ""))
-        #expect(transient(403, ""))
-        #expect(HTTP.isTransient(status: 403, body: Data("not json".utf8)))
+        #expect(HTTP.isTransient(status: 429) && HTTP.isTransient(status: 500) && HTTP.isTransient(status: 503))
+        #expect(!HTTP.isTransient(status: 400) && !HTTP.isTransient(status: 404) && !HTTP.isTransient(status: 403))
+        #expect(HTTP.isStrayRefusal(status: 403, body: Data()) && HTTP.isStrayRefusal(status: 403, body: Data("not json".utf8)))
         #expect(HTTP.isStrayRefusal(status: 403, body: Data(#"{"error":{"message":"Request refused"}}"#.utf8)))
         let denied = Data(#"{"error":{"message":"The caller does not have permission"}}"#.utf8)
-        #expect(!HTTP.isTransient(status: 403, body: denied) && !HTTP.isStrayRefusal(status: 403, body: denied))
+        #expect(!HTTP.isStrayRefusal(status: 403, body: denied))
         #expect(!HTTP.isStrayRefusal(status: 404, body: Data()))
         #expect(InnerTube.retries == 2)
         for _ in 0..<20 {
@@ -356,6 +352,12 @@ private final class FlakyServer: URLProtocol {
         ))
         await auth.take(response, sent: "SAPISID=xyz")
         #expect(await auth.sessionCookie == "SAPISID=abc", "another login's answer")
+        let offSite = try #require(URL(string: "https://lh3.googleusercontent.com/a"))
+        let redirected = try #require(HTTPURLResponse(
+            url: offSite, statusCode: 200, httpVersion: nil, headerFields: ["Set-Cookie": "SIDCC=new; Domain=.youtube.com"]
+        ))
+        await auth.take(redirected, sent: "SAPISID=abc")
+        #expect(await auth.sessionCookie == "SAPISID=abc", "an answer redirected off youtube.com")
         await auth.take(response, sent: "SAPISID=abc")
         #expect(await auth.sessionCookie == "SAPISID=abc; SIDCC=new")
         await auth.signOut()
@@ -372,18 +374,5 @@ private final class FlakyServer: URLProtocol {
         let refusal = await #expect(throws: YTMError.self) { try await api.reportWatchTime(ping, watched) }
         #expect(refusal?.kind == .notSignedIn, "refused before anything is sent")
         await auth.signOut()
-    }
-
-    @Test func noticesAnswersServedSignedOut() {
-        let context = { (loggedIn: String) in
-            Data(#"""
-            {"responseContext":{"serviceTrackingParams":[{"service":"GFEEDBACK",
-            "params":[{"key":"browse_id","value":"FEmusic_home"},
-            {"key":"logged_in","value":"\#(loggedIn)"}]}]}}
-            """#.utf8)
-        }
-        #expect(GoogleAuth.answeredSignedOut(context("0")))
-        #expect(!GoogleAuth.answeredSignedOut(context("1")))
-        #expect(!GoogleAuth.answeredSignedOut(Data("{}".utf8)))
     }
 }

@@ -54,10 +54,9 @@ extension AppModel {
         return try await load.value
     }
 
-    /// The whole of the expired page cached at `since`, to swap in should it differ; nil once it fails, in part too,
-    /// and the copy stays. Shared by the screens asking, and it outlives them: still the copy it replaces, it is
-    /// cached once they have gone. Forgotten meanwhile, as after a like or a sign-out, it is the next visit's to load;
-    /// edited meanwhile, the copy is newer. Saved or subscribed to meanwhile, it keeps what that set.
+    /// The whole of the expired page cached at `since`, to swap in should it differ; nil should any of it fail, the
+    /// copy staying. Shared, and cached even once the screens asking have gone, unless the copy was forgotten or
+    /// edited meanwhile; a save or subscription made meanwhile is kept.
     func refreshPage(_ route: Route, since: ContinuousClock.Instant) async -> Page? {
         if let refresh = pageRefreshes[route] { return await refresh.value }
         let generation = accountGeneration

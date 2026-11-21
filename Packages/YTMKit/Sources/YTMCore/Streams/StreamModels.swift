@@ -43,7 +43,7 @@ public struct ResolvedStream: Codable, Hashable, Sendable {
     public init(
         url: URL, headers: [String: String], itag: Int, codec: AudioCodec,
         contentLength: Int64, bitrate: Int, duration: Double?, loudnessDb: Double?,
-        isPremium: Bool = false, client: String? = nil
+        isPremium: Bool = false
     ) {
         self.url = url
         self.headers = headers
@@ -54,7 +54,6 @@ public struct ResolvedStream: Codable, Hashable, Sendable {
         self.duration = duration
         self.loudnessDb = loudnessDb
         self.isPremium = isPremium
-        self.client = client
     }
 
     /// "OPUS 165", with Premium formats at YouTube's nominal 256 kbps.

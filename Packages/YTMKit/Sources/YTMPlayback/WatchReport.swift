@@ -17,7 +17,7 @@ struct WatchReport {
     /// Also tells this play from a replay of the same song.
     let started: ContinuousClock.Instant
     /// Where they go, once the play's report is answered.
-    private(set) var ping: WatchTime?
+    private var ping: WatchTime?
     private var sent = 0
     /// Since `started`.
     private var nextAt = Duration.zero
@@ -25,8 +25,7 @@ struct WatchReport {
     private(set) var stretches: [ClosedRange<Double>] = []
     /// The end of the last stretch heard.
     private var position = 0.0
-    /// Forgotten on a seek, as ticks stop while paused, where a seek could pass for time played through.
-    var lastTick: (position: Double, at: ContinuousClock.Instant)?
+    private var lastTick: (position: Double, at: ContinuousClock.Instant)?
 
     init(started: ContinuousClock.Instant) {
         self.started = started
@@ -35,6 +34,11 @@ struct WatchReport {
     mutating func answered(_ ping: WatchTime) {
         self.ping = ping
         nextAt = ping.due(0, sent: .zero)
+    }
+
+    /// Ticks stop while paused, where a seek could pass for time played through.
+    mutating func seeked() {
+        lastTick = nil
     }
 
     /// Only time played through counts, as for a scrobble.

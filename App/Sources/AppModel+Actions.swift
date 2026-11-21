@@ -48,7 +48,7 @@ extension AppModel {
         guard card.kind == .album || card.kind == .playlist, let route = card.route else { return nil }
         return { [self] in
             // An expired copy may be missing songs added since.
-            if let kept = keptPage(route), kept.isFresh { return kept.page }
+            if let kept = pageCache[route], kept.isFresh { return kept.page }
             return try await fetchPage(route)
         }
     }
@@ -92,7 +92,7 @@ extension AppModel {
         if let album = track.album { open(.album(album.id)) }
     }
 
-    /// Writing to the pasteboard never asks permission and cannot fail, so there is no failure to report.
+    /// The pasteboard never prompts or fails, so the toast always confirms.
     func copyLink(_ link: String) {
         UIPasteboard.general.string = link
         showToast("Link copied")

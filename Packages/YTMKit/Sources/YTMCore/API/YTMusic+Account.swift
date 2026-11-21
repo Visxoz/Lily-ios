@@ -2,8 +2,6 @@ import Foundation
 import os
 
 extension YTMusic {
-    private static let signInLog = Logger(subsystem: "Lily", category: "GoogleAuth")
-
     /// Nil when signed out, or when YouTube no longer takes the session. The picture comes
     /// from the guide, as the menu has been seen to keep serving the one before a change.
     @concurrent
@@ -31,13 +29,9 @@ extension YTMusic {
         request.httpBody = Data(#"[000,"-0000000000000000000"]"#.utf8)
         do {
             let (_, response) = try await HTTP.data(for: request)
-            // Only youtube.com may set youtube.com's cookies, should it redirect.
-            guard let host = response.url?.host()?.lowercased(), host == "youtube.com" || host.hasSuffix(".youtube.com") else {
-                throw YTMError(.refused, "The renewal was redirected off youtube.com.")
-            }
             await auth.take(response, sent: cookie)
         } catch {
-            Self.signInLog.warning("Couldn't renew the sign-in: \(sentence(for: error), privacy: .public)")
+            GoogleAuth.log.warning("Couldn't renew the sign-in: \(sentence(for: error), privacy: .public)")
         }
     }
 
@@ -57,7 +51,7 @@ extension YTMusic {
             })
             return Account.isSignedIn(page: String(decoding: html, as: UTF8.self))
         } catch {
-            Self.signInLog.warning("Couldn't check the sign-in: \(sentence(for: error), privacy: .public)")
+            GoogleAuth.log.warning("Couldn't check the sign-in: \(sentence(for: error), privacy: .public)")
             return nil
         }
     }

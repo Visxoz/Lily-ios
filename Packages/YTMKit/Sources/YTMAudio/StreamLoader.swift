@@ -10,9 +10,8 @@ final class StreamLoader {
     static let maxRetryDelay = Duration.seconds(5)
     /// How long a connection that stops answering is retried, so one that comes back within it plays on.
     static let rideOut = Duration.seconds(60)
-    /// Fresh URLs asked for in a row without a whole range arriving from them: the same client once
-    /// more, then each of the others. YTMCore names them, as this module can't see its list, so a
-    /// test keeps the two in step.
+    /// Fresh URLs asked for in a row without a whole range arriving: one per plain-URL client in YTMCore,
+    /// which this module can't see; StreamRecoveryTests keeps the two in step.
     static let maxRefreshes = 3
     private static let replayLength: Int64 = 256 << 10
     static let warmLength: Int64 = 64 << 10
@@ -82,8 +81,7 @@ final class StreamLoader {
         // Kept apart, so a stray error once a lost connection is back gets its own tries.
         var drops = 0
         var refreshes = 0
-        // From the first failure in a row, not the last byte, as a phone coming back
-        // from a dead zone fails at once while its network returns.
+        // From the first failure in a row, not the last byte: a phone back from a dead zone fails at once.
         var failingSince: ContinuousClock.Instant?
         // The range after the one arriving, asked for already so it follows with no round trip.
         var ahead: (start: Int64, bytes: AsyncThrowingStream<Data, any Error>)?

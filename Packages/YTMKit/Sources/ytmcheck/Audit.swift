@@ -27,7 +27,7 @@ extension Findings {
         duplicates(tracks.map(\.id), label)
         for track in tracks {
             let name = "\(label) › \(track.title.isEmpty ? track.id : track.title)"
-            expect(Self.isVideoId(track.id), "\(name): video ID \(track.id) isn't one")
+            expect((try? YTMusic.videoId(track.id)) != nil, "\(name): video ID \(track.id) isn't one")
             expect(!track.title.isEmpty, "\(name): no title")
             expect(!track.artists.isEmpty, "\(name): no artists")
             expect(track.artists.allSatisfy { !$0.name.isEmpty }, "\(name): an artist without a name")
@@ -89,11 +89,6 @@ extension Findings {
         var seen = Set<String>()
         let repeated = ids.filter { !seen.insert($0).inserted }
         expect(repeated.isEmpty, "\(label): repeated \(Set(repeated).sorted().prefix(5))")
-    }
-
-    /// Eleven characters of base64url.
-    static func isVideoId(_ id: String) -> Bool {
-        id.utf8.count == 11 && id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
     }
 }
 

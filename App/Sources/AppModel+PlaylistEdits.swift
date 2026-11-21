@@ -1,11 +1,6 @@
 import Foundation
 import YTMCore
 
-/// The header's rename and delete, which ask first.
-enum PlaylistDialog {
-    case rename, delete
-}
-
 /// Edits to the account's own playlists, from the page showing one. Songs removed or moved show so at once, and
 /// go back should YouTube refuse.
 extension AppModel {
@@ -19,17 +14,15 @@ extension AppModel {
     }
 
     /// Applies `change` to the route's cached copy and to `model`'s page, answering what it gave there, else in the
-    /// cache. Counted, so a load asked for before it never puts back what it changed. The cached copy counts as fresh
-    /// as YouTube's from then on, as YouTube may not show the edit yet, unless `renewing` is false: then one already
-    /// expired stays so, to reload as it would have.
+    /// cache. A change is counted, so a load asked for before it never puts it back. The copy then counts as fresh,
+    /// as YouTube may not show the edit yet; without `renewing`, one already expired stays so.
     @discardableResult
     func editPage<R>(_ route: Route, shown model: PageModel?, renewing: Bool = true, _ change: (inout Page) -> R?) -> R? {
         pageEdits[route, default: 0] += 1
         var cached: R?
         if var kept = pageCache[route], let result = change(&kept.page) {
             cached = result
-            // A new time, so a screen showing the old copy takes this one on a return; one only just expired, as
-            // `seedLibrary` gives, for a copy that was.
+            // A new time either way, so a screen showing the old copy takes this one on a return.
             kept.at = renewing || kept.isFresh ? .now : .now - Self.pageFreshFor
             pageCache[route] = kept
             if route == .library { api.saveLibrary(kept.page) }
@@ -152,14 +145,16 @@ extension AppModel {
     private func editLibraryPlaylist(_ id: String, _ edit: (inout [Card], Int) -> Void) {
         for route in [Route.library, .libraryPlaylists] {
             editPage(route, shown: nil, renewing: false) { page -> Void? in
+                var found = false
                 for index in page.sections.indices {
                     guard case .cards(var section) = page.sections[index],
                           let at = section.cards.firstIndex(where: { $0.kind == .playlist && $0.id == id })
                     else { continue }
                     edit(&section.cards, at)
                     page.sections[index] = .cards(section)
+                    found = true
                 }
-                return ()
+                return found ? () : nil
             }
         }
     }

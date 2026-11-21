@@ -80,7 +80,7 @@ struct PageHeaderView: View {
     }
 
     private var canSave: Bool {
-        model != nil && header.saved != nil && header.saveId != nil && header.editable != true
+        model != nil && header.saved != nil && header.playlistId != nil && header.editable != true
     }
 
     private var canSubscribe: Bool {

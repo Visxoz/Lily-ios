@@ -89,7 +89,7 @@ struct PageContent: View {
         // The cards' art is fetched as the page is built, rather than as each
         // scrolls in, and stops once it is left.
         .task(id: [cardCount, model?.replacements ?? 0]) { await prefetchArt() }
-        .environment(\.pinsPlaylists, route == .library || route == .libraryPlaylists)
+        .environment(\.pinsPlaylists, route.showsPins)
         .modifier(PlaylistDialogs(dialog: $dialog, name: $newName, title: page.header?.title ?? "", model: model))
     }
 

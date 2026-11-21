@@ -1,6 +1,11 @@
 import SwiftUI
 import YTMCore
 
+/// The header's rename and delete, which ask first.
+enum PlaylistDialog {
+    case rename, delete
+}
+
 extension EnvironmentValues {
     /// The page of the account's own playlist whose songs the rows are, which their menus remove and dragging
     /// moves; nil anywhere else, its other sections included.

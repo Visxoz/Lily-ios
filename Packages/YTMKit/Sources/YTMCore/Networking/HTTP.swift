@@ -24,6 +24,12 @@ enum HTTP {
         return hosts.contains(host) || domains.contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
+    /// youtube.com or a subdomain: the only hosts sent or let set the account's cookies.
+    static func isYouTube(_ host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        return host == "youtube.com" || host.hasSuffix(".youtube.com")
+    }
+
     /// Nothing is cached and no cookie is kept: the signed-in Cookie header is
     /// set per request from the Keychain.
     static let api: URLSession = {
@@ -62,10 +68,9 @@ enum HTTP {
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
     }()
 
-    /// Checks the host and fails outside 2xx. Errors omit the URL, which may
-    /// carry stream signatures. `retries` re-asks a 5xx, 429, stray 403 or timeout.
-    /// With `refusals`, as signed-in requests have, each attempt waits out a pause and is counted.
-    /// `sign` sets each attempt's headers once its turn comes; `answered` sees every answer, whatever its status.
+    /// Checks the host and fails outside 2xx; errors omit the URL, which may carry stream signatures.
+    /// `retries` re-asks a 5xx, 429, stray 403 or timeout. `refusals` pauses and counts each attempt,
+    /// `sign` sets its headers once its turn comes, and `answered` sees every answer.
     static func data(
         for request: URLRequest, session: URLSession = api, retries: Int = 0, refusals: Refusals? = nil,
         sign: (inout URLRequest) async -> Void = { _ in },
@@ -89,7 +94,7 @@ enum HTTP {
                 refusals?.answered(refused: refused)
                 if (200..<300).contains(http.statusCode) { return (data, http) }
                 // Refused even after a pause: failing beats holding the caller through another.
-                guard attempt < retries, isTransient(status: http.statusCode, body: data), !(paused && refused) else {
+                guard attempt < retries, refused || isTransient(status: http.statusCode), !(paused && refused) else {
                     throw YTMError(status: http.statusCode)
                 }
             } catch let error as URLError {
@@ -101,8 +106,8 @@ enum HTTP {
         }
     }
 
-    static func isTransient(status: Int, body: Data) -> Bool {
-        status == 429 || (500..<600).contains(status) || isStrayRefusal(status: status, body: body)
+    static func isTransient(status: Int) -> Bool {
+        status == 429 || (500..<600).contains(status)
     }
 
     /// A 403 not for want of permission, as to someone else's private playlist: YouTube refuses

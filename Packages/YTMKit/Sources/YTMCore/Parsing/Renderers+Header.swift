@@ -4,8 +4,7 @@ extension Renderers {
     /// An album or playlist page's header renderer, from the two-column page's
     /// first tab or else its own header, from inside the wrapper owned playlists add.
     static func detailHeader(in response: JSON) -> JSON {
-        let tab = response["contents", "twoColumnBrowseResultsRenderer", "tabs"][0]["tabRenderer", "content", "sectionListRenderer", "contents"][0]
-        for wrapper in [tab, response["header"]] {
+        for wrapper in headerWrappers(in: response) {
             let editable = wrapper["musicEditablePlaylistDetailHeaderRenderer", "header"]
             let renderer = (editable.exists ? editable : wrapper).first("musicResponsiveHeaderRenderer", "musicDetailHeaderRenderer")
             if renderer.exists { return renderer }
@@ -16,14 +15,19 @@ extension Renderers {
     /// Whether the header comes in the wrapper the account's own playlists have, and who can see it, read leniently
     /// so an odd privacy still leaves it editable.
     static func ownership(in response: JSON) -> (editable: Bool, privacy: PlaylistPrivacy?) {
-        let tab = response["contents", "twoColumnBrowseResultsRenderer", "tabs"][0]["tabRenderer", "content", "sectionListRenderer", "contents"][0]
-        for wrapper in [tab, response["header"]] {
+        for wrapper in headerWrappers(in: response) {
             let editable = wrapper["musicEditablePlaylistDetailHeaderRenderer"]
             guard editable.exists else { continue }
             let privacy = editable["editHeader", "musicPlaylistEditHeaderRenderer", "privacy"].string
             return (true, privacy.flatMap(PlaylistPrivacy.init(rawValue:)))
         }
         return (false, nil)
+    }
+
+    /// The two-column page's first tab, then the page's own header.
+    private static func headerWrappers(in response: JSON) -> [JSON] {
+        let tab = response["contents", "twoColumnBrowseResultsRenderer", "tabs"][0]["tabRenderer", "content", "sectionListRenderer", "contents"][0]
+        return [tab, response["header"]]
     }
 
     /// Whether the album or playlist is in the library, from its save button, which only signed-in requests get:

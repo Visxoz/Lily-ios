@@ -60,8 +60,7 @@ import YTMCore
     }
 
     /// Without `reporting`, signed out or with the YouTube history off, the play's watch time is dropped.
-    /// Quitting mid-song loses what was heard since the last ping, as on Windows, since nothing flushes
-    /// from `persistSession()`.
+    /// Quitting mid-song loses what was heard since the last ping, as on Windows.
     func flushWatch(_ flush: WatchReport.Flush, paused: Bool, reporting: Bool) {
         guard reporting else {
             watch = nil
@@ -81,7 +80,7 @@ import YTMCore
     }
 
     func seeked() {
-        watch?.lastTick = nil
+        watch?.seeked()
     }
 
     /// An old play's URL never goes out with another account's cookie.

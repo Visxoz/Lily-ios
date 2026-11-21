@@ -27,7 +27,7 @@ struct WatchReportTests {
         var report = WatchReport(started: start)
         report.tick(position: 0, speed: 1, at: at(0))
         report.tick(position: 0.25, speed: 1, at: at(0.25))
-        report.lastTick = nil
+        report.seeked()
         report.tick(position: 30.25, speed: 1, at: at(60))
         report.tick(position: 30.5, speed: 1, at: at(60.25))
         #expect(report.stretches == [0...0.25, 30.25...30.5], "30 s sought to over a minute paused")

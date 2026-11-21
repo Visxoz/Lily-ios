@@ -55,7 +55,7 @@ struct Format: Sendable, Hashable {
         isDefaultAudio = track.exists ? track["audioIsDefault"].bool ?? false : true
     }
 
-    /// Not a dynamic-range compressed variant, dubbed track or surround mix, which the decoders can't play.
+    /// The original stereo mix: not a dynamic-range compressed variant, a dubbed track or surround.
     var isPlain: Bool {
         !isDrc && channels.map { $0 <= 2 } ?? true && isDefaultAudio
     }

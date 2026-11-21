@@ -31,7 +31,7 @@ extension YTMusic {
     }
 
     private func statsCookie() async throws -> String {
-        guard let origin = ClientProfile.webRemix.origin, let cookie = await auth.headers(origin: origin)?["Cookie"] else {
+        guard let cookie = await auth.sessionCookie else {
             throw YTMError(.notSignedIn, "Sign in to keep a YouTube history.")
         }
         return cookie
@@ -110,7 +110,7 @@ enum PlayReport {
     /// A stats URL from the player response, for the play `cpn`. Nil without one, or when it is
     /// anywhere but youtube.com: it is sent the account's cookie.
     static func statsURL(_ base: String?, client: String, cpn: String) -> URL? {
-        guard let base, var parts = URLComponents(string: base), isYouTube(parts.host) else { return nil }
+        guard let base, var parts = URLComponents(string: base), HTTP.isYouTube(parts.host) else { return nil }
         parts.percentEncodedQueryItems = (parts.percentEncodedQueryItems ?? []) + [
             URLQueryItem(name: "ver", value: "2"),
             URLQueryItem(name: "c", value: client),
@@ -122,7 +122,7 @@ enum PlayReport {
     /// A GET as the web client, with the account's cookie. `HTTP` keeps the URL, which carries the
     /// session's tracking tokens, out of its errors.
     static func ping(_ url: URL, cookie: String) async throws {
-        guard isYouTube(url.host()) else { throw YTMError(.refused, "The app blocked a request to a site it doesn't use.") }
+        guard HTTP.isYouTube(url.host()) else { throw YTMError(.refused, "The app blocked a request to a site it doesn't use.") }
         var request = URLRequest(url: url)
         request.allHTTPHeaderFields = ["User-Agent": ClientProfile.webRemix.userAgent, "Cookie": cookie]
         _ = try await HTTP.data(for: request)
@@ -130,11 +130,6 @@ enum PlayReport {
 
     static func login(_ cookie: String) -> Int? {
         GoogleAuth.login(cookie)?.hashValue
-    }
-
-    private static func isYouTube(_ host: String?) -> Bool {
-        guard let host = host?.lowercased() else { return false }
-        return host == "youtube.com" || host.hasSuffix(".youtube.com")
     }
 
     /// A client playback nonce, from the web player's alphabet.

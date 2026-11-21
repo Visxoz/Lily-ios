@@ -209,11 +209,8 @@ final class PageModel {
     /// Signed in, Home's Speed dial takes in this phone's recent plays heard
     /// long enough to count, as YouTube's seldom has them.
     private func onScreen(_ page: Page, in app: AppModel) -> Page {
-        switch route {
-        case .home where app.isSignedIn: page.withRecentPlays(app.history.history.heard)
-        case .library, .libraryPlaylists: page.withPinnedFirst(app.pinned)
-        default: page
-        }
+        if route == .home, app.isSignedIn { return page.withRecentPlays(app.history.history.heard) }
+        return route.showsPins ? page.withPinnedFirst(app.pinned) : page
     }
 
     private func show(_ page: Page, for app: AppModel, saved: Bool = false) {
@@ -224,4 +221,9 @@ final class PageModel {
         showsSaved = saved
         step += 1
     }
+}
+
+extension Route {
+    /// Library's pages, where pinned playlists go first.
+    var showsPins: Bool { self == .library || self == .libraryPlaylists }
 }

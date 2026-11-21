@@ -222,16 +222,15 @@ struct PrefetcherTests {
         let now = ContinuousClock.now
         let later = now + .seconds(2 * 60 * 60)
         prefetcher.storePlaying("a", .init(stream: FakeMusic.stream("a"), resolvedAt: now, epoch: prefetcher.epoch), at: now)
-        #expect(prefetcher.held("a", whole: true) != nil)
-        #expect(prefetcher.held("a", whole: false) == nil, "the rest of a part file needs a URL that works")
-        #expect(prefetcher.held("b", whole: true) == nil)
+        #expect(prefetcher.held("a") != nil)
+        #expect(prefetcher.held("b") == nil)
         #expect(prefetcher.take("a", at: later) == nil, "too old to resolve ahead from")
-        #expect(prefetcher.held("a", whole: true) != nil, "but still replays from the cache")
+        #expect(prefetcher.held("a") != nil, "but still replays from the cache")
         prefetcher.remove("a")
-        #expect(prefetcher.held("a", whole: true) == nil, "one that failed is never replayed")
+        #expect(prefetcher.held("a") == nil, "one that failed is never replayed")
         prefetcher.storePlaying("a", .init(stream: FakeMusic.stream("a"), resolvedAt: now, epoch: prefetcher.epoch), at: now)
         prefetcher.clear()
-        #expect(prefetcher.held("a", whole: true) == nil, "for the old quality or account")
+        #expect(prefetcher.held("a") == nil, "for the old quality or account")
     }
 
     @Test func refusesAStreamAskedForBeforeAClear() {

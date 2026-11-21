@@ -60,7 +60,8 @@ extension Page {
     /// an entry ID, or past the songs loaded while the playlist has more than that.
     public func successor(from: Int, to: Int) -> Successor? {
         let tracks = headerTracks
-        let rest = tracks.indices.filter { $0 != from }.map { tracks[$0] }
+        var rest = tracks
+        if rest.indices.contains(from) { rest.remove(at: from) }
         guard rest.indices.contains(to) else {
             return (header?.count ?? 0) <= tracks.count ? .end : nil
         }
@@ -84,7 +85,7 @@ extension Page {
             guard header.subscribed != nil, header.channelId == id else { return false }
             self.header?.subscribed = on
         } else {
-            guard header.saved != nil, header.saveId == id else { return false }
+            guard header.saved != nil, header.playlistId == id else { return false }
             self.header?.saved = on
         }
         return true

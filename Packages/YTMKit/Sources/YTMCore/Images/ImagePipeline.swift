@@ -26,7 +26,7 @@ public final class ImagePipeline: Sendable {
     /// Downloaded songs' artwork, at the player's size, which serves every smaller one.
     private static let kept = FileStore.shared.downloads.appending(path: "Artwork", directoryHint: .isDirectory)
     /// How long the URL cache's copy is used before it is fetched again, as artwork can change under the same URL.
-    static let maxAge: TimeInterval = 30 * 24 * 60 * 60
+    private static let maxAge: TimeInterval = 30 * 24 * 60 * 60
     /// HTTP's dates, as `Sun, 06 Nov 1994 08:49:37 GMT`.
     private static let httpDate = Date.ParseStrategy(
         format: "\(weekday: .abbreviated), \(day: .twoDigits) \(month: .abbreviated) \(year: .defaultDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)):\(minute: .twoDigits):\(second: .twoDigits) GMT",
@@ -159,8 +159,7 @@ public final class ImagePipeline: Sendable {
         _ = try? await HTTP.data(for: request, session: HTTP.media)
     }
 
-    /// The URL cache's copy of `request` if younger than `maxAge`, read once; an older one the request skips, and
-    /// the fresh answer replaces it.
+    /// The cached copy if under `maxAge` old; an older one is dropped and `request` set to skip the cache.
     private static func inDateCopy(of request: inout URLRequest) -> Data? {
         guard let cached = HTTP.artworkCache.cachedResponse(for: request) else { return nil }
         guard isStale(cached.response, now: .now) else { return cached.data }

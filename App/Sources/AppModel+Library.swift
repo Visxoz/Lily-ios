@@ -6,7 +6,7 @@ extension AppModel {
     /// once, and put back should YouTube refuse.
     func toggleInLibrary(subscribe: Bool, in model: PageModel) {
         guard let header = model.page?.header else { return }
-        let (now, id) = subscribe ? (header.subscribed, header.channelId) : (header.saved, header.saveId)
+        let (now, id) = subscribe ? (header.subscribed, header.channelId) : (header.saved, header.playlistId)
         guard let now, let id, !libraryEdits.contains(id) else { return }
         let on = !now
         let (done, what) = switch (subscribe, on) {

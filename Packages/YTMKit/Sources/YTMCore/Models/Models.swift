@@ -212,10 +212,9 @@ public struct PageHeader: Codable, Hashable, Sendable {
     public var editable: Bool?
     /// Who can see the account's own playlist.
     public var privacy: PlaylistPrivacy?
-    /// Whether the album or playlist is in the library; unknown signed out and on the account's own playlists.
+    /// Whether the album or playlist is in the library, saved by `playlistId`; unknown signed out and on the
+    /// account's own playlists.
     public var saved: Bool?
-    /// The playlist saving it targets, an album's being its audio playlist.
-    public var saveId: String?
     /// Whether the account is subscribed to the artist; unknown signed out.
     public var subscribed: Bool?
     /// The channel subscribing to the artist takes.

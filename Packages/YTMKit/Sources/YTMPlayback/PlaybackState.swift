@@ -34,8 +34,7 @@ struct PlaybackState {
     /// A song whose connection dropped, and the tries at opening it again.
     var reopen: (id: String, tries: Int)?
 
-    /// Counts a try at opening `id` again after its connection dropped, where
-    /// the sound got to should it have started, and returns the tries.
+    /// Counts a try at reopening `id`; once it has sounded, keeps where it got to and its play. Returns the tries.
     mutating func reopenTry(_ id: String, position: Double) -> Int {
         if started {
             resume = (id, position)

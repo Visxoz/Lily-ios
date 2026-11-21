@@ -67,7 +67,7 @@ private let editablePlaylist = #"""
         let tracks = page.headerTracks
         #expect(tracks.count == 1 && tracks[0].artistNames == "Band")
         #expect(header.editable == true && header.privacy == .private && header.count == 1204)
-        #expect(header.saved == nil && header.saveId == nil, "own playlists have no save button")
+        #expect(header.saved == nil, "own playlists have no save button")
         #expect(tracks[0].setVideoId == "S1")
     }
 
@@ -210,7 +210,7 @@ private func libraryToggle(toggled: Bool, _ off: String, _ on: String) -> String
             """#)
         let header = try #require(try Renderers.album(response, id: "MPREb_bHfHGoy7vuv").page.header)
         #expect(header.saved == true)
-        #expect(header.saveId == "OLAK5uy_nMr9h2VlS-2PULNz3M3XVXQj_P3C2bqaY", "the menu is still found behind the save button")
+        #expect(header.playlistId == "OLAK5uy_nMr9h2VlS-2PULNz3M3XVXQj_P3C2bqaY", "the menu is still found behind the save button")
     }
 
     @Test func adoptsSongsFromTheAlbumsPlaylist() throws {
