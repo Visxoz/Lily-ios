@@ -1,10 +1,13 @@
 import Observation
+import os
 import YTMCore
 
 /// Each load is numbered, so a late result of one the screen has moved past
 /// never shows.
 @Observable
 final class PageModel {
+    private static let log = Logger(subsystem: "Lily", category: "pages")
+
     enum Phase {
         case loading
         case loaded(Page)
@@ -126,13 +129,20 @@ final class PageModel {
         }
         if cached, let kept = app.keptPage(route) {
             if kept.at != shownAt { present(kept.page) }
-            guard !kept.isFresh, let fresh = await app.refreshPage(route, since: kept.at),
-                  isCurrent(generation, account, in: app),
-                  // Home's shelves differ on every load and Home never moves
-                  // what is shown, so its fresh feed waits for the next visit.
-                  route != .home || !app.isSignedIn
-            else { return }
-            if fresh.sections != source?.sections || fresh.header != source?.header {
+            guard !kept.isFresh, let fresh = await app.refreshPage(route, since: kept.at) else { return }
+            // Home's shelves differ on every load and Home never moves
+            // what is shown, so its fresh feed waits for the next visit.
+            let onScreen = isCurrent(generation, account, in: app)
+            let current = onScreen && (route != .home || !app.isSignedIn)
+            let swap = current && (fresh.sections != source?.sections || fresh.header != source?.header)
+            // Whether the refresh cached what it brought, not merely that another load replaced the copy.
+            let ours = app.pageCache[route]?.page == fresh
+            if onScreen || ours {
+                let outcome = swap ? "swapped in" : ours ? "cached for the next visit" : "dropped"
+                Self.log.debug("refreshed an expired page: \(outcome, privacy: .public)")
+            }
+            guard current else { return }
+            if swap {
                 // Where the reader has got to stays.
                 show(fresh, for: app)
             } else {

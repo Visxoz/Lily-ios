@@ -13,8 +13,10 @@ extension PlayerController {
         setPaused(isPlaying)
     }
 
-    /// At the queue's end with autoplay on, plays on into a radio of the last.
+    /// At the queue's end with autoplay on, plays on into a radio of the last. The song is chosen, so earlier
+    /// failures no longer count towards the run that stops playback.
     public func next() {
+        playback.failures = 0
         next(user: true)
     }
 
@@ -25,11 +27,17 @@ extension PlayerController {
             if playback.started { recordPlay() }
             return
         }
-        if queue.back(repeat: repeatMode) != nil { startCurrent() }
+        if queue.back(repeat: repeatMode) != nil {
+            playback.failures = 0
+            startCurrent()
+        }
     }
 
     public func jump(to index: Int) {
-        if queue.jump(to: index) != nil { startCurrent() }
+        if queue.jump(to: index) != nil {
+            playback.failures = 0
+            startCurrent()
+        }
     }
 
     /// Moves to `seconds` into the song, kept short of its very end. With
@@ -61,6 +69,8 @@ extension PlayerController {
     func setPaused(_ paused: Bool) {
         guard current != nil else { return }
         if !paused, isStopped {
+            // Replayed, as after stopping at the queue's end.
+            playback.failures = 0
             startCurrent()
             return
         }
@@ -76,7 +86,9 @@ extension PlayerController {
         publishPlayback()
     }
 
+    /// Not the user's, the song played through, which starts the run of failures over.
     func next(user: Bool) {
+        if !user { playback.failures = 0 }
         if queue.advance(user: user, repeat: repeatMode) != nil {
             startCurrent()
             return

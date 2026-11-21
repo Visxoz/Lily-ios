@@ -11,27 +11,32 @@ extension YTMusic {
     /// A batch that fails ends the list with what arrived, unless `whole`, when it throws instead.
     func playlistTracks(_ id: String, limit: Int, asOwner: Bool, whole: Bool = false) async throws -> [Track] {
         let shelf = Renderers.trackShelf(in: try await playlistResponse(id, asOwner: asOwner))
-        var tracks = Renderers.tracks(shelf["contents"].array)
+        var seen = Set<String>()
+        var (tracks, fetched) = Renderers.playlistRows(shelf["contents"].array, seen: &seen)
         var token = Renderers.continuation(shelf)
-        while let current = token, tracks.count < limit {
-            guard let batch = try await playlistBatch(after: current, asOwner: asOwner) else {
+        while let current = token, fetched < limit {
+            guard let batch = try await playlistBatch(after: current, asOwner: asOwner, seen: &seen) else {
                 if whole { throw YTMError(.network, "The whole playlist couldn't be loaded.") }
                 break
             }
-            guard !batch.tracks.isEmpty else { break }
+            guard batch.fetched > 0 else { break }
             tracks += batch.tracks
+            fetched += batch.fetched
             token = batch.next
         }
         return tracks
     }
 
-    /// Nil when the batch failed for any reason but cancellation. `entries` keeps each song's entry ID, for the
-    /// account's own playlist.
-    func playlistBatch(after token: String, asOwner: Bool, entries: Bool = false) async throws -> (tracks: [Track], next: String?)? {
+    /// Nil when the batch failed for any reason but cancellation. Leaves out the entries `seen` holds, as
+    /// `Renderers.playlistRows` does; `fetched` counts them too.
+    func playlistBatch(
+        after token: String, asOwner: Bool, entries: Bool = false, seen: inout Set<String>
+    ) async throws -> (tracks: [Track], fetched: Int, next: String?)? {
         do {
             let response = try await asAccount(asOwner) { try await self.innerTube.continuation(token, authenticated: $0) }.response
             let (items, next) = Renderers.continuationItems(in: response)
-            return (Renderers.tracks(items, context: ItemContext(entries: entries)), next)
+            let batch = Renderers.playlistRows(items, entries: entries, seen: &seen)
+            return (batch.tracks, batch.fetched, next)
         } catch {
             try Task.checkCancellation()
             return nil
@@ -68,7 +73,8 @@ extension Renderers {
         let ownership = ownership(in: response)
         // Only those the account made take edits, not Liked music or the mixes.
         let own = ownership.editable && id.hasPrefix("PL")
-        let tracks = tracks(shelf["contents"].array, context: ItemContext(entries: own))
+        var seen = Set<String>()
+        let (tracks, fetched) = playlistRows(shelf["contents"].array, entries: own, seen: &seen)
         let token = continuation(shelf)
         // The whole list's count is worth reading only when this batch isn't all of it.
         let count = token == nil ? tracks.count : trackCount(header)
@@ -92,8 +98,49 @@ extension Renderers {
         return Page(
             header: pageHeader,
             sections: [Section.tracks("", tracks, mode: .section)].compactMap(\.self),
-            more: token.flatMap { tracks.isEmpty ? nil : .tracks(token: $0) }
+            more: token.flatMap { tracks.isEmpty ? nil : .tracks(token: $0, seen: seen, fetched: fetched) }
         )
+    }
+
+    /// A batch of a playlist's songs, without the entries `seen` already holds, which it then holds too: YouTube
+    /// sometimes answers a long curated playlist's next batch from its start again. By entry rather than song, so a
+    /// song the playlist holds twice keeps both. `fetched` counts the repeats too. `entries` keeps each song's entry
+    /// ID, for the account's own playlist.
+    static func playlistRows(_ items: [JSON], entries: Bool = false, seen: inout Set<String>) -> (tracks: [Track], fetched: Int) {
+        let rows = keepFirstEntries(items, seen: &seen) {
+            $0["musicResponsiveListItemRenderer", "playlistItemData", "playlistSetVideoId"].string
+        }
+        let tracks = tracks(rows, context: ItemContext(entries: entries))
+        return (tracks, tracks.count + items.count - rows.count)
+    }
+
+    /// `page` with a later batch of its songs from `YTMusic.playlistBatch`, and the step after should one be due,
+    /// handing on `seen`. A batch of nothing but repeats carries on, as the next may hold new songs again; `fetched`,
+    /// the tracks come before the batch, repeats included, counts towards `YTMusic.playlistLimit`.
+    static func addingBatch(
+        _ batch: (tracks: [Track], fetched: Int, next: String?), to page: Page, seen: Set<String>, fetched: Int
+    ) -> Page {
+        var page = page
+        page.more = nil
+        guard case .tracks(var section)? = page.sections.first else { return page }
+        section.tracks += batch.tracks
+        page.sections[0] = .tracks(section)
+        let total = fetched + batch.fetched
+        if let next = batch.next, batch.fetched > 0, total < YTMusic.playlistLimit {
+            page.more = .tracks(token: next, seen: seen, fetched: total)
+        }
+        if page.header != nil {
+            // The header counts the whole playlist when YouTube said how
+            // long it is, else the tracks loaded.
+            let count = max(page.header?.count ?? 0, section.tracks.count)
+            page.header?.count = count
+            page.header?.meta = Formatting.playlistMeta(count: count, tracks: section.tracks)
+        }
+        return page
+    }
+
+    static func keepFirstEntries<T>(_ items: [T], seen: inout Set<String>, entry: (T) -> String?) -> [T] {
+        items.filter { item in entry(item).map { seen.insert($0).inserted } ?? true }
     }
 
     /// The channel the facepile links to, else the one in the strapline or

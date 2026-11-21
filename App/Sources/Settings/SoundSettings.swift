@@ -45,7 +45,8 @@ struct SoundSettings: View {
 
     private static func normaliseDetail(_ normalise: Normalise) -> String {
         switch normalise {
-        case .off: "Plays every track as it was mastered."
+        // All three about as long, so the rows below stay put on a pick.
+        case .off: "Plays every track as it was mastered, leaving loud ones loud and quiet ones quiet."
         case .quiet: "Plays every track at a similar loudness, a little quieter than Normal."
         case .normal: "Plays every track at a similar loudness, turning quiet ones up and loud ones down."
         }

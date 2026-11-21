@@ -31,7 +31,8 @@ import Testing
         #expect(refusal("socks5://") == "The address needs a host.")
         #expect(refusal(":8080") == notAnAddress, "an empty host is no address")
         #expect(refusal("ftp://:21") == notAnAddress)
-        #expect(refusal("socks5://user@") == notAnAddress)
+        #expect(refusal("http://:8080") == notAnAddress)
+        #expect(refusal("socks5://user@") == "That isn't a proxy address. Write @, # or / in a user name or password as %40, %23 or %2F.")
         #expect(refusal("not a proxy") == notAnAddress)
         #expect(refusal("socks5://prøxy.lan") == "The address needs a port, like :1080.")
         #expect(refusal("socks5://prøxy.lan:1080") == notAnAddress, "not a URI")
@@ -49,5 +50,7 @@ import Testing
         #expect(unencoded.user == "me")
         #expect(unencoded.password == "p@ss word", "encoded as Windows does")
         #expect(unencoded.shown == "http://10.0.0.1:3128")
+        #expect(refusal("http://user:pa#ss@proxy:8080")?.contains("%23") == true, "says how to write a password's #")
+        #expect(try Proxy.parse("http://user:pa%23ss@proxy:8080").password == "pa#ss")
     }
 }

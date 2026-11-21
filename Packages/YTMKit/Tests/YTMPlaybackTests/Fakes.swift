@@ -162,7 +162,7 @@ final class FakeMusic: MusicService {
     }
 
     func loadStep(_ page: Page) async throws -> (page: Page, whole: Bool) {
-        guard case .tracks(let token)? = page.more, let id = page.header?.playlistId,
+        guard case .tracks(let token, _, _)? = page.more, let id = page.header?.playlistId,
               let step = token.split(separator: "#").last.flatMap({ Int($0) }),
               case .tracks(var section)? = page.sections.first else { return (page, true) }
         log("more \(token)")

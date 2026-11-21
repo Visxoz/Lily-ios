@@ -33,10 +33,11 @@ extension YTMusic {
         switch list {
         case .songs:
             let shelf = try await libraryShelf(list)
-            guard let section = Section.tracks("", Renderers.tracks(LibraryList.items(shelf)), mode: .section) else {
-                return Page(header: header, sections: [])
-            }
-            return Page(header: header, sections: [section], more: Renderers.continuation(shelf).map { .tracks(token: $0) })
+            var seen = Set<String>()
+            let (tracks, fetched) = Renderers.playlistRows(LibraryList.items(shelf), seen: &seen)
+            guard let section = Section.tracks("", tracks, mode: .section) else { return Page(header: header, sections: []) }
+            let more = Renderers.continuation(shelf).map { Continuation.tracks(token: $0, seen: seen, fetched: fetched) }
+            return Page(header: header, sections: [section], more: more)
         case .playlists:
             cards = try await libraryPlaylists(all: true).cards
         case .albums, .artists:

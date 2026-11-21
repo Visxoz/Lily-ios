@@ -237,7 +237,7 @@ import YTMCore
     private func soundStarted() {
         playback.started = true
         playback.loading = false
-        playback.failures = 0
+        // Not `failures`: a song that sounds then fails, as all do once googlevideo cuts every client off, counts.
         playback.resume = nil
         playback.reopen = nil
         let recorded = playback.playRecorded == playback.generation
@@ -379,6 +379,7 @@ import YTMCore
 
     /// Also drops what was on its way for the old queue.
     func replaceQueue(with tracks: [Track], start: Int, shuffle: Bool) {
+        playback.failures = 0
         // Chosen afresh, a song that dropped starts over.
         if playback.reopen != nil {
             playback.reopen = nil

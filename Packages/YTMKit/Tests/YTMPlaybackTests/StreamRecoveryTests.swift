@@ -134,6 +134,44 @@ struct StreamRecoveryTests {
         #expect(Array(rig.music.calls.suffix(3)) == ["stream a 251", "cut off VISIONOS", "stream a 251"], "in the same format")
     }
 
+    @Test func stopsAfterThreeSongsInARowFailPartway() async throws {
+        let rig = await started()
+        rig.player.play(songs("a", "b", "c", "d"))
+        try await soundThenFail(["a", "b", "c"], rig)
+        #expect(rig.player.current?.id == "c", "as when googlevideo cuts every client off")
+        #expect(!rig.player.isPlaying && !rig.player.isBuffering)
+    }
+
+    @Test func aSkipRestartsTheRunOfFailures() async throws {
+        let rig = await started()
+        rig.player.play(songs("a", "b", "c", "d", "e"))
+        try await soundThenFail(["a", "b"], rig)
+        rig.player.next()
+        try await soundThenFail(["d"], rig)
+        #expect(rig.player.current?.id == "e" && rig.player.isPlaying)
+    }
+
+    @Test func aSongPlayedThroughRestartsTheRun() async throws {
+        let rig = await started()
+        rig.player.play(songs("a", "b", "c", "d", "e"))
+        try await soundThenFail(["a", "b"], rig)
+        await rig.soundStarts()
+        rig.player.handle(.finished)
+        try await soundThenFail(["d"], rig)
+        #expect(rig.player.current?.id == "e" && rig.player.isPlaying)
+    }
+
+    /// Each of `ids` in turn starts to sound, then fails.
+    private func soundThenFail(_ ids: [String], _ rig: Rig) async throws {
+        for id in ids {
+            await rig.settle()
+            #expect(rig.player.current?.id == id)
+            await rig.soundStarts()
+            rig.player.handle(.failed(id: try #require(rig.playing).id, message: "Damaged."))
+        }
+        await rig.settle()
+    }
+
     /// YTMAudio can't see YTMCore, so its refresh count is checked against the clients here.
     @Test func refreshesOncePerPlainURLClient() {
         #expect(StreamLoader.maxRefreshes == ClientProfile.plainStreamClients.count)

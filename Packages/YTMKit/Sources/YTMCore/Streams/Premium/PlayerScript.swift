@@ -117,6 +117,8 @@ actor PlayerScripts {
                 let script = try await PlayerScript.load(store: store)
                 if let old = current?.script.id, old != script.id {
                     Logger.premium.info("player \(script.id, privacy: .public) replaces \(old, privacy: .public)")
+                } else if current != nil {
+                    Logger.premium.debug("the Premium player \(script.id, privacy: .public) is still current")
                 }
                 // A recheck keeps its claim's time and any failure since, which asks for the next one sooner.
                 current = (script, current?.check ?? Check(checked: .now))

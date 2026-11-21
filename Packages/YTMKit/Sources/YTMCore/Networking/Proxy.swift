@@ -22,7 +22,6 @@ public enum Proxy {
 
     private static let keychainKey = "proxy"
     private static let log = Logger(subsystem: "Lily", category: "proxy")
-    private static let notAnAddress = "That isn't a proxy address, like http://127.0.0.1:8080."
 
     /// Read once, by the first session made, as each takes it then: a new one applies from the next start.
     static let inUse: Address? = {
@@ -69,6 +68,10 @@ public enum Proxy {
     /// HTTP, HTTPS or SOCKS5, with a host and a port. Without a scheme, HTTP.
     static func parse(_ text: String) throws(YTMError) -> Address {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A sign-in's @, # or / otherwise end the user name or password early.
+        let notAnAddress = text.contains("@")
+            ? "That isn't a proxy address. Write @, # or / in a user name or password as %40, %23 or %2F."
+            : "That isn't a proxy address, like http://127.0.0.1:8080."
         // As on Windows, a sign-in's spaces and stray @ are encoded, and a host outside ASCII becomes punycode.
         guard let parts = URLComponents(string: text.contains("://") ? text : "http://" + text),
               let scheme = parts.scheme?.lowercased() else { throw YTMError(.refused, notAnAddress) }

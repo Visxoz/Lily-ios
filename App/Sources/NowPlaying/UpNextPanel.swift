@@ -58,7 +58,7 @@ struct UpNextPanel: View {
                     .accessibilityLabel("Done selecting")
             } else {
                 if app.isSignedIn {
-                    PanelAction(title: "Save") { app.player.saveQueueAsPlaylist() }
+                    PanelAction(title: "Save") { app.saveQueueAsPlaylist() }
                 }
                 if count > 1 {
                     PanelAction(title: "Select") { editMode = .active }

@@ -62,7 +62,8 @@ private struct PageBody: View {
         }
         // Completes the page while it is on screen, so Home is saved whole.
         .task(id: model.step) { await model.loadMore(in: app) }
-        // Read only on Library's pages, the ones pins reorder.
+        // Read only on Library's pages, the ones pins reorder and a saved queue joins.
         .onChange(of: route.showsPins ? app.pinned : []) { model.rearrange(in: app) }
+        .onChange(of: route.showsPins ? app.playlistsAdded : 0) { Task { await model.appear(in: app, returning: false) } }
     }
 }

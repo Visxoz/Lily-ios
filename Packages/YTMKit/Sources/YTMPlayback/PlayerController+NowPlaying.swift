@@ -15,7 +15,7 @@ extension PlayerController {
             ratingGeneration += 1
             self.rating = rating
             if rating == .dislike {
-                next(user: true)
+                next()
                 // Nothing to skip to: the queue's end, or a repeat of it.
                 if current?.id == id { stop() }
             }

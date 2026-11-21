@@ -12,7 +12,7 @@ struct ProxyRow: View {
     @State private var failure = ""
 
     var body: some View {
-        SettingRow(label: "Proxy", detail: failure.isEmpty ? detail : failure, stacked: true) {
+        SettingRow(label: "Proxy", detail: failure.isEmpty ? detail : failure, detailRoom: detail, stacked: true) {
             HStack(spacing: 12) {
                 TextField("Proxy address", text: $text, prompt: Text(saved?.address ?? "http://host:port").foregroundStyle(theme.textDim))
                     .font(.system(size: 13))

@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingRow<Control: View>: View {
     let label: String
     var detail = ""
+    /// A detail whose height this one keeps, so a shorter one put in its place, as an error, doesn't move the
+    /// rows below.
+    var detailRoom = ""
     var stacked = false
     @ViewBuilder let control: Control
 
@@ -18,10 +21,14 @@ struct SettingRow<Control: View>: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.text)
                 if !detail.isEmpty {
-                    Text(detail)
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    // One cell for both, so it is as tall as the taller.
+                    ZStack(alignment: .topLeading) {
+                        if !detailRoom.isEmpty { Text(detailRoom).hidden() }
+                        Text(detail)
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                    .font(.system(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

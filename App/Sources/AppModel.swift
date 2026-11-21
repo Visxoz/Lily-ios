@@ -71,6 +71,9 @@ final class AppModel {
     /// Playlist IDs pinned to the top of Library's playlists, kept apart from the settings so only the views
     /// showing pins redraw as they change.
     private(set) var pinned: [String] = []
+    /// Counts the playlists put in Library's cached pages, so a Library page on screen, as under Now Playing,
+    /// shows one at once.
+    var playlistsAdded = 0
     private(set) var artwork: ArtworkColours?
     private(set) var toast: Toast?
 

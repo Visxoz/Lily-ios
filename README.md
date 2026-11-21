@@ -122,7 +122,7 @@ Lily starts in pure black with its own orchid. Pick another look and accent in *
 | **Crossfade** | Fades each song into the next over 6 seconds, or a length you choose from 1 to 12, cutting the silence at the joins. An album played in order still runs straight on, and skipping never fades. |
 | **Equaliser** | Ten bands from 31 Hz to 16 kHz, ±12 dB each, with presets: Flat, Bass boost, Treble boost, Vocal, Rock, Electronic and Acoustic. Boosting turns the rest down to leave headroom. |
 | **Normalise volume** | Plays every track at a similar loudness, from YouTube's own measurement: loud ones turned down and quiet ones up, at Normal or a Quiet level 6 dB lower, with a limiter so nothing clips. |
-| **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music pauses rather than carrying on through the speaker; plug a pair in and it plays on through them. |
+| **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music pauses, or with **Pause when unplugged** off, carries on through the speaker; plug a pair in and it plays on through them. |
 | **Rides out a lost connection** | A connection that drops is waited on for a minute. Gone longer, the song opens again where it stopped, a few times, then waits for you to press play, rather than skipping. |
 
 ## Take it offline
@@ -214,7 +214,7 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 
 Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, where a playlist's menu can pin it to the top, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations, with the time you listened, as on the web, unless you turn off **YouTube history** in **Settings ▸ Account**.
 
-Your own playlists can be edited from their page: press and hold a song, then drag it into a new order, remove songs from their menu, or rename it, change who can see it, or delete it from **More** in its header (making one public or unlisted needs a YouTube channel on the account). Any other album or playlist can be saved to your library from its header, and artists subscribed to. Every song, album, playlist and artist has **Copy link** in its menu.
+Your own playlists can be edited from their page: press and hold a song, then drag it into a new order, remove songs from their menu, or rename it, change who can see it, or delete it from **More** in its header (making one public or unlisted needs a YouTube channel on the account). Any other album or playlist can be saved to your library from its header, and artists subscribed to. **Copy link** is in the menus of songs, the queue, cards and page headers.
 
 The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews the sign-in every 10 minutes, as an open YouTube tab does, and should YouTube sign you out, it says so.
 

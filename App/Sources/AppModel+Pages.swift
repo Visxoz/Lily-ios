@@ -104,7 +104,7 @@ extension AppModel {
         pageCache[route] = nil
     }
 
-    /// After the player changed the account's library (a song rated, the queue saved).
+    /// After the player changed the account's library by rating a song.
     func libraryChanged() {
         for route in [Route.likedSongs, .library, .libraryPlaylists] { forget(route) }
     }

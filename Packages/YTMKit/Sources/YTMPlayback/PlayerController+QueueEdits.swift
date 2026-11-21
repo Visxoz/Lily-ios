@@ -29,23 +29,24 @@ extension PlayerController {
         if queue.revision != before { queueEdited() }
     }
 
-    /// Saves the queue as a private playlist, such as "Queue 14 November 2026". Signed in only.
-    public func saveQueueAsPlaylist() {
-        let ids = Array(queue.items.map(\.id))
-        guard !ids.isEmpty else { return }
+    /// Saves the queue as a private playlist, such as "Queue 14 November 2026", answering its card for Library to
+    /// show at once, as YouTube's list of playlists takes a while to hold one just made. Signed in only.
+    @discardableResult
+    public func saveQueueAsPlaylist() async -> Card? {
+        let tracks = Array(queue.items)
+        guard !tracks.isEmpty else { return nil }
         let title = Date.now.formatted(Self.playlistTitle)
-        say("Saving \(Formatting.songs(ids.count)) as a playlist…")
-        let music = music
-        Task { [weak self] in
-            let result = await Result { try await music.createPlaylist(title: title, videoIds: ids) }
-            guard let self else { return }
-            switch result {
-            case .success:
-                libraryRevision += 1
-                say("Saved as “\(title)”")
-            case .failure(let error):
-                say("Couldn't save the playlist: \(sentence(for: error))")
-            }
+        say("Saving \(Formatting.songs(tracks.count)) as a playlist…")
+        do {
+            let id = try await music.createPlaylist(title: title, videoIds: tracks.map(\.id))
+            say("Saved as “\(title)”")
+            return Card(
+                kind: .playlist, id: id, title: title, subtitle: "Playlist • \(Formatting.songs(tracks.count))",
+                thumbnail: tracks.lazy.compactMap(\.thumbnail).first
+            )
+        } catch {
+            say("Couldn't save the playlist: \(sentence(for: error))")
+            return nil
         }
     }
 

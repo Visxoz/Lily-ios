@@ -179,6 +179,18 @@ struct PlayerReuseTests {
         #expect(rig.player.current?.id == "x")
     }
 
+    @Test func aQueueSavedAsAPlaylistAnswersItsCardForLibrary() async throws {
+        let rig = await started()
+        var later = song("b")
+        later.thumbnail = "https://i.ytimg.com/vi/b/sddefault.jpg"
+        rig.player.play([song("a"), later])
+        let card = try #require(await rig.player.saveQueueAsPlaylist())
+        #expect(card.kind == .playlist && card.id == "PL1" && card.title.hasPrefix("Queue "))
+        #expect(card.subtitle == "Playlist • 2 songs")
+        #expect(card.thumbnail == later.thumbnail, "the first queued song with artwork")
+        #expect(rig.player.libraryRevision == 0, "Library keeps its copy, which the card joins")
+    }
+
     @Test func aSkipWhileASongsRadioLoadsWaitsForIt() async {
         let rig = await started()
         rig.music.set { $0.radios["a"] = songs("b", "c") }

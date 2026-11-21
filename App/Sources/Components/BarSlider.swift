@@ -35,11 +35,14 @@ struct BarSlider: View {
                 .fill(theme.ink.opacity(0.16))
                 .scaleEffect(x: min(max(buffered, 0), 1), anchor: .leading)
             Capsule()
-                .fill(dragging ? theme.accent : isEnabled ? theme.text : theme.textDim)
+                .fill(dragging ? theme.accent : theme.text)
                 // Scaled rather than resized, so a moving bar never lays out.
                 .scaleEffect(x: shown, anchor: .leading)
         }
         .frame(height: Self.barHeight)
+        // So a slider that does nothing doesn't look as if it would.
+        .opacity(isEnabled ? 1 : 0.4)
+        .animation(Theme.fast, value: isEnabled)
         .overlay(alignment: .leading) {
             Circle()
                 .fill(theme.text)

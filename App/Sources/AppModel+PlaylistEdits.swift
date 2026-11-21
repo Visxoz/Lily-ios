@@ -140,17 +140,40 @@ extension AppModel {
         }
     }
 
-    /// Shows a rename or deletion on Library's pages, and the copy saved for the next start, at once, as YouTube's
-    /// lists can take a moment to.
+    /// Signed in or out meanwhile, the playlist is the last account's, so Library is left be.
+    func saveQueueAsPlaylist() {
+        let generation = accountGeneration
+        Task {
+            guard let card = await player.saveQueueAsPlaylist(), generation == accountGeneration else { return }
+            // A copy already expired stays so, rather than passing an old Library off as current.
+            editLibraryPlaylists { cards in
+                guard !cards.contains(where: { $0.id == card.id }) else { return false }
+                // First among the account's own, after Liked music.
+                cards.insert(card, at: cards.firstIndex { $0.id.hasPrefix("PL") } ?? cards.endIndex)
+                return true
+            }
+            playlistsAdded += 1
+        }
+    }
+
     private func editLibraryPlaylist(_ id: String, _ edit: (inout [Card], Int) -> Void) {
+        editLibraryPlaylists { cards in
+            guard let at = cards.firstIndex(where: { $0.kind == .playlist && $0.id == id }) else { return false }
+            edit(&cards, at)
+            return true
+        }
+    }
+
+    /// Shows a change to the account's playlists on Library's pages, and the copy saved for the next start, at once,
+    /// as YouTube's lists can take a moment to. `edit` answers whether it changed the cards of a section of playlists.
+    private func editLibraryPlaylists(_ edit: (inout [Card]) -> Bool) {
         for route in [Route.library, .libraryPlaylists] {
             editPage(route, shown: nil, renewing: false) { page -> Void? in
                 var found = false
                 for index in page.sections.indices {
-                    guard case .cards(var section) = page.sections[index],
-                          let at = section.cards.firstIndex(where: { $0.kind == .playlist && $0.id == id })
+                    guard case .cards(var section) = page.sections[index], section.cards.contains(where: { $0.kind == .playlist }),
+                          edit(&section.cards)
                     else { continue }
-                    edit(&section.cards, at)
                     page.sections[index] = .cards(section)
                     found = true
                 }

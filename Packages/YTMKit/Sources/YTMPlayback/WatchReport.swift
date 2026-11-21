@@ -1,4 +1,5 @@
 import Foundation
+import os
 import YTMCore
 
 /// A play's watch-time pings, as the web player sends them: the stretches heard, on YouTube's
@@ -69,6 +70,13 @@ struct WatchReport {
         stretches = []
         sent += 1
         nextAt = ping.due(sent, sent: elapsed)
+        // What it reports, without the ping's URL and its tokens.
+        let spans = watched.stretches.map { String(format: "%.1f-%.1f", $0.lowerBound, $0.upperBound) }.joined(separator: ", ")
+        let state = (paused ? ", paused" : "") + (flush == .last ? ", final" : "")
+        let (count, at) = (sent, position)
+        Logger.playback.debug(
+            "watch time \(count) at \(elapsed.seconds, format: .fixed(precision: 0)) s: heard [\(spans, privacy: .public)], at \(at, format: .fixed(precision: 1)) s\(state, privacy: .public)"
+        )
         return (ping, watched)
     }
 }
