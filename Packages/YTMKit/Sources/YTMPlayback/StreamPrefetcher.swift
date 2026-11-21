@@ -4,7 +4,7 @@ import YTMCore
 
 /// Streams resolved ahead for the next song, and kept from songs played for
 /// previous or repeat. Stream URLs last about six hours; one older than an
-/// hour is asked for again.
+/// hour is asked for again, unless it is the playing song's and wholly cached.
 struct StreamPrefetcher {
     static let freshFor = Duration.seconds(60 * 60)
 
@@ -16,6 +16,8 @@ struct StreamPrefetcher {
     }
 
     private var streams: [String: Prefetched] = [:]
+    /// The playing song's, kept however old, as a replay of a whole file plays from the cache.
+    private var playing: (id: String, prefetched: Prefetched)?
     /// So a song started or queued meanwhile waits on its resolve rather than
     /// asking again.
     private var pending: [String: Task<ResolvedStream, any Error>] = [:]
@@ -44,8 +46,21 @@ struct StreamPrefetcher {
         streams[id] = prefetched
     }
 
+    /// As `store`, and kept as the playing song's.
+    mutating func storePlaying(_ id: String, _ prefetched: Prefetched, at now: ContinuousClock.Instant = .now) {
+        store(id, prefetched, at: now)
+        playing = prefetched.epoch == epoch && !prefetched.stream.url.isFileURL ? (id, prefetched) : nil
+    }
+
+    /// The playing song's stream, for `whole` files only: of one partly cached, the rest needs a URL that works.
+    func held(_ id: String, whole: Bool) -> Prefetched? {
+        guard whole, let playing, playing.id == id else { return nil }
+        return playing.prefetched
+    }
+
     mutating func remove(_ id: String) {
         streams[id] = nil
+        if playing?.id == id { playing = nil }
     }
 
     func isPending(_ id: String) -> Bool {
@@ -80,6 +95,7 @@ struct StreamPrefetcher {
     mutating func clear() {
         epoch += 1
         streams.removeAll()
+        playing = nil
         for task in pending.values { task.cancel() }
         pending.removeAll()
     }
@@ -112,7 +128,7 @@ extension PlayerController {
     func resolveAhead(
         _ track: Track, warming: Bool = true, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }
     ) {
-        guard localStream(track.id) == nil else { return }
+        guard localStream(track.id) == nil, heldStream(track.id) == nil else { return }
         if let kept = prefetcher.kept(track.id) {
             // A kept stream may have lost its part file since; the engine skips
             // a file cached or open.
@@ -138,7 +154,7 @@ extension PlayerController {
     /// Unless `owning`, a pending resolve is waited on but left in place, so
     /// cancelling the wait, as a skip does to gapless queueing, leaves it running.
     func streamSource(for id: String, owning: Bool = true) -> @Sendable () async throws -> StreamPrefetcher.Prefetched {
-        if let prefetched = localStream(id) ?? prefetcher.take(id) { return { prefetched } }
+        if let prefetched = localStream(id) ?? heldStream(id) ?? prefetcher.take(id) { return { prefetched } }
         let epoch = prefetcher.epoch
         if !owning, let pending = prefetcher.pendingTask(id) {
             return { .init(stream: try await pending.value, resolvedAt: .now, epoch: epoch) }
@@ -151,6 +167,11 @@ extension PlayerController {
         }
         let resolve = resolver(for: id)
         return { .init(stream: try await resolve(), resolvedAt: .now, epoch: epoch) }
+    }
+
+    /// The playing song's stream, however old, while the engine holds all of it, as on repeat-one or a restart.
+    func heldStream(_ id: String) -> StreamPrefetcher.Prefetched? {
+        prefetcher.held(id, whole: id == current?.id && audio.bufferedFraction >= 1)
     }
 
     /// Only while `track` is still next: the engine warms one song, and a

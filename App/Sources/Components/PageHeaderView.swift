@@ -12,8 +12,11 @@ struct PageHeaderView: View {
     /// mirror the banner up into the space a pull to refresh opens.
     let extendsBanner: Bool
     let download: DownloadButton?
+    /// The page's address, which a menu at the end of the buttons copies.
+    let link: String?
     let perform: (HeaderAction) -> Void
 
+    @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
     /// The page samples its tint at this size too, so the decode is shared.
@@ -60,7 +63,7 @@ struct PageHeaderView: View {
                 .padding(.bottom, 24)
             }
 
-            if canPlay || canRadio {
+            if canPlay || canRadio || link != nil {
                 HStack(spacing: 20) {
                     if canPlay {
                         PlayButton(size: 56) { perform(.play) }
@@ -74,6 +77,16 @@ struct PageHeaderView: View {
                             .accessibilityLabel("Start radio")
                     }
                     download
+                    if let link {
+                        Menu {
+                            Button("Copy link") { app.copyLink(link) }
+                        } label: {
+                            IconView(icon: .more, size: 28, colour: theme.textSecondary)
+                                .frame(width: 48, height: 48)
+                                .contentShape(Circle())
+                        }
+                        .accessibilityLabel("More")
+                    }
                 }
                 .padding(.horizontal, Metrics.pagePadding)
                 .frame(height: Metrics.actionsHeight)

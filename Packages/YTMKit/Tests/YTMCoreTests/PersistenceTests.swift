@@ -19,6 +19,8 @@ import Testing
         #expect(settings.look == .dark && settings.accent == .artwork && settings.shuffle == .smart)
         #expect(settings.normalise && !settings.crossfade && settings.quality == .high)
         #expect(!settings.foldToScrub, "off until asked for")
+        #expect(settings.pauseOnUnplug, "on until turned off")
+        #expect(Settings.crossfadeLengths.contains(settings.crossfadeSeconds), "a length Settings offers")
         let saved = try JSONEncoder().encode(settings)
         #expect(try JSONDecoder().decode(Settings.self, from: saved) == settings)
     }
@@ -27,6 +29,13 @@ import Testing
         #expect(Settings().speed == 1)
         #expect(try decode(#"{"speed": 1.2}"#).speed == 1.2)
         #expect(try decode(#"{"speed": 1.7}"#).speed == 1, "not offered")
+    }
+
+    @Test func keepsTheCrossfadeWithinTheLengthsOffered() throws {
+        #expect(try decode(#"{"crossfadeSeconds": 10}"#).crossfadeSeconds == 10)
+        #expect(try decode(#"{"crossfadeSeconds": 30}"#).crossfadeSeconds == 12)
+        #expect(try decode(#"{"crossfadeSeconds": 0.2}"#).crossfadeSeconds == 1)
+        #expect(try !decode(#"{"pauseOnUnplug": false}"#).pauseOnUnplug)
     }
 
     @Test func defaultsToLilysOrchidOnBlack() {

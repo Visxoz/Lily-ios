@@ -112,7 +112,8 @@ struct PageContent: View {
             canRadio: header.radioId != nil,
             topInset: frame.top,
             extendsBanner: frame.side > 0,
-            download: canPlay && Downloads.isDownloadable(route) ? DownloadButton(route: route, page: page) : nil
+            download: canPlay && Downloads.isDownloadable(route) ? DownloadButton(route: route, page: page) : nil,
+            link: route.link
         ) { app.perform($0, on: page) }
     }
 

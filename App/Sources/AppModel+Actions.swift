@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import YTMCore
 
 enum HeaderAction {
@@ -69,5 +70,11 @@ extension AppModel {
 
     func openAlbum(of track: Track) {
         if let album = track.album { open(.album(album.id)) }
+    }
+
+    /// Writing to the pasteboard never asks permission and cannot fail, so there is no failure to report.
+    func copyLink(_ link: String) {
+        UIPasteboard.general.string = link
+        showToast("Link copied")
     }
 }

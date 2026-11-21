@@ -75,6 +75,30 @@ struct StreamLoaderTests {
         let (loader, received, failure) = try await load(again, from: MemoryByteSource(files: [:], refuseFrom: 0))
         #expect(failure == nil && received == file && loader.isComplete && loader.available == Int64(file.count))
     }
+
+    @Test func rangesEndOnAMegabyte() {
+        #expect(StreamLoader.rangeEnd(from: 65_536, total: 4_171_552) == 1_048_576, "the range after a warm-up")
+        #expect(StreamLoader.rangeEnd(from: 1_048_576, total: 4_171_552) == 2_097_152)
+        #expect(StreamLoader.rangeEnd(from: 4_000_000, total: 4_171_552) == 4_171_552)
+        #expect(StreamLoader.rangeEnd(from: 0, total: 0) == .max, "of unknown length")
+    }
+
+    @Test func warmsOnlyTheStartOfAWholeFileAnswer() async throws {
+        let whole = Data(count: 200_000)
+        let item = try AudioItem.fixture("song", length: whole.count)
+        let loader = try StreamLoader(item: item, cache: cache)
+        await loader.warm(source: IgnoringRanges(file: whole))
+        #expect(loader.available == StreamLoader.warmLength)
+    }
+}
+
+/// Answers any range with the whole file, as a server ignoring ranges does.
+private struct IgnoringRanges: ByteSource {
+    let file: Data
+
+    func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
+        MemoryByteSource(files: ["song": file]).bytes(of: url, headers: headers, range: 0..<Int64(file.count))
+    }
 }
 
 private final class AgentRecording: ByteSource {

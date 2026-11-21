@@ -18,11 +18,22 @@ struct PlaybackSettings: View {
             detail: "Plays every track at a similar loudness, as YouTube Music does.",
             isOn: $settings.value.normalise
         )
-        ToggleRow(
-            label: "Crossfade",
-            detail: "Fades each track into the next. Tracks of an album played in order still run straight on.",
-            isOn: $settings.value.crossfade
-        )
+        SettingRow(label: "Crossfade", detail: "Fades each track into the next. Tracks of an album played in order still run straight on.") {
+            HStack(spacing: 12) {
+                if settings.value.crossfade {
+                    Menu {
+                        ForEach(Settings.crossfadeLengths, id: \.self) { seconds in
+                            Button(Self.length(seconds)) { settings.value.crossfadeSeconds = seconds }
+                        }
+                    } label: {
+                        let seconds = settings.value.crossfadeSeconds
+                        PillLabel(title: Settings.crossfadeLengths.contains(seconds) ? Self.length(seconds) : "Custom", small: true)
+                    }
+                }
+                Toggle("Crossfade", isOn: $settings.value.crossfade)
+                    .labelsHidden()
+            }
+        }
         SettingRow(label: "Speed", detail: "Faster or slower, the pitch moving with it as on a record.", stacked: true) {
             ChoicePills(choices: Settings.speeds.map { ($0, "\($0.formatted())×") }, selection: $settings.value.speed)
         }
@@ -32,6 +43,11 @@ struct PlaybackSettings: View {
             }
             .buttonStyle(PressScale(scale: 0.96))
         }
+        ToggleRow(
+            label: "Pause when unplugged",
+            detail: "Pauses when headphones or the device playing are unplugged, rather than carrying on through another.",
+            isOn: $settings.value.pauseOnUnplug
+        )
         ToggleRow(
             label: "Autoplay",
             detail: "Keeps playing similar music when the queue ends.",
@@ -45,6 +61,10 @@ struct PlaybackSettings: View {
             )
         }
         StorageRow()
+    }
+
+    private static func length(_ seconds: Double) -> String {
+        "\(Int(seconds)) s"
     }
 
     private func qualityDetail(_ quality: AudioQuality) -> String {

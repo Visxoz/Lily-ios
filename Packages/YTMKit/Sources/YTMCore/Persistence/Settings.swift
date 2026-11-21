@@ -53,12 +53,18 @@ public struct Settings: Codable, Equatable, Sendable {
     static let equaliserBands = 6
     /// In the order Settings offers them.
     public static let speeds = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]
+    /// The crossfade lengths Settings offers, in seconds.
+    public static let crossfadeLengths: [Double] = [1, 2, 3, 4, 5, 6, 8, 10, 12]
 
     public var muted = false
     public var quality: AudioQuality = .high
     public var normalise = true
     /// Fade each track into the next, rather than playing them gaplessly.
     public var crossfade = false
+    /// Long enough to blend two songs, short enough to keep most of an ending.
+    public var crossfadeSeconds = 6.0
+    /// Pauses as the device playing is unplugged, rather than carrying on through the next.
+    public var pauseOnUnplug = true
     public var speed = 1.0
     public var autoplay = true
     public var shuffle: ShuffleMode = .off
@@ -95,6 +101,10 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&quality, .quality)
         file.read(&normalise, .normalise)
         file.read(&crossfade, .crossfade)
+        file.read(&crossfadeSeconds, .crossfadeSeconds)
+        // Outside the lengths offered, the nearer end of them.
+        crossfadeSeconds = min(max(crossfadeSeconds, Self.crossfadeLengths[0]), Self.crossfadeLengths[Self.crossfadeLengths.count - 1])
+        file.read(&pauseOnUnplug, .pauseOnUnplug)
         file.read(&speed, .speed) { Self.speeds.contains($0) }
         file.read(&autoplay, .autoplay)
         file.read(&shuffle, .shuffle)

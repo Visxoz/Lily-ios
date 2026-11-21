@@ -30,6 +30,7 @@ struct TrackLinks: View {
             .disabled(track.firstArtistId == nil)
         Button("Go to album") { app.openAlbum(of: track) }
             .disabled(track.album == nil)
+        Button("Copy link") { app.copyLink(track.link) }
     }
 }
 
@@ -64,5 +65,8 @@ struct CardMenu: View {
             Button("Start radio") { app.startRadio(from: card) }
         }
         CardDownloadItem(card: card)
+        if let link = card.link {
+            Button("Copy link") { app.copyLink(link) }
+        }
     }
 }

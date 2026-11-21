@@ -1,16 +1,17 @@
 import AVFoundation
 import os
 
-/// Route changes are left alone: unplugging headphones carries on through the
-/// next device rather than pausing, and the engine follows the new output itself.
+/// Unplugging the device playing pauses, unless Settings says to carry on; a device
+/// plugged in plays on, and the engine follows the new output itself.
 @MainActor final class AudioSessionController {
     #if os(iOS)
     private var isActive = false
     /// Playing when the system took the session away, so it resumes only then.
     private var resumeAfterInterruption = false
     private var observers: [NotificationCenter.ObservationToken] = []
-    /// The media services reset has no typed message, so it is observed by name.
+    /// The media services reset and route changes have no typed messages, so they are observed by name.
     private var resetObserver: (any NSObjectProtocol)?
+    private var routeObserver: (any NSObjectProtocol)?
     /// iOS 26 has no typed session messages either, so interruptions come by name there.
     private var interruptionObserver: (any NSObjectProtocol)?
 
@@ -59,11 +60,25 @@ import os
             guard let self, let player else { return }
             MainActor.assumeIsolated { self.servicesReset(player) }
         }
+        routeObserver = center.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: session, queue: .main
+        ) { [weak self, weak player] notification in
+            let reason = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+                .flatMap(AVAudioSession.RouteChangeReason.init)
+            // Apple's reason for headphones unplugged and Bluetooth, AirPlay, CarPlay or USB going away.
+            guard let self, let player, reason == .oldDeviceUnavailable else { return }
+            MainActor.assumeIsolated {
+                guard player.settings.value.pauseOnUnplug else { return }
+                // A call ending after the headphones were pulled must not resume through the speaker.
+                resumeAfterInterruption = false
+                player.outputUnplugged()
+            }
+        }
     }
 
     isolated deinit {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
-        for observer in [resetObserver, interruptionObserver].compactMap(\.self) {
+        for observer in [resetObserver, routeObserver, interruptionObserver].compactMap(\.self) {
             NotificationCenter.default.removeObserver(observer)
         }
     }

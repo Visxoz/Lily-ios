@@ -37,8 +37,9 @@ extension YTMusic: MusicService {
     var bufferedFraction: Double { get }
     var equaliser: (enabled: Bool, gains: [Float]) { get set }
     var normalise: Bool { get set }
+    var pauseOnUnplug: Bool { get set }
     var isMuted: Bool { get set }
-    var crossfadeSeconds: Double { get }
+    var crossfadeSeconds: Double { get set }
     var speed: Double { get set }
     func play(_ item: AudioItem, from seconds: Double, paused: Bool)
     func setNext(_ item: AudioItem?, crossfade: Bool)

@@ -162,6 +162,46 @@ struct PlayerReuseTests {
         #expect(rig.audio.warmed.isEmpty, "the file playing is not fetched again")
     }
 
+    @Test func aWholeSongReplaysFromTheCacheHoweverOldItsStream() async throws {
+        let rig = await started()
+        rig.player.play(songs("a"))
+        await rig.settle()
+        await rig.soundStarts()
+        let resolves = { rig.music.calls.filter { $0 == "stream a" }.count }
+        // Two hours on, too old to resolve ahead from.
+        func age() {
+            rig.player.prefetcher.storePlaying(
+                "a", .init(stream: FakeMusic.stream("a"), resolvedAt: .now - .seconds(2 * 60 * 60), epoch: rig.player.prefetcher.epoch)
+            )
+        }
+        age()
+        rig.audio.bufferedFraction = 1
+        rig.audio.currentTime = 1
+        rig.player.previous()
+        await rig.settle()
+        #expect(resolves() == 1, "a restart plays the whole file again")
+        await rig.soundStarts()
+
+        age()
+        rig.audio.bufferedFraction = 1
+        rig.settings.value.repeatMode = .one
+        rig.player.apply(rig.settings.value)
+        rig.audio.currentTime = 190
+        rig.player.onTick()
+        await rig.settle()
+        _ = try #require(rig.audio.next)
+        #expect(resolves() == 1, "and so does repeat one")
+
+        rig.settings.value.repeatMode = .off
+        rig.player.apply(rig.settings.value)
+        age()
+        rig.audio.bufferedFraction = 0.5
+        rig.audio.currentTime = 1
+        rig.player.previous()
+        await rig.settle()
+        #expect(resolves() == 2, "the rest of a part file needs a URL that works")
+    }
+
     @Test func lyricsComeAheadAndStayForASongPlayedAgain() async {
         let rig = await started()
         let words = Lyrics(lines: ["la"])

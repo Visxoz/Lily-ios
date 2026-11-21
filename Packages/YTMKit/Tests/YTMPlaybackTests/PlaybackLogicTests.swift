@@ -26,6 +26,7 @@ struct GaplessTests {
     @Test func queuesEarlierByTheFadeAndTheSilenceItMayCut() {
         #expect(GaplessScheduler.lead(crossfade: 0, speed: 1) == 15)
         #expect(GaplessScheduler.lead(crossfade: 6, speed: 1) == 25)
+        #expect(GaplessScheduler.lead(crossfade: 12, speed: 1) == 31, "the longest fade offered")
         #expect(abs(GaplessScheduler.lead(crossfade: 6, speed: 1.2) - 28) < 1e-9, "only opening the next takes clock time")
     }
 
@@ -214,6 +215,23 @@ struct PrefetcherTests {
         let result13 = prefetcher.take("a", at: now + .seconds(3600))
         #expect(result13 == nil)
         #expect(!prefetcher.has("a", at: now), "taken, even when stale")
+    }
+
+    @Test func holdsThePlayingSongsStreamHoweverOldWhileItIsWhole() {
+        var prefetcher = StreamPrefetcher()
+        let now = ContinuousClock.now
+        let later = now + .seconds(2 * 60 * 60)
+        prefetcher.storePlaying("a", .init(stream: FakeMusic.stream("a"), resolvedAt: now, epoch: prefetcher.epoch), at: now)
+        #expect(prefetcher.held("a", whole: true) != nil)
+        #expect(prefetcher.held("a", whole: false) == nil, "the rest of a part file needs a URL that works")
+        #expect(prefetcher.held("b", whole: true) == nil)
+        #expect(prefetcher.take("a", at: later) == nil, "too old to resolve ahead from")
+        #expect(prefetcher.held("a", whole: true) != nil, "but still replays from the cache")
+        prefetcher.remove("a")
+        #expect(prefetcher.held("a", whole: true) == nil, "one that failed is never replayed")
+        prefetcher.storePlaying("a", .init(stream: FakeMusic.stream("a"), resolvedAt: now, epoch: prefetcher.epoch), at: now)
+        prefetcher.clear()
+        #expect(prefetcher.held("a", whole: true) == nil, "for the old quality or account")
     }
 
     @Test func refusesAStreamAskedForBeforeAClear() {

@@ -132,7 +132,7 @@ extension PlayerController {
         recordPlay()
         show(queued.prefetched.stream)
         // Kept for previous, a jump back or repeat one, as `play` keeps its song.
-        prefetcher.store(track.id, queued.prefetched)
+        prefetcher.storePlaying(track.id, queued.prefetched)
         updateBuffering()
         publishPlayback()
         extendWithRadioIfEnding()

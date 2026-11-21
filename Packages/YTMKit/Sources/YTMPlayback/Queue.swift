@@ -1,9 +1,16 @@
 import Foundation
 import YTMCore
 
-/// Shuffle reorders what comes after the current entry, as YouTube Music does, and turning it off restores the
-/// original order. Smart Shuffle's entries are marked so they can be taken out again.
-public struct Queue<Element: Hashable & Sendable>: Sendable {
+/// What shuffle spreads apart, so one artist's or album's songs don't bunch.
+public protocol Spreadable {
+    var shuffleArtist: String { get }
+    var shuffleAlbum: String { get }
+}
+
+/// Shuffle reorders what comes after the current entry, as YouTube Music does, keeping an artist's and an album's
+/// songs apart, and turning it off restores the original order. Smart Shuffle's entries are marked so they can be
+/// taken out again.
+public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
     public struct Entry: Sendable, Identifiable {
         /// Unique within the queue: a row's identity across edits, as the same item may sit in several entries.
         public let id: Int
@@ -69,7 +76,7 @@ public struct Queue<Element: Hashable & Sendable>: Sendable {
         case (true, nil):
             for index in entries.indices { entries[index].rank = index }
             unshuffledCount = entries.count
-            entries[(currentIndex.map { $0 + 1 } ?? 0)...].shuffle(using: &generator)
+            shuffleAfterCurrent()
             revision += 1
         case (false, let ranked?):
             unshuffle(ranked: ranked)
@@ -77,6 +84,50 @@ public struct Queue<Element: Hashable & Sendable>: Sendable {
         default:
             break
         }
+    }
+
+    private mutating func shuffleAfterCurrent() {
+        let start = currentIndex.map { $0 + 1 } ?? 0
+        let upcoming = Array(entries[start...])
+        let order = spread(upcoming.map(\.item), by: [\.shuffleArtist, \.shuffleAlbum])
+        entries.replaceSubrange(start..., with: order.map { upcoming[$0] })
+        // The spread doesn't see the current entry, so its artist may follow it.
+        if let current = currentIndex,
+           let other = entries[start...].firstIndex(where: { $0.item.shuffleArtist != entries[current].item.shuffleArtist }) {
+            entries.insert(entries.remove(at: other), at: start)
+        }
+    }
+
+    /// A random order of `items` in which each key's items sit evenly apart from a random offset, with a little
+    /// jitter, as a plain shuffle bunches them by chance; within a key, the next key is spread the same way.
+    private mutating func spread(_ items: [Element], by keys: ArraySlice<KeyPath<Element, String>>) -> [Int] {
+        guard let key = keys.first else { return Array(items.indices).shuffled(using: &generator) }
+        // Groups in order of first appearance, as a dictionary's order would make the draws below differ from run
+        // to run.
+        var index: [String: Int] = [:]
+        var groups: [[Int]] = []
+        for (at, item) in items.enumerated() {
+            let name = item[keyPath: key]
+            if let group = index[name] {
+                groups[group].append(at)
+            } else {
+                index[name] = groups.count
+                groups.append([at])
+            }
+        }
+        var placed: [(position: Double, index: Int)] = []
+        placed.reserveCapacity(items.count)
+        for group in groups {
+            let order = spread(group.map { items[$0] }, by: keys.dropFirst())
+            let gap = 1 / Double(group.count)
+            let offset = Double.random(in: 0..<1, using: &generator)
+            for (n, member) in order.enumerated() {
+                let jitter = 0.4 * Double.random(in: 0..<1, using: &generator) - 0.2
+                placed.append(((Double(n) + offset + jitter) * gap, group[member]))
+            }
+        }
+        placed.sort { $0.position < $1.position }
+        return placed.map(\.index)
     }
 
     /// Each entry that had a place leads a run of the entries added while shuffled that follow it, so those stay
@@ -270,6 +321,12 @@ public struct Queue<Element: Hashable & Sendable>: Sendable {
         entries.removeSubrange((current + 1)...)
         revision += 1
     }
+}
+
+extension Track: Spreadable {
+    /// By name, as rows don't all carry the artist's ID.
+    public var shuffleArtist: String { artists.first?.name ?? "" }
+    public var shuffleAlbum: String { album?.name ?? "" }
 }
 
 /// xorshift64: tiny, fast and seedable, so tests can pin a shuffle. Not for anything that needs real randomness.

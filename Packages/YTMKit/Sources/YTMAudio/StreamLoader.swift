@@ -80,14 +80,14 @@ final class StreamLoader {
         while total <= 0 || available < total {
             guard !Task.isCancelled else { return nil }
             let start = available
-            let end = total > 0 ? min(start + Self.rangeLength, total) : .max
+            let end = Self.rangeEnd(from: start, total: total)
             let bytes = if let ahead, ahead.start == start {
                 ahead.bytes
             } else {
                 source.bytes(of: url, headers: headers, range: start..<end)
             }
             ahead = end < total
-                ? (end, source.bytes(of: url, headers: headers, range: end..<min(end + Self.rangeLength, total)))
+                ? (end, source.bytes(of: url, headers: headers, range: end..<Self.rangeEnd(from: end, total: total)))
                 : nil
             do {
                 for try await data in bytes {
@@ -138,6 +138,12 @@ final class StreamLoader {
         return nil
     }
 
+    /// Ends on a megabyte, as a cut-off URL serves the first and refuses the rest, so the range after a warm-up's
+    /// start must not run past it. A file of unknown length is asked for to its end.
+    static func rangeEnd(from start: Int64, total: Int64) -> Int64 {
+        total > 0 ? min((start / rangeLength + 1) * rangeLength, total) : .max
+    }
+
     /// Only a head start for `run`, so it never retries.
     func warm(isolation: isolated (any Actor)? = #isolation, source: any ByteSource) async {
         guard available == 0, total > 0 else { return }
@@ -145,6 +151,8 @@ final class StreamLoader {
             for try await data in source.bytes(of: url, headers: headers, range: 0..<min(Self.warmLength, total)) {
                 guard !Task.isCancelled else { return }
                 try append(data)
+                // A whole file answered in place of the range is too much for a warm-up.
+                guard available < Self.warmLength else { return }
             }
         } catch {
             Logger.audio.debug("Could not warm a stream")

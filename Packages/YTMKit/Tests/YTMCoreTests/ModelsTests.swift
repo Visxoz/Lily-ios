@@ -18,3 +18,15 @@ import Testing
     #expect(badge(141, .aac, 262_000) == "AAC 256")
     #expect(badge(251, .opus, 135_400) == "OPUS 135")
 }
+
+@Test func linksNameEachKindAndSkipPagesWithoutOne() {
+    #expect(Track(id: "dQw4w9WgXcQ", title: "").link == "https://music.youtube.com/watch?v=dQw4w9WgXcQ")
+    #expect(Card(kind: .song, id: "v", title: "").link == "https://music.youtube.com/watch?v=v")
+    #expect(Route.album("MPREb_x").link == "https://music.youtube.com/browse/MPREb_x")
+    #expect(Route.playlist("PLx").link == "https://music.youtube.com/playlist?list=PLx")
+    #expect(Route.artist("UCx").link == "https://music.youtube.com/channel/UCx")
+    #expect(Card(kind: .artist, id: "UCx", title: "").link == Route.artist("UCx").link)
+    #expect(Card(kind: .genre, id: "x", title: "").link == nil)
+    #expect(Route.home.link == nil)
+    #expect(Route.search("x").link == nil)
+}

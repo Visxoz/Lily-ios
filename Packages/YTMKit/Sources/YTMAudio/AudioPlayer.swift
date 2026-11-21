@@ -43,6 +43,14 @@ import Foundation
         }
     }
 
+    /// The engine pauses as the device playing goes away, straight from the system's notice, ahead of the controller.
+    public var pauseOnUnplug = true {
+        didSet {
+            let on = pauseOnUnplug
+            engine.send { $0.pauseOnUnplug = on }
+        }
+    }
+
     private let continuation: AsyncStream<AudioEvent>.Continuation
     private let engine: PlaybackEngine
     private var relay: Task<Void, Never>?

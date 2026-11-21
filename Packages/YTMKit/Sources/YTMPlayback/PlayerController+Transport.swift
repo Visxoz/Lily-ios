@@ -45,6 +45,14 @@ extension PlayerController {
         publishPlayback(at: target)
     }
 
+    /// The device playing went away: pauses rather than carrying on through another, keeping the queue and
+    /// position, so Play carries on through whatever plays now.
+    func outputUnplugged() {
+        guard settings.value.pauseOnUnplug, isPlaying else { return }
+        setPaused(true)
+        say("Paused, as the device playing was unplugged")
+    }
+
     /// Playing with nothing loaded starts the song shown.
     func setPaused(_ paused: Bool) {
         guard current != nil else { return }
@@ -124,6 +132,8 @@ extension PlayerController {
             gapless.forget()
         }
         for task in [resolving, queueing, autoplay] { task?.cancel() }
+        // Before the stop, which forgets how much of the song the engine holds.
+        let held = heldStream(track.id)
         // The output runs on while the stream resolves, so iOS keeps the app
         // running, and the system's Now Playing, through a slow fetch.
         audio.stop(keepingOutput: true)
@@ -134,7 +144,7 @@ extension PlayerController {
         publishPlayback()
         // A stream resolved ahead needs no await, so the song loads on this
         // turn and the quality badge never shows empty in between.
-        if let prefetched = localStream(track.id) ?? prefetcher.take(track.id) {
+        if let prefetched = localStream(track.id) ?? held ?? prefetcher.take(track.id) {
             load(track, prefetched)
             return
         }
@@ -166,7 +176,7 @@ extension PlayerController {
             audio.play(item, from: start, paused: !isPlaying)
             // Kept with when it was resolved, so previous, a jump back or
             // repeat one plays it again without asking.
-            prefetcher.store(track.id, prefetched)
+            prefetcher.storePlaying(track.id, prefetched)
         } catch {
             playbackFailed(track.title, error.message)
         }

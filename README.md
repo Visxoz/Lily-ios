@@ -37,7 +37,7 @@
 <td width="33%" valign="top">
 
 ### Sounds better
-256 kbps Opus with Premium, gapless playback, a 6-second crossfade, volume levelling and a six-band equaliser.
+256 kbps Opus with Premium, gapless playback, a crossfade of 1 to 12 seconds, volume levelling and a six-band equaliser.
 
 </td>
 <td width="33%" valign="top">
@@ -119,10 +119,10 @@ Lily starts in pure black with its own orchid. Pick another look and accent in *
 | --- | --- |
 | **Premium streams** | Signed in with Premium on High, songs play in YouTube's 256 kbps formats, and Now Playing says so. Music videos swap to their song versions to get them. |
 | **Gapless** | The next song is lined up 15 seconds early and follows without a gap, and the screen changes the moment the sound does. |
-| **Crossfade** | Fades each song into the next over 6 seconds, cutting the silence at the joins. An album played in order still runs straight on, and skipping never fades. |
+| **Crossfade** | Fades each song into the next over 6 seconds, or a length you choose from 1 to 12, cutting the silence at the joins. An album played in order still runs straight on, and skipping never fades. |
 | **Equaliser** | Six bands from 60 Hz to 15 kHz, ±12 dB each, with presets: Flat, Bass boost, Treble boost, Vocal, Rock, Electronic and Acoustic. Boosting turns the rest down to leave headroom. |
 | **Normalise volume** | Plays every track at a similar loudness, from YouTube's own measurement, as YouTube Music does. |
-| **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music carries on through the speaker. |
+| **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music pauses rather than carrying on through the speaker; plug a pair in and it plays on through them. |
 
 ## Take it offline
 
@@ -203,9 +203,10 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 | Drag a song in the queue | Move it |
 | Swipe a song in the queue | Remove it |
 | **Select** in the queue | Pick several songs, then play them next or remove them |
-| Press and hold a song | Play it next, add it to the queue, start a radio, download it, like it, save it to a playlist, or go to its artist or album |
-| Press and hold a card | Play it, start a radio, or download an album or playlist |
-| Tap the shuffle button | Cycle Off, Shuffle and **Smart Shuffle**, which mixes in recommendations |
+| Press and hold a song | Play it next, add it to the queue, start a radio, download it, like it, save it to a playlist, go to its artist or album, or copy its link |
+| Press and hold a card | Play it, start a radio, download an album or playlist, or copy its link |
+| Tap **More** beside an album's, playlist's or artist's buttons | Copy its link |
+| Tap the shuffle button | Cycle Off, Shuffle and **Smart Shuffle**, which mixes in recommendations. Shuffling keeps an artist's or an album's songs apart |
 | On iPhone Duo, half open with **Fold to scrub** on, fold or open it | Skip back or ahead 10 seconds a step |
 
 ## Your account

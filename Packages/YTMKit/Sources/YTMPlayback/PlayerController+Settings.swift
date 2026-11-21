@@ -57,6 +57,8 @@ extension PlayerController {
         applied = new
         if audio.isMuted != new.muted { audio.isMuted = new.muted }
         if audio.normalise != new.normalise { audio.normalise = new.normalise }
+        if audio.pauseOnUnplug != new.pauseOnUnplug { audio.pauseOnUnplug = new.pauseOnUnplug }
+        if audio.crossfadeSeconds != new.crossfadeSeconds { audio.crossfadeSeconds = new.crossfadeSeconds }
         if audio.speed != new.speed {
             audio.speed = new.speed
             nowPlaying?.speed = new.speed
@@ -85,7 +87,7 @@ extension PlayerController {
             gapless.forget()
             audio.setNext(nil, crossfade: false)
             preparePremium()
-        } else if old.crossfade != new.crossfade {
+        } else if old.crossfade != new.crossfade || old.crossfadeSeconds != new.crossfadeSeconds {
             // A song queued, or being queued, with the old setting is queued again.
             dropQueuedNext()
         }

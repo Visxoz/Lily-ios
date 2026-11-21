@@ -34,7 +34,7 @@ actor PlaybackEngine {
     private let cacheLocation: AudioCache.Location
     let source: any ByteSource
     let events: AsyncStream<Stamped>.Continuation
-    private var observer: (any NSObjectProtocol)?
+    private var observers: [any NSObjectProtocol] = []
 
     var session: UInt64 = 0
     var heard: Track?
@@ -43,6 +43,7 @@ actor PlaybackEngine {
     var next: Track?
     var warmed: Warmed?
     var normalise = true
+    var pauseOnUnplug = true
     /// The crossfade into `next`, in seconds, or 0 to follow without a gap.
     var nextFade = 0.0
     var plan: FadePlan?
@@ -214,10 +215,8 @@ actor PlaybackEngine {
     /// Drops anything playing; the mute, equaliser and speed carry over.
     func rebuildGraph() {
         clear()
-        if let observer {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        observer = nil
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
+        observers = []
         let old = graph
         old.engine.stop()
         graph = makeGraph()
@@ -228,9 +227,7 @@ actor PlaybackEngine {
         clear()
         warmed?.task.cancel()
         warmed = nil
-        if let observer {
-            NotificationCenter.default.removeObserver(observer)
-        }
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
         graph.engine.stop()
         events.finish()
     }
@@ -345,12 +342,32 @@ actor PlaybackEngine {
 
     /// A device change stops the engine, so it reconnects at the new format and carries on.
     private func observeOutputChanges() {
-        guard observer == nil else { return }
-        observer = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: graph.engine, queue: nil
-        ) { [weak self] _ in
-            self?.send { $0.outputChanged() }
-        }
+        guard observers.isEmpty else { return }
+        observers = [
+            NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: graph.engine, queue: nil
+            ) { [weak self] _ in
+                self?.send { $0.outputChanged() }
+            },
+        ]
+        #if os(iOS)
+        // Straight to the engine's queue, not through the main actor's, so the pause lands before, or close
+        // behind, a device change restarting the sound on the speaker.
+        observers.append(NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: AVAudioSession.sharedInstance(), queue: nil
+        ) { [weak self] notification in
+            let reason = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+                .flatMap(AVAudioSession.RouteChangeReason.init)
+            guard reason == .oldDeviceUnavailable else { return }
+            self?.send { $0.unplugged() }
+        })
+        #endif
+    }
+
+    /// Ahead of the controller, whose own pause still follows with the toast.
+    private func unplugged() {
+        guard pauseOnUnplug, !paused, heard != nil else { return }
+        pause()
     }
 
     private func outputChanged() {

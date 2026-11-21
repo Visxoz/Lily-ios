@@ -383,6 +383,7 @@ struct PlayerControllerTests {
         #expect(rig.player.bufferedFraction == 0, "nothing loaded")
         rig.player.play(songs("a"))
         await rig.settle()
+        rig.audio.bufferedFraction = 0.4
         #expect(rig.player.bufferedFraction == 0.4)
     }
 
