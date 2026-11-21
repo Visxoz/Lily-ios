@@ -1,71 +1,85 @@
 import Foundation
 
 public struct EqualiserBands {
-    /// Each band's centre in Hz.
-    public static let frequencies: [Float] = [60, 150, 400, 1_000, 2_400, 15_000]
+    /// Each band's centre in Hz, an octave apart.
+    public static let frequencies: [Float] = [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000]
     /// Either way, in dB.
     public static let maxGain: Float = 12
     /// Each band's gain in dB, from low to high.
     public static let presets: [(name: String, gains: [Float])] = [
-        ("Flat", [0, 0, 0, 0, 0, 0]),
-        ("Bass boost", [6, 4, 1, 0, 0, 0]),
-        ("Treble boost", [0, 0, 0, 1, 4, 6]),
-        ("Vocal", [-2, -1, 2, 4, 3, 0]),
-        ("Rock", [4, 2, -2, -1, 2, 4]),
-        ("Electronic", [5, 3, 0, -1, 2, 4]),
-        ("Acoustic", [3, 2, 1, 1, 2, 2]),
+        ("Flat", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        ("Bass boost", [6, 6, 4, 2, 1, 0, 0, 0, 0, 0]),
+        ("Treble boost", [0, 0, 0, 0, 0, 1, 2, 4, 5, 6]),
+        ("Vocal", [-2, -2, -1, 1, 3, 4, 3, 2, 1, 0]),
+        ("Rock", [4, 4, 2, 0, -2, -1, 1, 3, 4, 4]),
+        ("Electronic", [5, 5, 3, 1, 0, -1, 1, 3, 4, 4]),
+        ("Acoustic", [3, 3, 2, 1, 1, 1, 2, 2, 2, 2]),
     ]
 
-    /// About an octave and a half.
-    static let q = 0.9
-    /// The same width as `AVAudioUnitEQ` takes it, in octaves.
-    static let bandwidth = Float(2 / log(2.0) * asinh(1 / (2 * q)))
+    /// One gain per band, in fixed storage, as the render thread may not allocate.
+    typealias Gains = InlineArray<10, Float>
 
-    /// Exactly one gain per band; missing ones are 0.
-    static func clamped(_ gains: [Float]) -> [Float] {
-        frequencies.indices.map { gains.indices.contains($0) ? min(max(gains[$0], -maxGain), maxGain) : 0 }
+    /// How wide the peaks are: an octave.
+    static let q = 2.squareRoot()
+    /// How fast a gain glides to a new setting, in dB a second: the whole 12 dB in 75 ms, so a slider's steps
+    /// never click.
+    static let glide: Float = 160
+    /// Frames between new coefficients while gliding.
+    static let block = 32
+
+    /// Missing gains are 0.
+    static func clamped(_ gains: [Float]) -> Gains {
+        Gains { gains.indices.contains($0) ? min(max(gains[$0], -maxGain), maxGain) : 0 }
     }
 
-    /// In dB. Neighbouring bands overlap and their boosts add, so the peak is found on a sixth-octave
-    /// grid from 20 Hz to below Nyquist.
-    static func headroom(for gains: [Float], sampleRate: Double) -> Float {
-        let filters = clamped(gains).enumerated().map { Peak(band: $0.offset, gain: $0.element, rate: sampleRate) }
-        let top = sampleRate * 0.45
-        let peak = (0..<64)
-            .map { min(20 * pow(1_000, Double($0) / 63), top) }
-            .map { hz in filters.reduce(0) { $0 + $1.response(at: hz, rate: sampleRate) } }
-            .max() ?? 0
-        return Float(max(peak, 0))
+    /// The preamp that cancels the peak of the combined boost. Neighbouring bands overlap and their boosts add,
+    /// so the peak is found on a sixth-octave grid from 20 Hz to below Nyquist.
+    static func preamp(for filters: InlineArray<10, Peak>, rate: Double) -> Float {
+        // 1000^(1/63): 64 points from 20 Hz to 20 kHz.
+        let step = 1.115_884
+        let top = rate * 0.45
+        var (hz, peak) = (20.0, 1.0)
+        for _ in 0..<64 {
+            var power = 1.0
+            for band in filters.indices {
+                power *= filters[band].power(at: min(hz, top), rate: rate)
+            }
+            peak = max(peak, power.squareRoot())
+            hz *= step
+        }
+        return Float(1 / peak)
     }
 
-    /// RBJ's Audio EQ Cookbook peaking filter, only to work out the bands' combined response.
-    /// A peaking filter's b1 equals its a1.
+    /// RBJ's Audio EQ Cookbook peaking filter, normalised by a0. A peaking filter's b1 equals its a1, so only a1
+    /// is kept.
     struct Peak {
-        var b0 = 1.0, b2 = 0.0, a1 = 0.0, a2 = 0.0
+        var b0: Float = 1, b2: Float = 0, a1: Float = 0, a2: Float = 0
 
-        init(band: Int, gain: Float, rate: Double) {
-            let centre = Double(EqualiserBands.frequencies[band])
-            // A centre at or past Nyquist would be unstable, so it passes through.
+        init(centre: Double, gain: Float, rate: Double) {
+            // A centre at or past Nyquist makes the filter unstable, which would turn the music into full-scale
+            // noise; such a band passes through.
             guard centre < rate * 0.45 else { return }
             let a = pow(10, Double(gain) / 40)
             let w0 = 2 * Double.pi * centre / rate
             let alpha = sin(w0) / (2 * EqualiserBands.q)
             let a0 = 1 + alpha / a
-            b0 = (1 + alpha * a) / a0
-            b2 = (1 - alpha * a) / a0
-            a1 = -2 * cos(w0) / a0
-            a2 = (1 - alpha / a) / a0
+            b0 = Float((1 + alpha * a) / a0)
+            b2 = Float((1 - alpha * a) / a0)
+            a1 = Float(-2 * cos(w0) / a0)
+            a2 = Float((1 - alpha / a) / a0)
         }
 
-        /// In dB.
-        func response(at hz: Double, rate: Double) -> Double {
+        /// The gain at `hz`, squared, from the transfer function
+        /// H(e^jw) = (b0 + b1 e^-jw + b2 e^-2jw) / (1 + a1 e^-jw + a2 e^-2jw).
+        func power(at hz: Double, rate: Double) -> Double {
             let w = 2 * Double.pi * hz / rate
-            func magnitude(_ c0: Double, _ c1: Double, _ c2: Double) -> Double {
-                let re = c0 + c1 * cos(w) + c2 * cos(2 * w)
-                let im = -c1 * sin(w) - c2 * sin(2 * w)
-                return (re * re + im * im).squareRoot()
+            let (c1, s1, c2, s2) = (cos(w), sin(w), cos(2 * w), sin(2 * w))
+            func part(_ k0: Float, _ k1: Float, _ k2: Float) -> Double {
+                let (k0, k1, k2) = (Double(k0), Double(k1), Double(k2))
+                let (re, im) = (k0 + k1 * c1 + k2 * c2, k1 * s1 + k2 * s2)
+                return re * re + im * im
             }
-            return 20 * log10(magnitude(b0, a1, b2) / magnitude(1, a1, a2))
+            return part(b0, a1, b2) / part(1, a1, a2)
         }
     }
 }

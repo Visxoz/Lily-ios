@@ -367,15 +367,36 @@ struct PlayerControllerTests {
         rig.player.play([song("a", album: "x", number: 1), song("b", album: "x", number: 2)])
         await rig.settle()
         await rig.soundStarts()
-        #expect(rig.audio.normalise)
+        #expect(rig.audio.normalise == 1)
         rig.audio.currentTime = 186
         rig.player.onTick()
         await rig.settle()
         let queued = try #require(rig.audio.next)
-        rig.settings.value.normalise = false
+        rig.settings.value.normalise = .off
         rig.player.apply(rig.settings.value)
-        #expect(!rig.audio.normalise, "the engine applies it to what plays now")
+        #expect(rig.audio.normalise == nil, "the engine applies it to what plays now")
         #expect(rig.audio.next?.id == queued.id, "the next song stays queued")
+        rig.settings.value.normalise = .quiet
+        rig.player.apply(rig.settings.value)
+        #expect(rig.audio.normalise == 0.5, "6 dB under Normal")
+    }
+
+    @Test func headphoneSettingsReachTheAudio() async {
+        let rig = await started()
+        rig.settings.value.crossfeed = true
+        rig.settings.value.mono = true
+        rig.settings.value.balance = -0.25
+        rig.player.apply(rig.settings.value)
+        #expect(rig.audio.crossfeed && rig.audio.mono && rig.audio.balance == -0.25)
+    }
+
+    @Test func turnsQuietSongsUp() throws {
+        var stream = FakeMusic.stream("q")
+        stream.loudnessDb = -2
+        let item = try PlayerController.audioItem(
+            id: "q#1", videoId: "q", stream: stream, chooser: Rig().player.chooser, quality: .high, signedIn: false, local: false
+        )
+        #expect(item.loudnessDB == 2)
     }
 
     @Test func pullsTheBufferedFractionOfTheSongLoaded() async {
@@ -460,7 +481,7 @@ struct StreamChooserTests {
     }
 }
 
-/// YTMCore can't see YTMAudio, so its band count is checked against the engine's here.
+/// YTMCore can't see YTMAudio, so its bands are checked against the engine's here.
 @Test func settingsKeepAGainForEveryEqualiserBand() {
-    #expect(Settings.equaliserBands == EqualiserBands.frequencies.count)
+    #expect(Settings.equaliserFrequencies == EqualiserBands.frequencies)
 }

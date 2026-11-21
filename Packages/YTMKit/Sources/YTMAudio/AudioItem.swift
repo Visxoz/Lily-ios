@@ -9,7 +9,7 @@ public struct AudioItem: Sendable {
     public let contentLength: Int64
     /// Names the file in the disk cache, so the same encode plays from there next time.
     public let cacheKey: String
-    /// Applied only while the player normalises.
+    /// The correction to the reference loudness, turning down or up, applied only while the player normalises.
     public let loudnessDB: Float
     /// A fresh URL and headers for the same file, asked for when the old URL is refused part way through.
     /// Told whether the last fresh URL was refused too.

@@ -10,6 +10,12 @@ public enum ShuffleMode: String, Codable, CaseIterable, Sendable {
     case off, on, smart
 }
 
+/// How tracks are evened out: Normal to YouTube's reference loudness, Quiet 6 dB under it, as Spotify's Quiet
+/// sits under its Normal.
+public enum Normalise: String, Codable, CaseIterable, Sendable {
+    case off, quiet, normal
+}
+
 public enum Look: String, Codable, CaseIterable, Sendable {
     case dark, light, black
 }
@@ -49,8 +55,8 @@ public enum Accent: String, Codable, CaseIterable, Sendable {
 }
 
 public struct Settings: Codable, Equatable, Sendable {
-    /// YTMCore cannot see YTMAudio's EqualiserBands, so its band count is repeated here and checked by a test.
-    static let equaliserBands = 6
+    /// YTMCore cannot see YTMAudio's EqualiserBands, so its bands are repeated here and checked by a test.
+    static let equaliserFrequencies: [Float] = [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000]
     /// In the order Settings offers them.
     public static let speeds = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]
     /// The crossfade lengths Settings offers, in seconds.
@@ -58,7 +64,7 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public var muted = false
     public var quality: AudioQuality = .high
-    public var normalise = true
+    public var normalise: Normalise = .normal
     /// Fade each track into the next, rather than playing them gaplessly.
     public var crossfade = false
     /// Long enough to blend two songs, short enough to keep most of an ending.
@@ -71,7 +77,11 @@ public struct Settings: Codable, Equatable, Sendable {
     public var repeatMode: RepeatMode = .off
     public var equaliserEnabled = false
     /// Each band's gain in dB, kept while the equaliser is off.
-    public var equaliserGains: [Float] = Array(repeating: 0, count: Settings.equaliserBands)
+    public var equaliserGains: [Float] = Array(repeating: 0, count: Settings.equaliserFrequencies.count)
+    public var crossfeed = false
+    public var mono = false
+    /// From -1, the left side alone, to 1, the right.
+    public var balance: Float = 0
     /// Report songs played to the signed-in account's YouTube history.
     public var youtubeHistory = true
     public var ratingButtons = true
@@ -104,6 +114,10 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&muted, .muted)
         file.read(&quality, .quality)
         file.read(&normalise, .normalise)
+        // Older versions kept it as on or off, which is Normal or Off.
+        if let on = try? file.decodeIfPresent(Bool.self, forKey: .normalise) {
+            normalise = on ? .normal : .off
+        }
         file.read(&crossfade, .crossfade)
         file.read(&crossfadeSeconds, .crossfadeSeconds)
         // Outside the lengths offered, the nearer end of them.
@@ -114,7 +128,13 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&shuffle, .shuffle)
         file.read(&repeatMode, .repeatMode)
         file.read(&equaliserEnabled, .equaliserEnabled)
-        file.read(&equaliserGains, .equaliserGains) { $0.count == Self.equaliserBands }
+        if let gains = try? file.decodeIfPresent([Float].self, forKey: .equaliserGains), let gains = Self.equaliserGains(gains) {
+            equaliserGains = gains
+        }
+        file.read(&crossfeed, .crossfeed)
+        file.read(&mono, .mono)
+        file.read(&balance, .balance)
+        balance = min(max(balance, -1), 1)
         file.read(&youtubeHistory, .youtubeHistory)
         file.read(&ratingButtons, .ratingButtons)
         file.read(&look, .look)
@@ -128,6 +148,26 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&foldToScrub, .foldToScrub)
         file.read(&account, .account)
         file.read(&pinned, .pinned)
+    }
+
+    /// Older versions had six bands, which are carried over to the ten by interpolating in log-frequency between
+    /// their centres, to the whole dB the sliders step in, so the old presets land on the new ones. Nil for any
+    /// other count.
+    static func equaliserGains(_ gains: [Float]) -> [Float]? {
+        if gains.count == equaliserFrequencies.count { return gains }
+        let old: [Double] = [60, 150, 400, 1_000, 2_400, 15_000]
+        guard gains.count == old.count else { return nil }
+        return equaliserFrequencies.map { centre in
+            let hz = Double(centre)
+            let db: Float = switch old.count(where: { $0 <= hz }) {
+            case 0: gains[0]
+            case old.count: gains[old.count - 1]
+            case let i:
+                gains[i - 1] + (gains[i] - gains[i - 1]) * Float(log(hz / old[i - 1]) / log(old[i] / old[i - 1]))
+            }
+            // Adding 0 turns a rounded -0 into 0.
+            return db.rounded() + 0
+        }
     }
 }
 

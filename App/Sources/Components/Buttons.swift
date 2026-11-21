@@ -145,11 +145,15 @@ struct PillGroup: View {
     let titles: [String]
     @Binding var selection: Int
 
-    /// Tighter pills only when the row won't fit, so no title is cut short.
+    /// Tighter pills only when the row won't fit, and scrolling only when even those won't, so no title is cut
+    /// short.
     var body: some View {
         ViewThatFits(in: .horizontal) {
             pills(compact: false)
             pills(compact: true)
+            ScrollView(.horizontal, showsIndicators: false) {
+                pills(compact: true)
+            }
         }
     }
 

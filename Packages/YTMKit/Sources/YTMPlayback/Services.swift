@@ -39,7 +39,10 @@ extension YTMusic: MusicService {
     var currentTime: Double { get }
     var bufferedFraction: Double { get }
     var equaliser: (enabled: Bool, gains: [Float]) { get set }
-    var normalise: Bool { get set }
+    var normalise: Float? { get set }
+    var crossfeed: Bool { get set }
+    var mono: Bool { get set }
+    var balance: Float { get set }
     var pauseOnUnplug: Bool { get set }
     var isMuted: Bool { get set }
     var crossfadeSeconds: Double { get set }

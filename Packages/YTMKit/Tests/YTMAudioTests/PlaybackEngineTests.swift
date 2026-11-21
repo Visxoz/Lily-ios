@@ -3,68 +3,6 @@ import Synchronization
 import Testing
 @testable import YTMAudio
 
-private final class EventLog: Sendable {
-    let events = Mutex<[AudioEvent]>([])
-}
-
-/// The engine rendering offline, faster than real time, with every event it sends.
-private final class OfflinePlayback: Sendable {
-    let engine: PlaybackEngine
-    private let received = EventLog()
-    private let relay: Task<Void, Never>
-
-    convenience init(files: [String: Data]) {
-        self.init(source: MemoryByteSource(files: files))
-    }
-
-    init(source: any ByteSource) {
-        let (stream, sink) = AsyncStream.makeStream(of: PlaybackEngine.Stamped.self)
-        let cache = AudioCache.Location(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), limit: 64 << 20)
-        engine = PlaybackEngine(output: .offline(sampleRate: Fixtures.rate), source: source, cache: cache, events: sink)
-        relay = Task { [received] in
-            for await stamped in stream {
-                received.events.withLock { $0.append(stamped.event) }
-            }
-        }
-    }
-
-    deinit {
-        relay.cancel()
-        engine.send { $0.shutDown() }
-    }
-
-    var events: [AudioEvent] { received.events.withLock { $0 } }
-
-    func state<T: Sendable>(_ body: @escaping @Sendable (isolated PlaybackEngine) -> T) async -> T {
-        await withCheckedContinuation { continuation in
-            engine.send { continuation.resume(returning: body($0)) }
-        }
-    }
-
-    /// The left channel of `seconds` rendered, each piece once the engine has sound ahead of it.
-    func render(seconds: Double) async -> [Float] {
-        var out: [Float] = []
-        while out.count < Int(seconds * Fixtures.rate) {
-            for _ in 0..<500 where !(await state(Self.ready)) {
-                try? await Task.sleep(for: .milliseconds(1))
-            }
-            out += await state { engine in
-                let format = engine.graph.engine.manualRenderingFormat
-                guard engine.graph.engine.isRunning, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1_024),
-                      (try? engine.graph.engine.renderOffline(1_024, to: buffer)) != nil, let left = buffer.floatChannelData?[0]
-                else { return [Float](repeating: 0, count: 1_024) }
-                return Array(UnsafeBufferPointer(start: left, count: Int(buffer.frameLength)))
-            }
-        }
-        return out
-    }
-
-    private static func ready(_ engine: isolated PlaybackEngine) -> Bool {
-        guard let producing = engine.producing, !engine.paused, !engine.awaitingNext else { return true }
-        return engine.playerRunning && (engine.aheadFrames >= 4_096 || producing.finished || engine.fade != nil)
-    }
-}
-
 struct PlaybackEngineTests {
     private let first = Fixtures.signal(frames: 48_000, silence: 200)
     private let second = Fixtures.signal(frames: 48_000).map { -$0 }
@@ -178,21 +116,21 @@ struct PlaybackEngineTests {
     @Test func liftsTheBandsTheEqualiserBoosts() async throws {
         let tones = (0..<96_000).map { frame -> Float in
             let time = Double(frame) / Fixtures.rate
-            return Float(0.3 * sin(2 * Double.pi * 60 * time) + 0.3 * sin(2 * Double.pi * 1_000 * time))
+            return Float(0.3 * sin(2 * Double.pi * 62 * time) + 0.3 * sin(2 * Double.pi * 1_000 * time))
         }
         let file = try Fixtures.opusWebM(tones)
         let playback = OfflinePlayback(files: ["tones": file])
         let item = try AudioItem.fixture("tones", length: file.count)
         func balance(_ output: [Float]) -> Double {
             let window = output[24_000..<48_000]
-            return 10 * log10(goertzel(window, 60) / goertzel(window, 1_000))
+            return 10 * log10(goertzel(window, 62) / goertzel(window, 1_000))
         }
         playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
         let flat = balance(await playback.render(seconds: 1))
-        playback.engine.send { $0.setEqualiser(enabled: true, gains: [12, 0, 0, 0, 0, 0]) }
+        playback.engine.send { $0.setEqualiser(enabled: true, gains: [0, 12, 0, 0, 0, 0, 0, 0, 0, 0]) }
         playback.engine.send { $0.seek(to: 0, session: 1) }
         let boosted = await playback.render(seconds: 1)
-        #expect(abs(balance(boosted) - flat - 12) < 1.5, "60 Hz lifted 12 dB against 1 kHz")
+        #expect(abs(balance(boosted) - flat - 12) < 1.5, "62 Hz lifted 12 dB against 1 kHz")
         #expect((boosted.map(abs).max() ?? 2) < 1, "lowered by the boost, so it never clips")
     }
 
@@ -202,8 +140,12 @@ struct PlaybackEngineTests {
         let item = try AudioItem.fixture("one", length: file.count)
         playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
         let before = await playback.render(seconds: 0.5)
-        playback.engine.send { $0.pause() }
-        let ramp = await playback.render(seconds: 0.05)
+        // In one go on the engine's queue, so the player's delayed pause lands after the ramp however busy the
+        // machine running the tests.
+        let ramp = await playback.state { engine in
+            engine.pause()
+            return (0..<3).flatMap { _ in OfflinePlayback.piece(engine).left }
+        }
         try await Task.sleep(for: .milliseconds(150))
         #expect(ramp.suffix(100).allSatisfy { abs($0) < 1e-4 }, "faded out within 50 ms")
         #expect((ramp[240..<480].map(abs).max() ?? 0) > 0.01, "ramped down over several ms rather than cut")
@@ -232,7 +174,7 @@ struct PlaybackEngineTests {
         let item = try AudioItem.fixture("one", length: file.count, loudnessDB: -6)
         playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
         let before = await playback.render(seconds: 0.25)
-        playback.engine.send { $0.normalise = false }
+        playback.engine.send { $0.normalise = nil }
         let output = before + (await playback.render(seconds: 5.5))
         let decoded = try DecodableFile(file).decode()
         let gain = pow(10, Float(-6) / 20)

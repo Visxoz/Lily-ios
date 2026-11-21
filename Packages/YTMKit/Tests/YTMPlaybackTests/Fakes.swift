@@ -217,7 +217,10 @@ final class FakeMusic: MusicService {
     var currentTime = 0.0
     var bufferedFraction = 0.0
     var equaliser: (enabled: Bool, gains: [Float]) = (false, [])
-    var normalise = true
+    var normalise: Float? = 1
+    var crossfeed = false
+    var mono = false
+    var balance: Float = 0
     var pauseOnUnplug = true
     var isMuted = false
     var crossfadeSeconds = 6.0

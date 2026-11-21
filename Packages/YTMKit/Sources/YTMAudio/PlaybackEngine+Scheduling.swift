@@ -102,10 +102,20 @@ extension PlaybackEngine {
         return (buffer, Scheduled(track: track, first: first, frames: filled))
     }
 
-    /// Ramps from where the last buffer ended, so toggling normalisation reaches the
+    /// The most a quiet track is turned up, +3 dB, as its peaks are unknown and quiet tracks are often the
+    /// dynamic ones; the sound unit's limiter catches the rest.
+    static let maxBoost: Float = 1.412_537_5
+
+    /// The gain played for a track whose loudness correction is `gain`. The cap comes after the level, so Quiet
+    /// turns up as far as Normal does.
+    static func normalised(_ gain: Float, by level: Float?) -> Float {
+        level.map { min(gain * $0, maxBoost) } ?? 1
+    }
+
+    /// Ramps from where the last buffer ended, so a change of normalisation reaches the
     /// item playing without a click.
     private func gainRamp(_ track: Track, frames: Int) -> Crossfade.Ramp {
-        let gain = normalise ? track.loudnessGain : 1
+        let gain = Self.normalised(track.loudnessGain, by: normalise)
         return Crossfade.Ramp(from: track.gain ?? gain, to: gain, length: frames)
     }
 
@@ -293,6 +303,7 @@ extension PlaybackEngine {
         playerFrames = 0
         playerRunning = false
         fadeInNext = true
+        graph.resetSound()
     }
 
     func startPlayer() {

@@ -13,11 +13,9 @@ struct PlaybackSettings: View {
                 selection: $settings.value.quality
             )
         }
-        ToggleRow(
-            label: "Normalise volume",
-            detail: "Plays every track at a similar loudness, as YouTube Music does.",
-            isOn: $settings.value.normalise
-        )
+        SettingRow(label: "Speed", detail: "Faster or slower, the pitch moving with it as on a record.", stacked: true) {
+            ChoicePills(choices: Settings.speeds.map { ($0, "\($0.formatted())×") }, selection: $settings.value.speed)
+        }
         SettingRow(label: "Crossfade", detail: "Fades each track into the next. Tracks of an album played in order still run straight on.") {
             HStack(spacing: 12) {
                 if settings.value.crossfade {
@@ -32,15 +30,6 @@ struct PlaybackSettings: View {
                 Toggle("Crossfade", isOn: $settings.value.crossfade)
                     .labelsHidden()
             }
-        }
-        SettingRow(label: "Speed", detail: "Faster or slower, the pitch moving with it as on a record.", stacked: true) {
-            ChoicePills(choices: Settings.speeds.map { ($0, "\($0.formatted())×") }, selection: $settings.value.speed)
-        }
-        SettingRow(label: "Equaliser", detail: EqualiserScreen.summary(settings.value)) {
-            NavigationLink(value: SettingsPage.equaliser) {
-                PillLabel(title: "Adjust", small: true)
-            }
-            .buttonStyle(PressScale(scale: 0.96))
         }
         ToggleRow(
             label: "Pause when unplugged",

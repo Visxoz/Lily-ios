@@ -17,6 +17,21 @@ import Foundation
         }
     }
 
+    /// For headphones: each side's lows fed a little into the other, as from speakers.
+    public var crossfeed = false {
+        didSet { sendStereo() }
+    }
+
+    /// Both sides in each ear.
+    public var mono = false {
+        didSet { sendStereo() }
+    }
+
+    /// From -1, the left side alone, to 1, the right; clamped to that.
+    public var balance: Float = 0 {
+        didSet { sendStereo() }
+    }
+
     /// Silences the app's own output; the level otherwise is the system volume's alone.
     public var isMuted = false {
         didSet {
@@ -35,8 +50,10 @@ import Foundation
         }
     }
 
+    /// The share of each item's loudness correction played: 1 for YouTube's reference loudness, 0.5 for 6 dB under
+    /// it, or nil to play items as they are. Boosts are capped at 3 dB, and a limiter keeps peaks under full scale.
     /// A change reaches the item playing once the few seconds already scheduled have played.
-    public var normalise = true {
+    public var normalise: Float? = 1 {
         didSet {
             let normalise = normalise
             engine.send { $0.normalise = normalise }
@@ -125,7 +142,7 @@ import Foundation
         engine.send { $0.stop(session: session, keepingOutput: keepingOutput) }
     }
 
-    /// For a media services reset, which takes the old graph with it. Mute, equaliser and speed carry over.
+    /// For a media services reset, which takes the old graph with it. Mute, sound settings and speed carry over.
     public func rebuild() {
         stop()
         engine.send { $0.rebuildGraph() }
@@ -151,6 +168,11 @@ import Foundation
 
     public func clearCache() async {
         await engine.clearCache()
+    }
+
+    private func sendStereo() {
+        let (crossfeed, mono, balance) = (crossfeed, mono, balance)
+        engine.send { $0.setStereo(crossfeed: crossfeed, mono: mono, balance: balance) }
     }
 
     private func deliver(_ stamped: PlaybackEngine.Stamped) {

@@ -355,8 +355,8 @@ import YTMCore
         local: Bool
     ) throws(YTMError) -> AudioItem {
         guard local || HostAllowlist.allows(stream.url) else { throw Self.blocked }
-        // Only ever turned down: YouTube's loudness above its reference level.
-        let loudness = -Float(max(stream.loudnessDb ?? 0, 0))
+        // YouTube's loudness against its reference level, turned down or up while normalising.
+        let loudness = -Float(stream.loudnessDb ?? 0)
         // The client of the URL last given, cut off should its fresh one be refused too.
         let client = OSAllocatedUnfairLock(initialState: stream.client)
         return AudioItem(

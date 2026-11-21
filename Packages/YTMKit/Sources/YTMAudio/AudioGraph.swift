@@ -7,12 +7,10 @@ final class AudioGraph {
     let player = AVAudioPlayerNode()
     private let mixer = AVAudioMixerNode()
     private let varispeed = AVAudioUnitVarispeed()
-    private let equaliser = AVAudioUnitEQ(numberOfBands: EqualiserBands.frequencies.count)
+    private let sound = AVAudioUnitEffect(audioComponentDescription: SoundUnit.component)
     private(set) var playerFormat: AVAudioFormat?
-    private var outputRate = 48_000.0
     private var level: Float = 1
     private var silenced = false
-    private var equaliserSetting: (enabled: Bool, gains: [Float]) = (false, [])
     private var speed = 1.0
 
     /// Renders into `offlineFormat` on demand rather than to the device, for tests.
@@ -20,15 +18,8 @@ final class AudioGraph {
         if let offlineFormat {
             try? engine.enableManualRenderingMode(.offline, format: offlineFormat, maximumFrameCount: 4_096)
         }
-        for node in [player, mixer, varispeed, equaliser] {
+        for node in [player, mixer, varispeed, sound] {
             engine.attach(node)
-        }
-        for (band, frequency) in zip(equaliser.bands, EqualiserBands.frequencies) {
-            band.filterType = .parametric
-            band.frequency = frequency
-            band.bandwidth = EqualiserBands.bandwidth
-            band.gain = 0
-            band.bypass = false
         }
         connectOutput()
     }
@@ -36,18 +27,16 @@ final class AudioGraph {
     /// Call again after the output device changes.
     func connectOutput() {
         let rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
-        outputRate = rate > 0 ? rate : 48_000
-        let format = AVAudioFormat(standardFormatWithSampleRate: outputRate, channels: 2)
+        let format = AVAudioFormat(standardFormatWithSampleRate: rate > 0 ? rate : 48_000, channels: 2)
         // Plain nodes at a standard format: the engine has no reason to refuse. At 1x the varispeed
         // stays out of the path, so the sound is exactly the decoder's.
         if speed == 1 {
-            _ = connect(mixer, to: equaliser, format: format)
+            _ = connect(mixer, to: sound, format: format)
         } else {
             _ = connect(mixer, to: varispeed, format: format)
-            _ = connect(varispeed, to: equaliser, format: format)
+            _ = connect(varispeed, to: sound, format: format)
         }
-        _ = connect(equaliser, to: engine.outputNode, format: format)
-        applyEqualiser()
+        _ = connect(sound, to: engine.outputNode, format: format)
     }
 
     /// The player must be stopped, so a change of rate leaves a short gap. False if the engine refused.
@@ -102,9 +91,16 @@ final class AudioGraph {
         applyVolume()
     }
 
+    /// Glides to the new gains; off, it glides to flat and rings out before resting.
     func setEqualiser(enabled: Bool, gains: [Float]) {
-        equaliserSetting = (enabled, EqualiserBands.clamped(gains))
-        applyEqualiser()
+        let gains = enabled ? EqualiserBands.clamped(gains) : EqualiserBands.Gains(repeating: 0)
+        unit?.change { $0.equaliser = gains }
+    }
+
+    /// Balance from -1, the left side alone, to 1, the right. Each change ramps in over 50 ms.
+    func setStereo(crossfeed: Bool, mono: Bool, balance: Float) {
+        let balance = min(max(balance, -1), 1)
+        unit?.change { ($0.crossfeed, $0.mono, $0.balance) = (crossfeed, mono, balance) }
     }
 
     /// True if the varispeed joined or left the path, which stops the engine to reconnect it.
@@ -118,9 +114,14 @@ final class AudioGraph {
         return true
     }
 
+    /// For a seek or a load.
+    func resetSound() {
+        unit?.change { $0.resets &+= 1 }
+    }
+
     func adoptSettings(of old: AudioGraph) {
         setLevel(old.level)
-        setEqualiser(enabled: old.equaliserSetting.enabled, gains: old.equaliserSetting.gains)
+        if let wanted = old.unit?.wanted { unit?.change { $0 = wanted } }
         _ = setSpeed(old.speed)
     }
 
@@ -130,17 +131,13 @@ final class AudioGraph {
         return (time.sampleTime, nodeTime.isHostTimeValid ? nodeTime.hostTime : nil)
     }
 
-    private func applyVolume() {
-        mixer.outputVolume = silenced ? 0 : level
+    /// Always ours, as the component is registered to it.
+    private var unit: SoundUnit? {
+        guard #available(iOS 27, macOS 27, *) else { return sound.auAudioUnit as? SoundUnit }
+        return sound.withAUAudioUnit { copy $0 } as? SoundUnit
     }
 
-    /// Lowers the whole signal by the bands' combined peak so they cannot push the music past full scale.
-    private func applyEqualiser() {
-        let gains = equaliserSetting.gains
-        for (band, gain) in zip(equaliser.bands, gains) {
-            band.gain = gain
-        }
-        equaliser.bypass = !equaliserSetting.enabled || gains.allSatisfy { $0 == 0 }
-        equaliser.globalGain = -EqualiserBands.headroom(for: gains, sampleRate: outputRate)
+    private func applyVolume() {
+        mixer.outputVolume = silenced ? 0 : level
     }
 }

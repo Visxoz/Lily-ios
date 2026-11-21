@@ -36,7 +36,7 @@ enum AudioChecks {
         let itag = stream.itag
         let item = AudioItem(
             id: song.id, url: stream.url, headers: stream.headers, contentLength: stream.contentLength,
-            cacheKey: "\(song.id)-\(itag)", loudnessDB: -Float(max(stream.loudnessDb ?? 0, 0))
+            cacheKey: "\(song.id)-\(itag)", loudnessDB: -Float(stream.loudnessDb ?? 0)
         ) { _ in
             let fresh = try await Live.api.stream(videoId: song.id, quality: .high, itag: itag)
             guard fresh.itag == itag, HTTP.isAllowed(fresh.url) else { throw YTMError(.unplayable, "The refreshed stream isn't the same file.") }

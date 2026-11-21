@@ -16,6 +16,22 @@ enum Fixtures {
         }
     }
 
+    /// Runs a stage of the sound unit over two channels, in place.
+    static func stereo(
+        _ left: inout [Float], _ right: inout [Float],
+        _ stage: (UnsafeMutableBufferPointer<Float>, UnsafeMutableBufferPointer<Float>) -> Void
+    ) {
+        left.withUnsafeMutableBufferPointer { left in
+            right.withUnsafeMutableBufferPointer { right in stage(left, right) }
+        }
+    }
+
+    /// The same, with `samples` in both channels, keeping the left.
+    static func mono(_ samples: inout [Float], _ stage: (UnsafeMutableBufferPointer<Float>, UnsafeMutableBufferPointer<Float>) -> Void) {
+        var right = samples
+        stereo(&samples, &right, stage)
+    }
+
     // MARK: Opus in WebM
 
     struct Encoded {

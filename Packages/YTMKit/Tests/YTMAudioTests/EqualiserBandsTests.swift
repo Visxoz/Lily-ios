@@ -1,41 +1,48 @@
+import Foundation
 import Testing
 @testable import YTMAudio
 
 struct EqualiserBandsTests {
-    @Test func matchesYtmNative() {
-        #expect(EqualiserBands.frequencies == [60, 150, 400, 1_000, 2_400, 15_000])
+    @Test func matchesWindows() {
+        #expect(EqualiserBands.frequencies == [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000])
         #expect(EqualiserBands.maxGain == 12)
         #expect(EqualiserBands.presets.map(\.name) == ["Flat", "Bass boost", "Treble boost", "Vocal", "Rock", "Electronic", "Acoustic"])
-        #expect(EqualiserBands.presets[3].gains == [-2, -1, 2, 4, 3, 0])
-        #expect(abs(EqualiserBands.bandwidth - 1.53) < 0.01, "Q 0.9, about an octave and a half")
+        #expect(EqualiserBands.presets.allSatisfy { $0.gains.count == EqualiserBands.Gains.count })
+        #expect(EqualiserBands.presets[3].gains == [-2, -2, -1, 1, 3, 4, 3, 2, 1, 0])
+        #expect(EqualiserBands.q == 2.squareRoot(), "an octave")
     }
 
     @Test(arguments: [44_100.0, 48_000.0])
     func bandsReachTheirGain(rate: Double) {
+        func db(_ peak: EqualiserBands.Peak, at hz: Double) -> Double { 10 * log10(peak.power(at: hz, rate: rate)) }
         for gain: Float in [-12, 6] {
-            for (band, centre) in EqualiserBands.frequencies.enumerated() {
-                let peak = EqualiserBands.Peak(band: band, gain: gain, rate: rate)
-                #expect(abs(peak.response(at: Double(centre), rate: rate) - Double(gain)) < 0.01)
+            for centre in EqualiserBands.frequencies.map(Double.init) {
+                let peak = EqualiserBands.Peak(centre: centre, gain: gain, rate: rate)
+                #expect(abs(db(peak, at: centre) - Double(gain)) < 0.01, "\(centre) Hz")
             }
-            let middle = EqualiserBands.Peak(band: 3, gain: gain, rate: rate)
-            #expect(abs(middle.response(at: 20, rate: rate)) < 0.1, "far bands untouched")
-            #expect(abs(middle.response(at: 20_000, rate: rate)) < 0.1)
+            let middle = EqualiserBands.Peak(centre: 1_000, gain: gain, rate: rate)
+            #expect(abs(db(middle, at: 20)) < 0.1, "far bands untouched")
+            #expect(abs(db(middle, at: 20_000)) < 0.1)
         }
     }
 
     @Test func leavesHeadroomForBoosts() {
-        #expect(EqualiserBands.headroom(for: [0, 0, 0, 0, 0, 0], sampleRate: 48_000) == 0)
-        #expect(EqualiserBands.headroom(for: [-6, -6, -6, -6, -6, -6], sampleRate: 48_000) == 0)
+        func headroom(_ gains: [Float]) -> Float {
+            let filters = Equaliser().filters(for: EqualiserBands.clamped(gains), rate: 48_000)
+            return -20 * log10(EqualiserBands.preamp(for: filters, rate: 48_000))
+        }
+        #expect(headroom([]) == 0)
+        #expect(headroom(Array(repeating: -6, count: 10)) == 0)
         // Clamped to 12 dB, and overlapping boosts add up past any one band.
-        #expect(abs(EqualiserBands.headroom(for: [20, 0, 0, 0, 0, 0], sampleRate: 48_000) - 12) < 0.1)
-        #expect(EqualiserBands.headroom(for: [12, 12, 12, 12, 12, 12], sampleRate: 48_000) > 12)
-        let bass = EqualiserBands.presets[1].gains
-        #expect(EqualiserBands.headroom(for: bass, sampleRate: 48_000) >= 6)
+        #expect(abs(headroom([20]) - 12) < 0.1)
+        #expect(headroom(Array(repeating: 12, count: 10)) > 12)
+        #expect(headroom(EqualiserBands.presets[1].gains) >= 6)
     }
 
     @Test func bandsPastNyquistPassThrough() {
-        let peak = EqualiserBands.Peak(band: 5, gain: 12, rate: 22_050)
-        #expect(peak.response(at: 1_000, rate: 22_050) == 0)
-        #expect(EqualiserBands.clamped([30, -30]) == [12, -12, 0, 0, 0, 0])
+        let peak = EqualiserBands.Peak(centre: 16_000, gain: 12, rate: 22_050)
+        #expect(peak.power(at: 1_000, rate: 22_050) == 1)
+        let clamped = EqualiserBands.clamped([30, -30])
+        #expect(clamped.indices.map { clamped[$0] } == [12, -12, 0, 0, 0, 0, 0, 0, 0, 0])
     }
 }

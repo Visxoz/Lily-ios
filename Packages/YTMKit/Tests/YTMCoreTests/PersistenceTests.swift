@@ -11,18 +11,44 @@ import Testing
         let settings = try decode(#"{"youtubeHistory": false, "accent": "beige", "equaliserGains": [1], "volume": 0.5}"#)
         #expect(!settings.youtubeHistory, "the opt-out is kept")
         #expect(settings.accent == .lily)
-        #expect(settings.equaliserGains == Array(repeating: 0, count: 6))
+        #expect(settings.equaliserGains == Array(repeating: 0, count: 10))
+    }
+
+    @Test func sixOldEqualiserBandsCarryOverToTen() throws {
+        // 31 Hz holds the old lowest, at 60 Hz; 62 Hz is just past it. 250 Hz is about halfway, in octaves,
+        // from 150 to 400 Hz.
+        #expect(try decode(#"{"equaliserGains": [1, 2, 3, 4, 5, 6]}"#).equaliserGains == [1, 1, 2, 3, 3, 4, 5, 5, 6, 6])
+        #expect(try decode(#"{"equaliserGains": [6, 4, 1, 0, 0, 0]}"#).equaliserGains == [6, 6, 4, 2, 1, 0, 0, 0, 0, 0], "Bass boost")
+        #expect(try decode(#"{"equaliserGains": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}"#).equaliserGains[9] == 10)
+        #expect(try decode(#"{"equaliserGains": [-0.4, 0, 0, 0, 0, 0]}"#).equaliserGains[0].sign == .plus, "no -0")
     }
 
     @Test func fillsMissingFieldsWithDefaults() throws {
         let settings = try decode(#"{"look": "dark", "accent": "artwork", "shuffle": "smart"}"#)
         #expect(settings.look == .dark && settings.accent == .artwork && settings.shuffle == .smart)
-        #expect(settings.normalise && !settings.crossfade && settings.quality == .high)
+        #expect(settings.normalise == .normal && !settings.crossfade && settings.quality == .high)
         #expect(!settings.foldToScrub, "off until asked for")
         #expect(settings.pauseOnUnplug, "on until turned off")
+        #expect(!settings.crossfeed && !settings.mono && settings.balance == 0)
         #expect(Settings.crossfadeLengths.contains(settings.crossfadeSeconds), "a length Settings offers")
         let saved = try JSONEncoder().encode(settings)
         #expect(try JSONDecoder().decode(Settings.self, from: saved) == settings)
+    }
+
+    @Test func readsNormaliseFromOlderVersions() throws {
+        #expect(try decode(#"{"normalise": false}"#).normalise == .off)
+        #expect(try decode(#"{"normalise": true}"#).normalise == .normal)
+        var quiet = Settings()
+        quiet.normalise = .quiet
+        let saved = try JSONEncoder().encode(quiet)
+        #expect(String(decoding: saved, as: UTF8.self).contains(#""normalise":"quiet""#))
+        #expect(try JSONDecoder().decode(Settings.self, from: saved).normalise == .quiet, "and its own")
+    }
+
+    @Test func keepsTheBalanceWithinTheSides() throws {
+        #expect(try decode(#"{"balance": -0.25, "crossfeed": true, "mono": true}"#).balance == -0.25)
+        #expect(try decode(#"{"balance": 3}"#).balance == 1)
+        #expect(try decode(#"{"balance": -3}"#).balance == -1)
     }
 
     @Test func keepsOnlyASpeedSettingsOffers() throws {

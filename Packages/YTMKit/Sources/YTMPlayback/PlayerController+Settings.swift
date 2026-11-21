@@ -60,7 +60,11 @@ extension PlayerController {
         let old = applied
         applied = new
         if audio.isMuted != new.muted { audio.isMuted = new.muted }
-        if audio.normalise != new.normalise { audio.normalise = new.normalise }
+        let level = Self.level(new.normalise)
+        if audio.normalise != level { audio.normalise = level }
+        if audio.crossfeed != new.crossfeed { audio.crossfeed = new.crossfeed }
+        if audio.mono != new.mono { audio.mono = new.mono }
+        if audio.balance != new.balance { audio.balance = new.balance }
         if audio.pauseOnUnplug != new.pauseOnUnplug { audio.pauseOnUnplug = new.pauseOnUnplug }
         if audio.crossfadeSeconds != new.crossfadeSeconds { audio.crossfadeSeconds = new.crossfadeSeconds }
         if audio.speed != new.speed {
@@ -94,6 +98,15 @@ extension PlayerController {
         } else if old.crossfade != new.crossfade || old.crossfadeSeconds != new.crossfadeSeconds {
             // A song queued, or being queued, with the old setting is queued again.
             dropQueuedNext()
+        }
+    }
+
+    /// The share of the loudness correction the engine plays.
+    private static func level(_ normalise: Normalise) -> Float? {
+        switch normalise {
+        case .off: nil
+        case .quiet: 0.5
+        case .normal: 1
         }
     }
 

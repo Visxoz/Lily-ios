@@ -17,31 +17,37 @@ struct EqualiserScreen: View {
     var body: some View {
         @Bindable var settings = app.settings
         let gains = settings.value.equaliserGains
-        VStack(alignment: .leading, spacing: 18) {
-            SettingRow(label: "Preset", detail: "A starting point; the bands below fine-tune it.") {
-                HStack(spacing: 12) {
-                    Menu {
-                        ForEach(EqualiserBands.presets.indices, id: \.self) { index in
-                            Button(EqualiserBands.presets[index].name) { choose(index) }
+        // Scrolling only where ten bands outgrow the screen, as on iPhone Duo's inner display held landscape.
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                SettingRow(label: "Preset", detail: "A starting point; the bands below fine-tune it.") {
+                    HStack(spacing: 12) {
+                        Menu {
+                            ForEach(EqualiserBands.presets.indices, id: \.self) { index in
+                                Button(EqualiserBands.presets[index].name) { choose(index) }
+                            }
+                        } label: {
+                            PillLabel(title: Self.preset(matching: gains) ?? "Custom", small: true)
                         }
-                    } label: {
-                        PillLabel(title: Self.preset(matching: gains) ?? "Custom", small: true)
+                        Toggle("Equaliser", isOn: $settings.value.equaliserEnabled)
+                            .labelsHidden()
                     }
-                    Toggle("Equaliser", isOn: $settings.value.equaliserEnabled)
-                        .labelsHidden()
+                }
+                // Closer together than the screen's rows, so ten bands fit.
+                VStack(spacing: 8) {
+                    ForEach(EqualiserBands.frequencies.indices, id: \.self) { band in
+                        BandRow(
+                            label: Self.label(EqualiserBands.frequencies[band]),
+                            gain: gains.indices.contains(band) ? gains[band] : 0,
+                            enabled: settings.value.equaliserEnabled
+                        ) { set(band, to: $0) }
+                    }
                 }
             }
-            ForEach(EqualiserBands.frequencies.indices, id: \.self) { band in
-                BandRow(
-                    label: Self.label(EqualiserBands.frequencies[band]),
-                    gain: gains.indices.contains(band) ? gains[band] : 0,
-                    enabled: settings.value.equaliserEnabled
-                ) { set(band, to: $0) }
-            }
-            Spacer(minLength: 0)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .scrollBounceBehavior(.basedOnSize)
         .background(theme.menu)
         .navigationTitle("Equaliser")
     }

@@ -42,7 +42,8 @@ actor PlaybackEngine {
     var producing: Track?
     var next: Track?
     var warmed: Warmed?
-    var normalise = true
+    /// The share of the loudness correction's gain played, or nil for none.
+    var normalise: Float? = 1
     var pauseOnUnplug = true
     /// The crossfade into `next`, in seconds, or 0 to follow without a gap.
     var nextFade = 0.0
@@ -195,6 +196,10 @@ actor PlaybackEngine {
         graph.setEqualiser(enabled: enabled, gains: gains)
     }
 
+    func setStereo(crossfeed: Bool, mono: Bool, balance: Float) {
+        graph.setStereo(crossfeed: crossfeed, mono: mono, balance: balance)
+    }
+
     /// Between two speeds other than 1x the change is live; to or from 1x the output is reconnected,
     /// so the sound carries on from where it was, as after a device change. Paused, `resume` does that.
     func setSpeed(_ speed: Double) {
@@ -212,7 +217,7 @@ actor PlaybackEngine {
     }
 
     /// For after a media services reset, when the old graph no longer reaches the device.
-    /// Drops anything playing; the mute, equaliser and speed carry over.
+    /// Drops anything playing; the mute, sound settings and speed carry over.
     func rebuildGraph() {
         clear()
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
