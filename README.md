@@ -216,7 +216,7 @@ Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in o
 
 Your own playlists can be edited from their page: press and hold a song, then drag it into a new order, remove songs from their menu, or rename it, change who can see it, or delete it from **More** in its header (making one public or unlisted needs a YouTube channel on the account). Any other album or playlist can be saved to your library from its header, and artists subscribed to. **Copy link** is in the menus of songs, the queue, cards and page headers.
 
-The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews the sign-in every 10 minutes, as an open YouTube tab does, and should YouTube sign you out, it says so.
+The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews the sign-in every hour, and should YouTube sign you out, it says so.
 
 <details>
 <summary><b>Connecting Last.fm</b></summary>

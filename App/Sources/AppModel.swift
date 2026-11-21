@@ -33,8 +33,8 @@ final class AppModel {
     static let toastFor: Duration = .seconds(5)
     /// After the launch's first page has had the network.
     static let renewSignInAfter: Duration = .seconds(10)
-    /// As often as an open YouTube tab renews its session cookies.
-    static let renewSignInEvery: Duration = .seconds(10 * 60)
+    /// Less often than an open YouTube tab, as a cookie found stale is renewed when YouTube answers signed out.
+    static let renewSignInEvery: Duration = .seconds(60 * 60)
     /// The least time between cookie checks, after one that didn't find the cookie rejected.
     static let signInRecheckAfter: Duration = .seconds(10 * 60)
     /// How long music plays on in the background before the artwork cache shrinks, as Windows waits once minimised.
