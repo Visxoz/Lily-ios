@@ -44,6 +44,7 @@ struct RootView: View {
         .preferredColorScheme(app.theme.colorScheme)
         .tint(app.theme.accent)
         .task { await app.followTheme() }
+        .task { await app.followPinned() }
         .modifier(FollowPlayer())
         .modifier(HingeCheck())
     }

@@ -7,6 +7,8 @@ public enum StoreFile: String, Sendable {
     /// The Premium path's trimmed player script.
     case player
     case downloads
+    /// Library as it last loaded, for the account signed in.
+    case library
 }
 
 /// JSON files in Application Support/Lily/. Writes run in order on one

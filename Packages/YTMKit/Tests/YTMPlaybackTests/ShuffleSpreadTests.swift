@@ -71,7 +71,7 @@ struct ShuffleSpreadTests {
         #expect(q.current == playing)
     }
 
-    /// As `continuePlaylist` adds each batch: unshuffled, appended, shuffled again.
+    /// As `continuePlaylist` adds each batch, among the songs still to play.
     @Test func aPlaylistArrivingInPagesIsSpreadToo() {
         let songs = library()
         var same = 0
@@ -79,9 +79,7 @@ struct ShuffleSpreadTests {
             var q = Queue<Song>(seed: UInt64(seed))
             q.set(items: songs.prefix(100), start: 0, shuffle: true)
             for start in stride(from: 100, to: songs.count, by: 100) {
-                q.setShuffle(false)
-                q.append(contentsOf: songs[start..<min(start + 100, songs.count)])
-                q.setShuffle(true)
+                q.extend(songs[start..<min(start + 100, songs.count)])
             }
             same += neighbours(Array(q.items)) { $0.artist == $1.artist }
         }
@@ -93,9 +91,7 @@ struct ShuffleSpreadTests {
         func shuffled() -> [Song] {
             var q = Queue<Song>(seed: 7)
             q.set(items: library(), start: 3, shuffle: true)
-            q.setShuffle(false)
-            q.append(contentsOf: (0..<50).map { Song(n: 300 + $0, artist: $0 % 10, album: 0) })
-            q.setShuffle(true)
+            q.extend((0..<50).map { Song(n: 300 + $0, artist: $0 % 10, album: 0) })
             return Array(q.items)
         }
         #expect(shuffled() == shuffled())

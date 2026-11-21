@@ -29,12 +29,14 @@ final class FakeMusic: MusicService {
         var playerUnprepared = false
         var lyrics: [String: Lyrics] = [:]
         var lyricsFail = false
-        /// Playlists as `page` and `loadMore` serve them, a batch at a time.
+        /// Playlists and albums as `page` and `loadStep` serve them, a batch at a time.
         var playlistBatches: [String: [[Track]]] = [:]
+        /// Batch tokens, as `PL#1`, that fail as YouTube's do: the page ends there, not whole.
+        var failingBatches: Set<String> = []
         var ratings: [String: Rating] = [:]
         /// Where a play reported goes on to send its watch time.
         var watchTime: WatchTime?
-        /// Streams and cards' tracks held back until `release`, as a slow network.
+        /// Streams, pages and cards' tracks held back until `release`, as a slow network.
         var held: Set<String> = []
         var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
         var calls: [String] = []
@@ -117,6 +119,7 @@ final class FakeMusic: MusicService {
 
     func radio(videoId: String) async throws -> [Track] {
         log("radio \(videoId)")
+        await waitWhileHeld("radio \(videoId)")
         return state.withLock { $0.radios[videoId] ?? $0.anyRadio }
     }
 
@@ -141,8 +144,13 @@ final class FakeMusic: MusicService {
     }
 
     func page(_ route: Route) async throws -> Page {
-        guard case .playlist(let id) = route else { throw YTMError(.notFound, "No such page.") }
+        let id: String
+        switch route {
+        case .playlist(let playlist), .album(let playlist): id = playlist
+        default: throw YTMError(.notFound, "No such page.")
+        }
         log("page \(id)")
+        await waitWhileHeld(id)
         let batches = state.withLock { $0.playlistBatches[id] } ?? []
         return Page(
             header: PageHeader(title: id, playlistId: id),
@@ -151,17 +159,21 @@ final class FakeMusic: MusicService {
         )
     }
 
-    func loadMore(_ page: Page) async throws -> Page {
+    func loadStep(_ page: Page) async throws -> (page: Page, whole: Bool) {
         guard case .tracks(let token)? = page.more, let id = page.header?.playlistId,
               let step = token.split(separator: "#").last.flatMap({ Int($0) }),
-              case .tracks(var section)? = page.sections.first else { return page }
+              case .tracks(var section)? = page.sections.first else { return (page, true) }
         log("more \(token)")
-        let batches = state.withLock { $0.playlistBatches[id] } ?? []
         var page = page
+        if state.withLock({ $0.failingBatches.contains(token) }) {
+            page.more = nil
+            return (page, false)
+        }
+        let batches = state.withLock { $0.playlistBatches[id] } ?? []
         section.tracks += batches.indices.contains(step) ? batches[step] : []
         page.sections[0] = .tracks(section)
         page.more = step + 1 < batches.count ? .tracks(token: "\(id)#\(step + 1)") : nil
-        return page
+        return (page, true)
     }
 
     func songVersion(of video: Track) async throws -> Track? {

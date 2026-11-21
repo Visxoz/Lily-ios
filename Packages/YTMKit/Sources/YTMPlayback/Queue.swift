@@ -46,10 +46,6 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
 
     public var recommendedIndices: [Int] { entries.indices.filter { entries[$0].isRecommended } }
 
-    public func item(at index: Int) -> Element? {
-        entries.indices.contains(index) ? entries[index].item : nil
-    }
-
     public func isRecommended(at index: Int) -> Bool {
         entries.indices.contains(index) && entries[index].isRecommended
     }
@@ -68,14 +64,20 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
         currentIndex = entries.isEmpty ? nil : min(max(start, 0), entries.count - 1)
         unshuffledCount = nil
         revision += 1
-        if shuffle { setShuffle(true) }
+        guard shuffle else { return }
+        rankEntries()
+        // Nothing has played yet, so those before the start are shuffled in too.
+        if let start = currentIndex {
+            entries.insert(entries.remove(at: start), at: 0)
+            currentIndex = 0
+        }
+        shuffleAfterCurrent()
     }
 
     public mutating func setShuffle(_ on: Bool) {
         switch (on, unshuffledCount) {
         case (true, nil):
-            for index in entries.indices { entries[index].rank = index }
-            unshuffledCount = entries.count
+            rankEntries()
             shuffleAfterCurrent()
             revision += 1
         case (false, let ranked?):
@@ -84,6 +86,12 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
         default:
             break
         }
+    }
+
+    /// Records the order shuffling replaces.
+    private mutating func rankEntries() {
+        for index in entries.indices { entries[index].rank = index }
+        unshuffledCount = entries.count
     }
 
     private mutating func shuffleAfterCurrent() {
@@ -216,6 +224,41 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
         guard entries.count > start else { return }
         revision += 1
         if currentIndex == nil { currentIndex = start }
+    }
+
+    /// While shuffled, each item goes in at random among the entries still to play, and goes last should shuffle
+    /// be turned off; otherwise they are appended.
+    public mutating func extend(_ items: some Sequence<Element>) {
+        guard var ranked = unshuffledCount else { return append(contentsOf: items) }
+        // Behind the entries played next or recommended right after the current, which the order doesn't know, so
+        // they still play next.
+        let after = currentIndex.map { $0 + 1 } ?? 0
+        var start = after + entries[after...].prefix { $0.rank == nil }.count
+        let before = entries.count
+        for item in items {
+            var added = entry(item)
+            added.rank = ranked
+            ranked += 1
+            // A few draws for a place not beside the same artist, as spreading again would reorder what is shown.
+            var at = start
+            for _ in 0..<4 {
+                at = start + randomBelow(entries.count - start + 1)
+                if !beside(at, item.shuffleArtist) { break }
+            }
+            entries.insert(added, at: at)
+            if currentIndex == nil {
+                // The rest go after it, so the first stays current.
+                currentIndex = at
+                start = at + 1
+            }
+        }
+        unshuffledCount = ranked
+        if entries.count > before { revision += 1 }
+    }
+
+    /// Whether an item put in at `at` would sit beside one by `artist`.
+    private func beside(_ at: Int, _ artist: String) -> Bool {
+        (at > 0 && entries[at - 1].item.shuffleArtist == artist) || (at < entries.count && entries[at].item.shuffleArtist == artist)
     }
 
     // MARK: Smart Shuffle's recommendations

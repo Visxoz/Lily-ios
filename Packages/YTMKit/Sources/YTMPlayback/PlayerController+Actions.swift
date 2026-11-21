@@ -31,33 +31,42 @@ extension PlayerController {
         }
     }
 
-    /// Returns once the songs have started, or failed to. With shuffle on, the
-    /// whole playlist loads first, so the first song can be any of it. A downloaded
-    /// album or playlist plays from the phone when YouTube can't load it.
-    public func play(_ card: Card) async {
+    /// Returns once the songs have started, or failed to. An album or playlist plays from its first page, from
+    /// `page` when given (the app's cached copy), and the rest of a long playlist joins as it arrives; `whole` is
+    /// given the playlist once every batch has. A downloaded album or playlist plays from the phone when YouTube
+    /// can't load it.
+    public func play(
+        _ card: Card, page: (@MainActor @Sendable () async throws -> Page)? = nil,
+        whole: (@MainActor @Sendable (Page) -> Void)? = nil
+    ) async {
         let local = card.route.flatMap(downloads.page(for:))
         switch card.kind {
         case .song:
             if let track = card.track { startRadio(from: track) }
-        case .playlist where settings.value.shuffle == .off:
+        case .album, .playlist:
             let music = music
+            let route = card.kind == .album ? Route.album(card.id) : .playlist(card.id)
             await load({
-                do { return try await music.page(.playlist(card.id)) } catch { if let local { return local } else { throw error } }
-            }, failure: "Couldn't load") { player, page in
-                player.play(page.headerTracks)
-                player.continuePlaylist(page)
+                do {
+                    if let page { return try await page() }
+                    return try await music.page(route)
+                } catch {
+                    if let local { return local } else { throw error }
+                }
+            }, failure: "Couldn't load") { player, found in
+                player.play(found.headerTracks)
+                player.continuePlaylist(found, whole: whole)
             }
-        case .album, .playlist, .artist:
+        case .artist:
             let music = music
-            await load({
-                do { return try await music.tracks(of: card) } catch { if let local { return local.headerTracks } else { throw error } }
-            }, failure: "Couldn't load") { $0.play($1) }
+            await load({ try await music.tracks(of: card) }, failure: "Couldn't load") { $0.play($1) }
         case .genre:
             break
         }
     }
 
-    public func startRadio(from card: Card) async {
+    /// An album's radio starts from the first song of `page` when given, as `play(_:page:whole:)`.
+    public func startRadio(from card: Card, page: (@MainActor @Sendable () async throws -> Page)? = nil) async {
         switch card.kind {
         case .playlist:
             await startRadio(playlistId: YTMusic.radioId(forPlaylist: card.id))
@@ -65,7 +74,10 @@ extension PlayerController {
             if let track = card.track { startRadio(from: track) }
         case .album, .artist:
             let music = music
-            await load({ try await music.tracks(of: card) }, failure: "Couldn't load") { player, tracks in
+            await load({
+                if card.kind == .album, let page { return try await page().headerTracks }
+                return try await music.tracks(of: card)
+            }, failure: "Couldn't load") { player, tracks in
                 if let first = tracks.first {
                     player.startRadio(from: first)
                 } else {
@@ -77,19 +89,16 @@ extension PlayerController {
         }
     }
 
-    /// Unshuffled Play starts the page's tracks at once and adds the rest of the
-    /// playlist as it arrives; Shuffle, or Play with shuffle on, first loads the whole playlist.
+    /// A partly loaded playlist plays from the page, shuffled with Shuffle, and adds the rest as it arrives; a
+    /// whole page's Shuffle plays its shuffle playlist when it has one.
     public func play(_ page: Page, shuffle: Bool = false) async {
         let tracks = page.headerTracks
-        let unfinished: String? = if case .tracks? = page.more { page.header?.playlistId } else { nil }
-        if !shuffle, settings.value.shuffle == .off, unfinished != nil {
-            // The rest follows from where the page has got to, without asking
-            // again for the batches it shows.
-            play(tracks)
+        if case .tracks? = page.more, page.header?.playlistId != nil {
+            play(tracks, shuffle: shuffle)
             continuePlaylist(page)
             return
         }
-        guard let playlist = (shuffle ? page.header?.shufflePlaylistId : nil) ?? unfinished else {
+        guard shuffle, let playlist = page.header?.shufflePlaylistId else {
             play(tracks, shuffle: shuffle)
             return
         }
@@ -108,7 +117,8 @@ extension PlayerController {
 
     /// Plays `track` now and queues a radio based on it.
     public func startRadio(from track: Track) {
-        replaceQueue(with: [track], start: 0, shuffle: false)
+        // Shuffled, if on, so the radio is shuffled in as it arrives.
+        replaceQueue(with: [track], start: 0, shuffle: settings.value.shuffle != .off)
         // Autoplay would otherwise ask for the same radio once this starts.
         playback.extending = true
         startCurrent()
@@ -119,7 +129,7 @@ extension PlayerController {
             playback.extending = false
             switch result {
             case .success(let tracks):
-                if queue.item(at: 0)?.id == track.id { appendUnique(tracks) }
+                appendUnique(tracks)
             case .failure(let error):
                 Logger.playback.warning("radio failed: \(sentence(for: error), privacy: .public)")
                 extendWithRadioIfEnding()
@@ -158,18 +168,14 @@ extension PlayerController {
     func extendWithRadioIfEnding() {
         guard settings.value.autoplay, repeatMode == .off, queue.peekNext(repeat: repeatMode) == nil,
               !playback.extending, let seed = queue.current?.id else { return }
-        let (revision, generation) = (queue.revision, playback.generation)
         playback.extending = true
         let music = music
         extending = Task { [weak self] in
             let result = await Result { try await music.radio(videoId: seed) }
             guard let self, !Task.isCancelled else { return }
             playback.extending = false
+            // Another queue, or clearing what is up next, cancels it, so the radio joins only the queue it is for.
             switch result {
-            // Both changing means another queue was started, which the radio
-            // is not for; one alone is an edit, or a skip, in the same queue.
-            case .success where queue.revision != revision && playback.generation != generation:
-                break
             case .success(let tracks):
                 appendUnique(tracks)
             case .failure(let error):
@@ -181,24 +187,20 @@ extension PlayerController {
     /// Once each: a song's radio leaves out the song itself, but may repeat others.
     func appendUnique(_ tracks: [Track]) {
         var known = Set(queue.items.map(\.id))
-        appendKeepingShuffle(tracks.filter { known.insert($0.id).inserted })
+        appendShuffledIn(tracks.filter { known.insert($0.id).inserted })
     }
 
-    private func appendKeepingShuffle(_ tracks: [Track]) {
-        queue.append(contentsOf: tracks)
-        // Recommendations are taken out first, as they are placed again
-        // where they are due.
-        if settings.value.shuffle != .off {
-            queue.removeRecommended()
-            queue.setShuffle(false)
-            queue.setShuffle(true)
-        }
+    /// While shuffled, among the songs still to play, so one may now be next.
+    private func appendShuffledIn(_ tracks: [Track]) {
+        guard !tracks.isEmpty else { return }
+        queue.extend(tracks)
+        dropStaleNext()
         prefetchNext()
     }
 
-    /// Adds the rest of a long playlist as each batch arrives. Every track is
-    /// kept, as a playlist may hold a song twice.
-    func continuePlaylist(_ page: Page) {
+    /// Adds the rest of a long playlist as each batch arrives, then gives `whole` the playlist unless a batch
+    /// failed. Every track is kept, as a playlist may hold a song twice.
+    func continuePlaylist(_ page: Page, whole: (@MainActor @Sendable (Page) -> Void)? = nil) {
         guard case .tracks? = page.more, !page.headerTracks.isEmpty else { return }
         let music = music
         // Its own task, so another queue, or clearing what is up next, drops
@@ -206,23 +208,17 @@ extension PlayerController {
         continuing = Task { [weak self] in
             var page = page
             var shown = page.headerTracks.count
+            var complete = true
             while case .tracks? = page.more {
-                guard let next = try? await music.loadMore(page), !Task.isCancelled, let self else { return }
-                page = next
+                guard let step = try? await music.loadStep(page), !Task.isCancelled, let self else { return }
+                page = step.page
+                complete = complete && step.whole
                 let all = page.headerTracks
                 guard all.count > shown else { continue }
-                // Unshuffled before the batch goes on, so it follows the
-                // playlist's own last song rather than the shuffle's.
-                let shuffled = settings.value.shuffle != .off
-                if shuffled {
-                    queue.removeRecommended()
-                    queue.setShuffle(false)
-                }
-                queue.append(contentsOf: all[shown...])
-                if shuffled { queue.setShuffle(true) }
-                prefetchNext()
+                appendShuffledIn(Array(all[shown...]))
                 shown = all.count
             }
+            if complete { whole?(page) }
         }
     }
 

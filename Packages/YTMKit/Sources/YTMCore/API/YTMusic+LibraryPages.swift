@@ -45,6 +45,16 @@ extension YTMusic {
         return Page(header: header, sections: [Section.cards("", cards, layout: .grid)].compactMap(\.self))
     }
 
+    /// Library as it last loaded, shown at once on the next start; the caller keeps it to the account it is for.
+    public func saveLibrary(_ page: Page) {
+        store.save(page, to: .library)
+    }
+
+    @concurrent
+    public func savedLibrary() async -> Page? {
+        store.load(Page.self, from: .library)
+    }
+
     func requireSignIn(_ message: String) async throws {
         guard await auth.isSignedIn else { throw YTMError(.notSignedIn, message) }
     }
@@ -81,6 +91,21 @@ extension YTMusic {
         var cards = Renderers.cards(LibraryList.items(shelf))
         if all { try await following(shelf, authenticated: true) { cards += Renderers.cards($0) } }
         return cards
+    }
+}
+
+extension Page {
+    /// Library's playlists with the `pinned` ones first, in the order pinned, then the rest in theirs; a pinned ID
+    /// not among them is passed over. Applied as the page shows, so the cache keeps YouTube's order.
+    public func withPinnedFirst(_ pinned: [String]) -> Page {
+        guard !pinned.isEmpty, let index = sections.firstIndex(where: { if case .cards = $0 { true } else { false } }),
+              case .cards(var section) = sections[index] else { return self }
+        let lead = pinned.flatMap { id in section.cards.filter { $0.id == id } }
+        let pins = Set(pinned)
+        section.cards = lead + section.cards.filter { !pins.contains($0.id) }
+        var page = self
+        page.sections[index] = .cards(section)
+        return page
     }
 }
 

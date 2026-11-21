@@ -304,10 +304,52 @@ struct QueueTests {
     @Test func setClampsTheStartAndCanShuffle() {
         var q = Queue<Int>(seed: 7)
         q.set(items: 0..<6, start: 9, shuffle: true)
+        #expect(q.currentIndex == 0 && q.current == 5, "the start leads, the rest shuffled after it")
+        q.setShuffle(false)
+        #expect(items(q) == Array(0..<6))
         #expect(q.currentIndex == 5)
-        #expect(items(q) == Array(0..<6), "nothing after the last entry to shuffle")
         q.set(items: [], start: 0, shuffle: false)
         #expect(q.current == nil)
+    }
+
+    @Test func aShuffledStartPartWayThroughPlaysEveryTrack() {
+        var q = Queue<Int>(seed: 42)
+        q.set(items: 0..<20, start: 10, shuffle: true)
+        var heard = [q.current]
+        while let next = q.advance(user: false, repeat: .off) { heard.append(next) }
+        #expect(heard.first == 10)
+        #expect(heard.compactMap(\.self).sorted() == Array(0..<20))
+        q.setShuffle(false)
+        #expect(items(q) == Array(0..<20))
+    }
+
+    @Test func tracksAddedWhileShuffledMixInAndGoLastUnshuffled() {
+        var q = queue(10)
+        q.setShuffle(true)
+        q.advance(user: false, repeat: .off)
+        q.advance(user: false, repeat: .off)
+        let played = Array(items(q)[..<3])
+        q.extend(10..<20)
+        let order = items(q)
+        #expect(Array(order[..<3]) == played, "what has played stays put")
+        #expect(order[3..<10].contains { $0 >= 10 }, "mixed in among those still to play")
+        #expect(order.sorted() == Array(0..<20))
+        q.setShuffle(false)
+        #expect(items(q) == Array(0..<20))
+    }
+
+    @Test func tracksAddedWhileShuffledGoBehindOnePlayedNext() {
+        var q = queue(10)
+        q.setShuffle(true)
+        q.playNext(99)
+        q.extend(10..<400)
+        #expect(q.peekNext(repeat: .off) == 99)
+    }
+
+    @Test func tracksAddedUnshuffledGoLast() {
+        var q = queue(3)
+        q.extend([7, 8])
+        #expect(items(q) == [0, 1, 2, 7, 8])
     }
 
     /// A row stays the same row however the queue moves.

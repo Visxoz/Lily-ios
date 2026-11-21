@@ -18,9 +18,12 @@ extension PlayerController {
         if queue.playNextMany(offsets) { queueEdited() }
     }
 
-    /// Also drops the rest of a playlist still on its way.
+    /// Also drops the rest of a playlist, or a radio, still on its way.
     public func clearUpcoming() {
         continuing?.cancel()
+        extending?.cancel()
+        // The radio cancelled never gets to say it is done, and the end of the queue asks for one again.
+        playback.extending = false
         let before = queue.revision
         queue.clearUpcoming()
         if queue.revision != before { queueEdited() }
@@ -52,10 +55,15 @@ extension PlayerController {
     )
 
     func queueEdited() {
+        dropStaleNext()
+        persistSoon()
+        prefetchNext()
+    }
+
+    /// Drops the song queued in the player should it no longer be next.
+    func dropStaleNext() {
         if let queued = gapless.queued, queued.trackID != queue.peekNext(repeat: repeatMode)?.id {
             dropQueuedNext()
         }
-        persistSoon()
-        prefetchNext()
     }
 }

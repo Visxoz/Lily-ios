@@ -171,4 +171,16 @@ private actor DownloadLog {
         #expect((whole.width, whole.height) == (400, 300), "never scaled up")
         #expect(ImagePipeline.decode(Data("not an image".utf8), edge: 100) == nil)
     }
+
+    @Test func fetchesACachedCopyAgainOnceAMonthOld() throws {
+        let url = try #require(URL(string: "https://i.ytimg.com/vi/a/hqdefault.jpg"))
+        func response(_ headers: [String: String]) throws -> HTTPURLResponse {
+            try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers))
+        }
+        let sent = try response(["Date": "Sun, 06 Nov 1994 08:49:37 GMT"])
+        let at = Date(timeIntervalSince1970: 784_111_777)
+        #expect(ImagePipeline.isStale(sent, now: at.addingTimeInterval(31 * 24 * 60 * 60)))
+        #expect(!ImagePipeline.isStale(sent, now: at.addingTimeInterval(24 * 60 * 60)))
+        #expect(!ImagePipeline.isStale(try response([:]), now: at.addingTimeInterval(365 * 24 * 60 * 60)), "no date, kept")
+    }
 }

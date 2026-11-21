@@ -43,9 +43,10 @@ extension YTMusic {
         return sections.isEmpty ? nil : Page(sections: sections)
     }
 
-    /// The saved Home and visitor ID belong to the account they were saved under.
+    /// The saved Home, Library and visitor ID belong to the account they were saved under.
     public func forgetAccount() async {
         store.remove(.home)
+        store.remove(.library)
         await innerTube.forgetVisitorData()
     }
 

@@ -38,6 +38,15 @@ import Testing
         #expect(try !decode(#"{"pauseOnUnplug": false}"#).pauseOnUnplug)
     }
 
+    @Test func keepsTheAccountAndPinsAcrossSaves() throws {
+        let old = try decode(#"{"look": "dark"}"#)
+        #expect(old.account == nil && old.pinned.isEmpty, "none in a file from before they were kept")
+        var settings = Settings()
+        settings.account = Account(name: "Lily", photo: "https://yt3.ggpht.com/a")
+        settings.pinned = ["LM", "PL1"]
+        #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings)) == settings)
+    }
+
     @Test func defaultsToLilysOrchidOnBlack() {
         let settings = Settings()
         #expect(settings.accent == .lily && settings.look == .black)

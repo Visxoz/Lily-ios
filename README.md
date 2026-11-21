@@ -205,7 +205,7 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 | Swipe a song in the queue | Remove it |
 | **Select** in the queue | Pick several songs, then play them next or remove them |
 | Press and hold a song | Play it next, add it to the queue, start a radio, download it, like it, save it to a playlist, go to its artist or album, or copy its link |
-| Press and hold a card | Play it, start a radio, download an album or playlist, or copy its link |
+| Press and hold a card | Play it, start a radio, download an album or playlist, or copy its link. In Library, pin a playlist to the top of its playlists |
 | Tap **More** beside an album's, playlist's or artist's buttons | Copy its link |
 | Tap the shuffle button | Cycle Off, Shuffle and **Smart Shuffle**, which mixes in recommendations. Shuffling keeps an artist's or an album's songs apart |
 | On iPhone Duo, half open with **Fold to scrub** on, fold or open it | Skip back or ahead 10 seconds a step |

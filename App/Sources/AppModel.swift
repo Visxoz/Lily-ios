@@ -68,6 +68,9 @@ final class AppModel {
     private(set) var accountGeneration = 0
 
     private(set) var theme: Theme
+    /// Playlist IDs pinned to the top of Library's playlists, kept apart from the settings so only the views
+    /// showing pins redraw as they change.
+    private(set) var pinned: [String] = []
     private(set) var artwork: ArtworkColours?
     private(set) var toast: Toast?
 
@@ -79,6 +82,8 @@ final class AppModel {
     @ObservationIgnored var pageCache: [Route: CachedPage] = [:]
     /// Shared by every screen asking for the same route.
     @ObservationIgnored var pageLoads: [Route: Task<Page, any Error>] = [:]
+    /// Expired pages being fetched whole, shared by every screen showing the copy.
+    @ObservationIgnored var pageRefreshes: [Route: Task<Page?, Never>] = [:]
     /// The launch's Home request, which the first load of Home takes over.
     @ObservationIgnored var homeAhead: Task<Page, any Error>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -120,11 +125,20 @@ final class AppModel {
             }
         }
         let home = isSignedIn ? Task { try await fetchPage(.home) } : nil
+        if isSignedIn { Task { await showLastRun() } }
         Task { await ImagePipeline.preconnect() }
         let homeSettled = Task { await Self.settled(home, within: .seconds(2)) }
         await player.start { await homeSettled.value }
         await homeSettled.value
         await refreshAccount()
+    }
+
+    /// The account's name and picture, and Library, as the last run saw them, while fresh ones load.
+    private func showLastRun() async {
+        let generation = accountGeneration
+        await settings.load()
+        if generation == accountGeneration, account == nil { account = settings.value.account }
+        await seedLibrary()
     }
 
     /// Not a task group, which would wait out `load` all the same.
@@ -134,6 +148,20 @@ final class AppModel {
         Task { _ = try? await load.value; finish.finish() }
         Task { try? await Task.sleep(for: limit); finish.finish() }
         for await _ in done {}
+    }
+
+    /// Replaces `pinned` only when it changes, so views reading it redraw only then.
+    func followPinned() async {
+        for await pinned in Observations({ [settings] in settings.value.pinned }) where pinned != self.pinned {
+            self.pinned = pinned
+        }
+    }
+
+    /// Pins a playlist after those pinned already, or unpins it.
+    func togglePin(_ card: Card) {
+        let pinning = !settings.value.pinned.contains(card.id)
+        settings.value.pinned.removeAll { $0 == card.id }
+        if pinning { settings.value.pinned.append(card.id) }
     }
 
     /// Replaces `theme` only when it changes, so views reading it redraw only then.
@@ -181,6 +209,8 @@ final class AppModel {
         }
         guard generation == accountGeneration else { return }
         account = found
+        // Kept for the next start, written only as it changes.
+        if let found, settings.value.account != found { settings.value.account = found }
     }
 
     /// Once YouTube answers a signed-in request as signed out: checks the cookie, as the session
@@ -214,12 +244,16 @@ final class AppModel {
         await api.forgetAccount()
         isSignedIn = await api.auth.isSignedIn
         account = nil
+        // It may be another account's.
+        settings.value.account = nil
         // Together with the bump, so no page asked for by the last account
         // lands in the cache once it is cleared.
         pageCache.removeAll()
         // A request the last account made must not be shared with the next.
         pageLoads.values.forEach { $0.cancel() }
         pageLoads.removeAll()
+        pageRefreshes.values.forEach { $0.cancel() }
+        pageRefreshes.removeAll()
         homeAhead.take()?.cancel()
         accountGeneration += 1
         if !quietly {

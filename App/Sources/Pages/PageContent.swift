@@ -84,9 +84,10 @@ struct PageContent: View {
                 Self.tints[tintSource.url] = background
             }
         }
-        // The page's art is fetched as the page is built, rather than as each
-        // row scrolls in, and stops once it is left.
-        .task(id: [itemCount, model?.replacements ?? 0]) { await prefetchArt() }
+        // The cards' art is fetched as the page is built, rather than as each
+        // scrolls in, and stops once it is left.
+        .task(id: [cardCount, model?.replacements ?? 0]) { await prefetchArt() }
+        .environment(\.pinsPlaylists, route == .library || route == .libraryPlaylists)
     }
 
     /// An album's or playlist's header, beside its tracks rather than over them.
@@ -178,36 +179,25 @@ struct PageContent: View {
         !page.headerTracks.isEmpty
     }
 
-    /// So a further step, which may only grow one section's tracks, fetches
-    /// its art too.
-    private var itemCount: Int {
+    /// So a further step that adds cards fetches their art too, and one that
+    /// only adds songs fetches nothing.
+    private var cardCount: Int {
         page.sections.reduce(0) { count, section in
-            switch section {
-            case .tracks(let s): count + s.tracks.count
-            case .cards(let s): count + s.cards.count
-            }
+            if case .cards(let s) = section { count + s.cards.count } else { count }
         }
     }
 
-    /// Albums' numbered rows, the chips and the top result draw none of this
-    /// art, or their own, so they are left out.
+    /// Song rows load their own art as they come on screen, so a long
+    /// playlist's isn't all downloaded at once. The chips and the top result
+    /// draw none of this art, or their own, so they are left out.
     private func prefetchArt() async {
         // The first screen's own loads go first, so none is asked for twice.
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }
-        var tracks: [String] = []
         var cards: [String] = []
-        for section in page.sections {
-            switch section {
-            case .tracks(let s) where !s.numbered:
-                tracks += s.tracks.compactMap(\.thumbnail)
-            case .cards(let s) where [.carousel, .grid, .speedDial].contains(s.layout):
-                cards += s.cards.compactMap(\.thumbnail)
-            case .tracks, .cards:
-                break
-            }
+        for case .cards(let s) in page.sections where [.carousel, .grid, .speedDial].contains(s.layout) {
+            cards += s.cards.compactMap(\.thumbnail)
         }
-        await ImagePipeline.shared.prefetch(tracks, pixelEdge: ArtworkImage.pixels(edge: Metrics.rowArt, scale: displayScale))
         await ImagePipeline.shared.prefetch(cards, pixelEdge: CardView.artPixels(scale: displayScale))
     }
 

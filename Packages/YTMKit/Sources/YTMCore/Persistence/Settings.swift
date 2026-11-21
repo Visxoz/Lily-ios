@@ -89,6 +89,10 @@ public struct Settings: Codable, Equatable, Sendable {
     public var smartDownloadCount = 50
     /// On iPhone Duo, folding the half-open hinge skips back and opening it skips ahead.
     public var foldToScrub = false
+    /// The signed-in account as last loaded, its name and picture shown at once on the next start.
+    public var account: Account?
+    /// Playlist IDs pinned to the top of Library's playlists, first pinned first.
+    public var pinned: [String] = []
 
     public init() {}
 
@@ -122,6 +126,8 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&smartDownloads, .smartDownloads)
         file.read(&smartDownloadCount, .smartDownloadCount) { $0 > 0 }
         file.read(&foldToScrub, .foldToScrub)
+        file.read(&account, .account)
+        file.read(&pinned, .pinned)
     }
 }
 

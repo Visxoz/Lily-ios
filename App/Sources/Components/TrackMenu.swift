@@ -58,11 +58,15 @@ struct CardMenu: View {
     let card: Card
 
     @Environment(AppModel.self) private var app
+    @Environment(\.pinsPlaylists) private var pinsPlaylists
 
     var body: some View {
         if card.kind != .genre {
             Button("Play") { app.play(card) }
             Button("Start radio") { app.startRadio(from: card) }
+        }
+        if pinsPlaylists, card.kind == .playlist, app.isSignedIn {
+            Button(app.pinned.contains(card.id) ? "Unpin" : "Pin to top") { app.togglePin(card) }
         }
         CardDownloadItem(card: card)
         if let link = card.link {

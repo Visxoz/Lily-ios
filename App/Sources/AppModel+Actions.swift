@@ -24,13 +24,33 @@ extension AppModel {
         open(route)
     }
 
+    /// An album or playlist plays from the page cached, and a long playlist's whole copy replaces its first page
+    /// once queued, so opening it next shows it all at once.
     func play(_ card: Card) {
-        Task { await player.play(card) }
+        let generation = accountGeneration
+        Task {
+            await player.play(card, page: cardPage(card), whole: { [self] whole in
+                // Only over a copy still half-loaded, as one completed meanwhile may be newer, and for this account.
+                guard generation == accountGeneration, let route = card.route, pageCache[route]?.page.more != nil
+                else { return }
+                pageCache[route]?.page = whole
+            })
+        }
     }
 
     /// A playlist's own radio, else one from its first song.
     func startRadio(from card: Card) {
-        Task { await player.startRadio(from: card) }
+        Task { await player.startRadio(from: card, page: cardPage(card)) }
+    }
+
+    /// An album's or playlist's page fresh in the cache, else fetched into it.
+    private func cardPage(_ card: Card) -> (@MainActor @Sendable () async throws -> Page)? {
+        guard card.kind == .album || card.kind == .playlist, let route = card.route else { return nil }
+        return { [self] in
+            // An expired copy may be missing songs added since.
+            if let kept = keptPage(route), kept.isFresh { return kept.page }
+            return try await fetchPage(route)
+        }
     }
 
     func perform(_ action: HeaderAction, on page: Page) {

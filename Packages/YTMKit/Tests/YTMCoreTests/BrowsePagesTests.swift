@@ -361,6 +361,16 @@ private actor Counter {
         #expect(LibraryList(.library) == nil)
     }
 
+    @Test func pinnedPlaylistsLeadInTheOrderPinned() throws {
+        let playlists = ["a", "b", "c", "d"].map { Card(kind: .playlist, id: $0, title: $0) }
+        let albums = Section.cards("Albums", [Card(kind: .album, id: "b", title: "b"), Card(kind: .album, id: "x", title: "x")], layout: .grid)
+        let page = Page(sections: [Section.cards("Playlists", playlists, layout: .grid), albums].compactMap(\.self))
+        let pinned = page.withPinnedFirst(["d", "gone", "b"])
+        let lead = try #require(pinned.sections.first.flatMap { if case .cards(let s) = $0 { s } else { nil } })
+        #expect(lead.cards.map(\.id) == ["d", "b", "a", "c"])
+        #expect(pinned.sections.last == page.sections.last, "only the playlists move")
+    }
+
     private func likedPage(rows: [String], more: Bool) -> String {
         let trailing = more ? #",{"continuationItemRenderer":{"continuationEndpoint":{"continuationCommand":{"token":"T"}}}}"# : ""
         return #"""

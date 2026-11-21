@@ -30,8 +30,8 @@ extension YTMusic {
         try await loadStep(page).page
     }
 
-    /// As `loadMore`; not `whole` once a step of Home failed, so the app keeps
-    /// it neither as Home nor for long.
+    /// As `loadMore`; not `whole` once a step failed, so the app keeps the
+    /// page neither as Home nor as the whole playlist.
     @concurrent
     public func loadStep(_ page: Page) async throws -> (page: Page, whole: Bool) {
         var page = page
@@ -41,9 +41,8 @@ extension YTMusic {
             break
         case .tracks(let token)?:
             page.more = nil
-            guard case .tracks(var section)? = page.sections.first,
-                  let batch = try await playlistBatch(after: token, asOwner: true)
-            else { return (page, whole) }
+            guard case .tracks(var section)? = page.sections.first else { return (page, whole) }
+            guard let batch = try await playlistBatch(after: token, asOwner: true) else { return (page, false) }
             section.tracks += batch.tracks
             page.sections[0] = .tracks(section)
             if let next = batch.next, !batch.tracks.isEmpty, section.tracks.count < Self.playlistLimit {

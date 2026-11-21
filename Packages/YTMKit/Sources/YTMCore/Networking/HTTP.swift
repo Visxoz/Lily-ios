@@ -39,20 +39,20 @@ enum HTTP {
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
     }()
 
-    /// Artwork, cached on disk across launches. Pages prefetch all their art,
-    /// so the cache must fit a long playlist's thumbnails (about 10 KB each)
-    /// without pushing Home's out. Kept here, as a session's `configuration` is a copy.
+    /// Artwork, cached on disk across launches, within Lily for Windows's budget. Pages prefetch their cards'
+    /// art and song rows load theirs as they show. Kept here, as a session's `configuration` is a copy.
     static let artworkCache = URLCache(
         memoryCapacity: 8 << 20,
-        diskCapacity: 100 << 20,
+        diskCapacity: 64 << 20,
         directory: URL.cachesDirectory.appending(path: "artwork", directoryHint: .isDirectory)
     )
 
     static let media: URLSession = {
         let config = URLSessionConfiguration.default
         config.urlCache = artworkCache
-        // Artwork URLs name their image and size, so a stored copy is always
-        // right; revalidating after the short max-age only delays the image.
+        // Artwork URLs name their image and size, so a stored copy is right for
+        // a long while; revalidating after the short max-age only delays the
+        // image. `ImagePipeline` fetches one older than 30 days again.
         config.requestCachePolicy = .returnCacheDataElseLoad
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false

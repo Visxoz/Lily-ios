@@ -25,6 +25,13 @@ public final class ImagePipeline: Sendable {
     private static let log = Logger(subsystem: "Lily", category: "ImagePipeline")
     /// Downloaded songs' artwork, at the player's size, which serves every smaller one.
     private static let kept = FileStore.shared.downloads.appending(path: "Artwork", directoryHint: .isDirectory)
+    /// How long the URL cache's copy is used before it is fetched again, as artwork can change under the same URL.
+    static let maxAge: TimeInterval = 30 * 24 * 60 * 60
+    /// HTTP's dates, as `Sun, 06 Nov 1994 08:49:37 GMT`.
+    private static let httpDate = Date.ParseStrategy(
+        format: "\(weekday: .abbreviated), \(day: .twoDigits) \(month: .abbreviated) \(year: .defaultDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)):\(minute: .twoDigits):\(second: .twoDigits) GMT",
+        locale: Locale(identifier: "en_US_POSIX"), timeZone: .gmt
+    )
 
     private let memory = MemoryCache(limit: memoryLimit)
     private let downloads = Downloads()
@@ -120,15 +127,19 @@ public final class ImagePipeline: Sendable {
         if let data = try? Data(contentsOf: keptFile(url)), let image = decode(data, edge: edge) {
             return image
         }
-        guard let request = requestURL(url, edge: edge) else {
+        guard let url = requestURL(url, edge: edge) else {
             log.debug("Skipped artwork from a host the app doesn't use.")
             return nil
         }
+        var request = URLRequest(url: url)
+        if let kept = inDateCopy(of: &request), let image = decode(kept, edge: edge) { return image }
         do {
-            let (data, _) = try await HTTP.data(for: URLRequest(url: request), session: HTTP.media)
+            let (data, _) = try await HTTP.data(for: request, session: HTTP.media)
             try Task.checkCancellation()
             guard let image = decode(data, edge: edge) else {
                 log.debug("Undecodable artwork.")
+                // Only artwork that decodes is kept.
+                HTTP.artworkCache.removeCachedResponse(for: request)
                 return nil
             }
             return image
@@ -142,10 +153,29 @@ public final class ImagePipeline: Sendable {
     @concurrent
     private static func download(_ url: String, edge: Int) async {
         guard !FileManager.default.fileExists(atPath: keptFile(url).path(percentEncoded: false)),
-              let request = requestURL(url, edge: edge).map({ URLRequest(url: $0) }),
-              HTTP.artworkCache.cachedResponse(for: request) == nil
+              var request = requestURL(url, edge: edge).map({ URLRequest(url: $0) }),
+              inDateCopy(of: &request) == nil
         else { return }
         _ = try? await HTTP.data(for: request, session: HTTP.media)
+    }
+
+    /// The URL cache's copy of `request` if younger than `maxAge`, read once; an older one the request skips, and
+    /// the fresh answer replaces it.
+    private static func inDateCopy(of request: inout URLRequest) -> Data? {
+        guard let cached = HTTP.artworkCache.cachedResponse(for: request) else { return nil }
+        guard isStale(cached.response, now: .now) else { return cached.data }
+        // Removed too, so no other request reads the old copy before the fresh one is stored.
+        HTTP.artworkCache.removeCachedResponse(for: request)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        return nil
+    }
+
+    /// By the date the server sent it; one without a date it can read counts as in date.
+    static func isStale(_ response: URLResponse, now: Date) -> Bool {
+        guard let sent = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Date"),
+              let date = try? Date(sent, strategy: httpDate)
+        else { return false }
+        return now.timeIntervalSince(date) > maxAge
     }
 
     /// googleusercontent renders any size, so ask for the pixels drawn; a wide

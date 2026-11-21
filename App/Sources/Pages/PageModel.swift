@@ -24,23 +24,24 @@ final class PageModel {
     /// The account the page shown was loaded for.
     @ObservationIgnored private var shownFor: Int?
     /// The page as YouTube sent it, before recent plays join Home's Speed
-    /// dial, so further steps, the cache, the saved feed and change checks use
-    /// YouTube's.
+    /// dial and pins lead Library's playlists, so further steps, the cache,
+    /// the saved feed and change checks use YouTube's.
     @ObservationIgnored private var source: Page?
 
     /// Whether the page stands in for Home's feed until the next visit: the
     /// saved feed or the charts, or a feed cut short by a step that failed.
     @ObservationIgnored private var showsSaved = false
-    /// So Home loads afresh once older than the page cache keeps pages; one
-    /// from the cache may be older still.
+    /// When the cache took the page shown (or it was shown, uncached), so Home
+    /// loads afresh once older than pages stay fresh, and a newer copy cached
+    /// since shows on the next visit.
     @ObservationIgnored private var shownAt: ContinuousClock.Instant?
     @ObservationIgnored private var loadingMore = false
 
-    /// Shows a page the cache still holds at once, so a page returned to
-    /// within five minutes has no skeleton or fade.
+    /// Shows a page the cache still holds at once, so a page returned to has
+    /// no skeleton or fade; one over five minutes old reloads behind it.
     init(route: Route, app: AppModel) {
         self.route = route
-        if app.accountGeneration > 0, let page = app.cachedPage(route) { show(page, for: app) }
+        if app.accountGeneration > 0, let kept = app.keptPage(route) { show(kept.page, for: app) }
     }
 
     var page: Page? {
@@ -54,12 +55,14 @@ final class PageModel {
     }
 
     /// Skips the load if it already holds this account's page, except History
-    /// each visit, Home while a stand-in shows, and any page once `isStale`.
+    /// each visit, Home while a stand-in shows, any page once `isStale`, and
+    /// one the cache holds a newer copy of.
     func appear(in app: AppModel, returning: Bool) async {
         guard app.accountGeneration > 0 else { return }
         if shownFor == app.accountGeneration {
-            mixInRecentPlays(in: app)
-            if route != .history, !showsSaved, !isStale(in: app, returning: returning) { return }
+            rearrange(in: app)
+            let newer = app.keptPage(route).map { $0.at != shownAt } ?? false
+            if route != .history, !showsSaved, !newer, !isStale(in: app, returning: returning) { return }
         } else {
             clear()
         }
@@ -105,8 +108,20 @@ final class PageModel {
             }
             show(page, for: app, saved: saved)
         }
-        if cached, let page = app.cachedPage(route) {
-            present(page)
+        if cached, let kept = app.keptPage(route) {
+            if kept.at != shownAt { present(kept.page) }
+            guard !kept.isFresh, let fresh = await app.refreshPage(route, since: kept.at),
+                  isCurrent(generation, account, in: app),
+                  // Home's shelves differ on every load and Home never moves
+                  // what is shown, so its fresh feed waits for the next visit.
+                  route != .home || !app.isSignedIn
+            else { return }
+            if fresh.sections != source?.sections || fresh.header != source?.header {
+                // Where the reader has got to stays.
+                show(fresh, for: app)
+            } else {
+                shownAt = app.pageCache[route]?.at ?? shownAt
+            }
             return
         }
         do {
@@ -133,7 +148,7 @@ final class PageModel {
                 phase = .failed(sentence(for: error))
             } else {
                 // What was shown stays and carries on from where it was.
-                mixInRecentPlays(in: app)
+                rearrange(in: app)
                 app.showToast(sentence(for: error))
                 step += 1
             }
@@ -144,24 +159,25 @@ final class PageModel {
         generation == self.generation && account == app.accountGeneration
     }
 
-    /// Home ages out with the page cache, as the app stays alive for days; any
-    /// other page is stale once out of the cache, unless `returning` with it
-    /// on screen.
+    /// Home ages out as pages stop being fresh, as the app stays alive for
+    /// days; any other page is stale once no longer fresh in the cache, unless
+    /// `returning` with it on screen.
     private func isStale(in app: AppModel, returning: Bool) -> Bool {
-        guard route == .home else { return !returning && app.cachedPage(route) == nil }
+        guard route == .home else { return !returning && app.keptPage(route)?.isFresh != true }
         guard let shownAt else { return false }
-        return shownAt.duration(to: .now) >= AppModel.pageCacheFor
+        return shownAt.duration(to: .now) >= AppModel.pageFreshFor
     }
 
     private func clear() {
         phase = .loading
         source = nil
+        shownAt = nil
         showsSaved = false
     }
 
-    /// Mixes what played since into the kept page's Speed dial. Not a new
-    /// feed, so the reader's place stays.
-    private func mixInRecentPlays(in app: AppModel) {
+    /// Mixes what played since into the kept page's Speed dial, and the pins
+    /// into Library's playlists. Not a new page, so the reader's place stays.
+    func rearrange(in app: AppModel) {
         guard let source, let shown = page else { return }
         let latest = onScreen(source, in: app)
         if latest != shown { phase = .loaded(latest) }
@@ -170,15 +186,18 @@ final class PageModel {
     /// Signed in, Home's Speed dial takes in this phone's recent plays heard
     /// long enough to count, as YouTube's seldom has them.
     private func onScreen(_ page: Page, in app: AppModel) -> Page {
-        guard route == .home, app.isSignedIn else { return page }
-        return page.withRecentPlays(app.history.history.heard)
+        switch route {
+        case .home where app.isSignedIn: page.withRecentPlays(app.history.history.heard)
+        case .library, .libraryPlaylists: page.withPinnedFirst(app.pinned)
+        default: page
+        }
     }
 
     private func show(_ page: Page, for app: AppModel, saved: Bool = false) {
         source = page
         phase = .loaded(onScreen(page, in: app))
         shownFor = app.accountGeneration
-        shownAt = .now
+        shownAt = app.pageCache[route]?.at ?? .now
         showsSaved = saved
         step += 1
     }

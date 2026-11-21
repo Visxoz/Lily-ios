@@ -37,27 +37,91 @@ struct PlayerReuseTests {
         #expect(rig.player.queue.items.map(\.id) == ["x"], "another queue drops the batches still to come")
     }
 
-    @Test func withShuffleOnAPlaylistLoadsWholeBeforeItPlays() async {
+    @Test func withShuffleOnAPlaylistStartsOnItsFirstBatchToo() async {
         let rig = await started()
         rig.settings.value.shuffle = .on
         rig.player.apply(rig.settings.value)
         let all = (0..<30).map { song("\($0)") }
-        rig.music.set {
-            $0.radios["PL"] = all
-            $0.playlistBatches["PL"] = [Array(all[..<2]), Array(all[2...])]
-        }
+        rig.music.set { $0.playlistBatches["PL"] = [Array(all[..<2]), Array(all[2...])] }
         await rig.player.play(Card(kind: .playlist, id: "PL", title: "List"))
-        #expect(rig.player.queue.count == 30, "a card's first song is picked from the whole list")
+        #expect(["0", "1"].contains(rig.player.current?.id), "a card starts on a song of its first batch")
+        await rig.settle()
+        #expect(Set(rig.player.queue.items.map(\.id)) == Set(all.map(\.id)) && rig.player.queue.count == 30)
+
         let page = Page(
             header: PageHeader(title: "List", playlistId: "PL"),
             sections: [.tracks(TrackSection(title: "", tracks: Array(all[..<2]), mode: .section))],
             more: .tracks(token: "PL#1")
         )
         await rig.player.play(page)
-        #expect(rig.player.queue.count == 30, "and header Play's")
+        #expect(["0", "1"].contains(rig.player.current?.id), "and header Play's")
         await rig.settle()
-        #expect(rig.music.calls.contains("playlist PL"))
-        #expect(!rig.music.calls.contains { $0.hasPrefix("page") || $0.hasPrefix("more") }, "no batches to reshuffle for")
+        #expect(rig.player.queue.count == 30)
+        #expect(!rig.music.calls.contains("playlist PL"), "the whole list is never asked for first")
+    }
+
+    @Test func headerShuffleOnAPartlyLoadedPlaylistTurnsShuffleOnAndPlaysFromThePage() async {
+        let rig = await started()
+        let all = (0..<12).map { song("\($0)") }
+        rig.music.set { $0.playlistBatches["PL"] = [Array(all[..<6]), Array(all[6...])] }
+        let page = Page(
+            header: PageHeader(title: "List", shufflePlaylistId: "PLshuffle", playlistId: "PL"),
+            sections: [.tracks(TrackSection(title: "", tracks: Array(all[..<6]), mode: .section))],
+            more: .tracks(token: "PL#1")
+        )
+        await rig.player.play(page, shuffle: true)
+        #expect(rig.settings.value.shuffle == .on)
+        #expect(Int(rig.player.current?.id ?? "") ?? 99 < 6, "started on the page's own songs")
+        await rig.settle()
+        #expect(rig.player.queue.count == 12)
+        #expect(!rig.music.calls.contains("playlist PLshuffle"))
+    }
+
+    @Test func aCardPlaysThePageItsLoaderGives() async {
+        let rig = await started()
+        let page = Page(
+            header: PageHeader(title: "Album"),
+            sections: [.tracks(TrackSection(title: "", tracks: songs("x", "y"), mode: .section))]
+        )
+        await rig.player.play(Card(kind: .album, id: "ALB", title: "Album")) { page }
+        #expect(rig.player.queue.items.map(\.id) == ["x", "y"])
+        #expect(!rig.music.calls.contains { $0.hasPrefix("page") || $0.hasPrefix("tracks") })
+
+        await rig.player.startRadio(from: Card(kind: .album, id: "ALB", title: "Album")) { page }
+        #expect(rig.player.queue.items.map(\.id) == ["x"], "and its radio starts from the page's first song")
+        #expect(!rig.music.calls.contains { $0.hasPrefix("page") || $0.hasPrefix("tracks") })
+    }
+
+    @Test func aCardsPlaylistIsHandedOnOnlyOnceEveryBatchHasLoaded() async {
+        let rig = await started()
+        rig.music.set { $0.playlistBatches["PL"] = [songs("a"), songs("b"), songs("c")] }
+        let handed = Handed()
+        let card = Card(kind: .playlist, id: "PL", title: "List")
+        await rig.player.play(card, whole: { handed.ids = $0.headerTracks.map(\.id) })
+        await rig.settle()
+        #expect(handed.ids == ["a", "b", "c"])
+
+        handed.ids = nil
+        rig.music.set { $0.failingBatches = ["PL#2"] }
+        await rig.player.play(card, whole: { handed.ids = $0.headerTracks.map(\.id) })
+        await rig.settle()
+        #expect(rig.player.queue.items.map(\.id) == ["a", "b"], "what loaded plays")
+        #expect(handed.ids == nil, "a playlist cut short is never taken as whole")
+    }
+
+    @Test func aSongsRadioWithShuffleOnIsShuffledIn() async {
+        let rig = await started()
+        rig.settings.value.shuffle = .on
+        rig.player.apply(rig.settings.value)
+        let radio = (1..<30).map { song("\($0)") }
+        rig.music.set { $0.radios["0"] = radio }
+        rig.player.startRadio(from: song("0"))
+        await rig.settle()
+        #expect(rig.player.queue.items.first?.id == "0", "the song plays first")
+        #expect(Array(rig.player.queue.items.dropFirst().map(\.id)) != radio.map(\.id), "the radio is shuffled")
+        rig.settings.value.shuffle = .off
+        rig.player.apply(rig.settings.value)
+        #expect(rig.player.queue.items.map(\.id) == ["0"] + radio.map(\.id), "and in its order once unshuffled")
     }
 
     @Test func batchesArrivingAfterShuffleIsTurnedOnKeepThePlaylistsOrder() async {
@@ -83,13 +147,28 @@ struct PlayerReuseTests {
         #expect(rig.player.queue.items.map(\.id) == ["a"])
     }
 
+    @Test func clearingUpNextDropsARadioStillLoading() async {
+        let rig = await started()
+        rig.music.set {
+            $0.held = ["radio a"]
+            $0.radios["a"] = songs("b", "c")
+        }
+        rig.player.startRadio(from: song("a"))
+        await rig.yieldToTasks()
+        rig.player.clearUpcoming()
+        rig.music.release("radio a")
+        await rig.settle()
+        #expect(rig.player.queue.items.map(\.id) == ["a"])
+        #expect(!rig.player.playback.extending, "the end of the queue may ask for a radio again")
+    }
+
     @Test func clearingUpNextLeavesACardStillLoadingToPlay() async {
         let rig = await started()
         rig.player.play(songs("a", "b"))
         await rig.settle()
         rig.music.set {
             $0.held = ["ALB"]
-            $0.radios["ALB"] = songs("x", "y")
+            $0.playlistBatches["ALB"] = [songs("x", "y")]
         }
         let tap = Task { await rig.player.play(Card(kind: .album, id: "ALB", title: "Album")) }
         await rig.yieldToTasks()
@@ -240,4 +319,9 @@ struct PlayerReuseTests {
         #expect(rig.player.lyrics == .loaded(words))
         #expect(rig.music.calls.filter { $0 == "lyrics a" }.count == 2, "a failure is not kept")
     }
+}
+
+/// What a card's `whole` was given, if anything.
+@MainActor private final class Handed {
+    var ids: [String]?
 }
