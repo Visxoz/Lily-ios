@@ -36,7 +36,7 @@ extension YTMusic {
             guard let section = Section.tracks("", Renderers.tracks(LibraryList.items(shelf)), mode: .section) else {
                 return Page(header: header, sections: [])
             }
-            return Page(header: header, sections: [section], more: Renderers.continuation(shelf).map { .tracks(token: $0, sectionIndex: 0) })
+            return Page(header: header, sections: [section], more: Renderers.continuation(shelf).map { .tracks(token: $0) })
         case .playlists:
             cards = try await libraryPlaylists(all: true).cards
         case .albums, .artists:
@@ -138,7 +138,7 @@ enum LibraryList: CaseIterable {
     static func likedMusicCard(_ response: JSON) -> Card? {
         let shelf = Renderers.trackShelf(in: response)
         guard shelf.exists else { return nil }
-        let header = Renderers.detailHeader(in: response).renderer
+        let header = Renderers.detailHeader(in: response)
         let count = Renderers.continuation(shelf) == nil ? Renderers.tracks(shelf["contents"].array).count : Renderers.trackCount(header)
         return Card(
             kind: .playlist, id: BuiltInPlaylist.likedMusic, title: "Liked music",

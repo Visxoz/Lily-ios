@@ -38,8 +38,7 @@ extension Renderers {
             duration: duration,
             thumbnail: Thumbnail.pick(thumbnails, edge: Thumbnail.row),
             trackNumber: renderer["index"].text.flatMap { Int($0) },
-            isVideo: isVideo,
-            setVideoId: renderer["playlistItemData", "playlistSetVideoId"].string
+            isVideo: isVideo
         )
     }
 

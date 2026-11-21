@@ -76,7 +76,7 @@ struct AlbumDetails {
 
 extension Renderers {
     static func album(_ response: JSON, id: String) throws -> AlbumDetails {
-        let (header, _) = detailHeader(in: response)
+        let header = detailHeader(in: response)
         guard let title = header["title"].text, !title.isEmpty else {
             throw YTMError(.notFound, "This album isn't available.")
         }

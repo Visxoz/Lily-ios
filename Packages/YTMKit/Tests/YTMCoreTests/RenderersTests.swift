@@ -131,7 +131,7 @@ private let homePage = #"""
         let album = AlbumRef(id: "MPREb_a", name: "The Album")
         let artist = ArtistRef(id: "UCx", name: "Someone")
         let track = try #require(Renderers.track(item, context: ItemContext(album: album, artists: [artist])))
-        #expect(track.trackNumber == 3 && track.duration == 212 && track.setVideoId == "S3")
+        #expect(track.trackNumber == 3 && track.duration == 212)
         #expect(track.album == album && track.artists == [artist] && !track.isVideo)
         #expect(Renderers.track(try json(#"{"flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"No ID"}]}}}]}"#)) == nil)
     }

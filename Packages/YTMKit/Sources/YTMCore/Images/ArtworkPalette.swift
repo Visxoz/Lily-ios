@@ -106,11 +106,6 @@ public enum ArtworkPalette {
         }
     }
 
-    /// The artwork's colour for controls, or nil for greyish artwork.
-    public static func vivid(_ image: CGImage) -> RGB? {
-        vivid(accent(image))
-    }
-
     /// A saturated take on an `accent`, for controls drawn in it rather than
     /// backgrounds behind white text, or nil when it is greyish.
     public static func vivid(_ accent: RGB) -> RGB? {

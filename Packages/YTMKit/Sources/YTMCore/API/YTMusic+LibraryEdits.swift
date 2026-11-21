@@ -34,34 +34,16 @@ extension YTMusic {
         try await editPlaylist(playlistId, actions: videoIds.map { ["action": "ACTION_ADD_VIDEO", "addedVideoId": $0] })
     }
 
-    /// By each entry's own ID, so only the copy chosen goes.
-    @concurrent
-    public func removeFromPlaylist(_ playlistId: String, tracks: [Track]) async throws {
-        let actions = tracks.compactMap { track in
-            track.setVideoId.map { ["action": "ACTION_REMOVE_VIDEO", "setVideoId": $0, "removedVideoId": track.id] }
-        }
-        guard actions.count == tracks.count else {
-            throw YTMError(.notFound, "These songs can't be removed: the playlist didn't say where they are.")
-        }
-        try await editPlaylist(playlistId, actions: actions)
-    }
-
     /// The create call takes only so many songs, so the rest are added after.
     @concurrent
     public func createPlaylist(title: String, videoIds: [String]) async throws -> String {
         let first = Array(videoIds.prefix(Self.perRequest))
-        let created = try await edit("playlist/create", ["title": title, "privacyStatus": "PRIVATE", "videoIds": first])
+        let created = try await edit("playlist/create", ["title": title, "privacyStatus": "PRIVATE", "videoIds": first], retries: 0)
         guard let id = created["playlistId"].string, !id.isEmpty else {
             throw YTMError(.parse, "YouTube didn't return the new playlist.")
         }
         try await addToPlaylist(id, videoIds: Array(videoIds.dropFirst(first.count)))
         return id
-    }
-
-    /// By playlist ID through the like endpoints, as the website's Save button.
-    @concurrent
-    public func setSaved(_ saved: Bool, playlistId: String) async throws {
-        _ = try await edit(saved ? "like/like" : "like/removelike", ["target": ["playlistId": playlistId]])
     }
 
     /// A refused edit, such as one to a full playlist, still answers 200, so
@@ -80,11 +62,12 @@ extension YTMusic {
         reply["status"].string == "STATUS_SUCCEEDED"
     }
 
-    private func edit(_ endpoint: String, _ body: [String: Any]) async throws -> JSON {
+    /// Creating passes `retries` 0, as a timed-out create YouTube carried out would make a second playlist.
+    private func edit(_ endpoint: String, _ body: [String: Any], retries: Int = InnerTube.retries) async throws -> JSON {
         guard await auth.isSignedIn else {
             throw YTMError(.notSignedIn, "Sign in to change your library.")
         }
-        return try await innerTube.post(endpoint, body: body)
+        return try await innerTube.post(endpoint, body: body, retries: retries)
     }
 }
 

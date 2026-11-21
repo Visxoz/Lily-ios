@@ -39,17 +39,17 @@ extension YTMusic {
         switch page.more {
         case nil:
             break
-        case .tracks(let token, let index)?:
+        case .tracks(let token)?:
             page.more = nil
-            guard page.sections.indices.contains(index), case .tracks(var section) = page.sections[index],
+            guard case .tracks(var section)? = page.sections.first,
                   let batch = try await playlistBatch(after: token, asOwner: true)
             else { return (page, whole) }
             section.tracks += batch.tracks
-            page.sections[index] = .tracks(section)
+            page.sections[0] = .tracks(section)
             if let next = batch.next, !batch.tracks.isEmpty, section.tracks.count < Self.playlistLimit {
-                page.more = .tracks(token: next, sectionIndex: index)
+                page.more = .tracks(token: next)
             }
-            if index == 0, let meta = page.header?.meta {
+            if let meta = page.header?.meta {
                 // The header counts the whole playlist when YouTube said how
                 // long it is, else the tracks loaded.
                 let count = max(Formatting.number(meta) ?? 0, section.tracks.count)

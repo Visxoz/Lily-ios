@@ -4,12 +4,17 @@ import YTMPlayback
 /// Folding the half-open phone seeks (`FoldScrub`), with a tick for each seek.
 /// Only held like a book: stood like a laptop, the phone rests on a desk.
 struct FoldToScrub: ViewModifier {
-    let isEnabled: Bool
+    let isSideBySide: Bool
 
     @Environment(AppModel.self) private var app
     @State private var scrub = FoldScrub()
     @State private var settling: Task<Void, Never>?
     @State private var seeks = 0
+
+    /// Read here rather than by Now Playing, so a change to any setting re-runs only this.
+    private var isEnabled: Bool {
+        app.settings.value.foldToScrub && isSideBySide
+    }
 
     func body(content: Content) -> some View {
         if #available(iOS 27.1, *) {

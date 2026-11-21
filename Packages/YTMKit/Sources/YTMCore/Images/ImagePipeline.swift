@@ -143,7 +143,7 @@ public final class ImagePipeline: Sendable {
     private static func download(_ url: String, edge: Int) async {
         guard !FileManager.default.fileExists(atPath: keptFile(url).path(percentEncoded: false)),
               let request = requestURL(url, edge: edge).map({ URLRequest(url: $0) }),
-              HTTP.media.configuration.urlCache?.cachedResponse(for: request) == nil
+              HTTP.artworkCache.cachedResponse(for: request) == nil
         else { return }
         _ = try? await HTTP.data(for: request, session: HTTP.media)
     }

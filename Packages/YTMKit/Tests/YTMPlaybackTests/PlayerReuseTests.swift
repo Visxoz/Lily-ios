@@ -22,7 +22,7 @@ struct PlayerReuseTests {
         let page = Page(
             header: PageHeader(title: "List", playlistId: "PL"),
             sections: [.tracks(TrackSection(title: "", tracks: songs("a", "b"), mode: .section))],
-            more: .tracks(token: "PL#1", sectionIndex: 0)
+            more: .tracks(token: "PL#1")
         )
         await rig.player.play(page)
         #expect(rig.player.current?.id == "a", "the page's tracks start at once")
@@ -51,7 +51,7 @@ struct PlayerReuseTests {
         let page = Page(
             header: PageHeader(title: "List", playlistId: "PL"),
             sections: [.tracks(TrackSection(title: "", tracks: Array(all[..<2]), mode: .section))],
-            more: .tracks(token: "PL#1", sectionIndex: 0)
+            more: .tracks(token: "PL#1")
         )
         await rig.player.play(page)
         #expect(rig.player.queue.count == 30, "and header Play's")

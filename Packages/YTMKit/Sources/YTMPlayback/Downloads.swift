@@ -27,7 +27,10 @@ import YTMCore
     }
     /// The app asks iOS for background time while this is true. Stored rather than worked out from
     /// `progress`, so views reading it don't redraw with every step.
-    public private(set) var isActive = false
+    public private(set) var isActive = false {
+        // However downloads stop, as the background time then ends and a suspended app may be killed.
+        didSet { if !isActive { saveIfPending() } }
+    }
     /// Nil until the system first reports, so nothing downloads before then.
     public private(set) var online: Bool?
     /// Cellular or a hotspot, for the Wi-Fi only setting.
@@ -52,6 +55,9 @@ import YTMCore
     @ObservationIgnored private var watching: Task<Void, Never>?
     /// Until the launch's own requests settle, so downloads don't slow Home or the first song.
     @ObservationIgnored private(set) var held = true
+    /// Finished songs save the index at most every 10 s, as it holds every song and a big download
+    /// would otherwise rewrite it once a song.
+    @ObservationIgnored private let indexSaving = Debounce(after: .seconds(10))
 
     @ObservationIgnored let music: any MusicService
     @ObservationIgnored let settings: SettingsStore
@@ -205,7 +211,7 @@ import YTMCore
                 await ImagePipeline.shared.keepOnly(artwork)
             }
         }
-        if saving || !unwanted.isEmpty { store.save(index, to: .downloads) }
+        if saving || !unwanted.isEmpty { saveNow() }
         guard canDownload, !held, !outOfRoom, resting == nil else { return }
         for track in wanted {
             guard active.count < Self.simultaneous else { break }
@@ -264,7 +270,7 @@ import YTMCore
         switch result {
         case .success(let stream):
             index.songs[track.id] = DownloadedSong(track: track, stream: stream, added: .now)
-            store.save(index, to: .downloads)
+            if !indexSaving.isPending { indexSaving.schedule { [weak self] in self?.saveNow() } }
         case .failure(AudioFailure.storage):
             if !outOfRoom { toasts.yield("There's no room to download more songs. Free some space and try again.") }
             outOfRoom = true
@@ -279,6 +285,18 @@ import YTMCore
             failed.insert(track.id)
         }
         reconcile()
+        // A song missing from the index has its file deleted at the next launch.
+        if active.isEmpty { saveIfPending() }
+    }
+
+    func saveNow() {
+        indexSaving.cancel()
+        store.save(index, to: .downloads)
+    }
+
+    /// As downloads stop and the app leaves the screen.
+    func saveIfPending() {
+        if indexSaving.isPending { saveNow() }
     }
 
     private static func isNetwork(_ error: any Error) -> Bool {

@@ -49,8 +49,7 @@ public actor AudioDownloader {
     /// A song played lately may already be whole in the play cache.
     private func adoptPlayed(_ item: AudioItem) -> Bool {
         let played = AudioCache.defaultDirectory.appending(path: AudioCache.safeName(item.cacheKey))
-        guard let size = try? played.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 0,
-              item.contentLength <= 0 || Int64(size) == item.contentLength else { return false }
+        guard AudioCache.isWhole(played, length: item.contentLength) else { return false }
         return cache.adopt(played, as: item.cacheKey)
     }
 

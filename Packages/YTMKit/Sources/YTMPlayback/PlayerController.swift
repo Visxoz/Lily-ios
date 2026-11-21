@@ -350,7 +350,7 @@ import YTMCore
         let loudness = -Float(max(stream.loudnessDb ?? 0, 0))
         return AudioItem(
             id: id, url: stream.url, headers: stream.headers, contentLength: stream.contentLength,
-            cacheKey: "\(videoId)-\(stream.itag)", loudnessDB: loudness
+            cacheKey: DownloadedSong.key(videoId: videoId, itag: stream.itag), loudnessDB: loudness
         ) {
             let fresh = try await chooser.refresh(videoId: videoId, wasPremium: stream.isPremium, signedIn: signedIn, quality: quality)
             guard fresh.itag == stream.itag, fresh.contentLength == stream.contentLength else { throw Self.otherFile }

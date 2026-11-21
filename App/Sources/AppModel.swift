@@ -238,6 +238,7 @@ final class AppModel {
     func keepDownloading(_ active: Bool) {
         if active, downloadTime == .invalid {
             downloadTime = UIApplication.shared.beginBackgroundTask(withName: "Downloads") { [weak self] in
+                self?.player.persistSession()
                 self?.keepDownloading(false)
             }
         } else if !active, downloadTime != .invalid {

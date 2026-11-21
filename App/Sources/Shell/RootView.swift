@@ -9,12 +9,12 @@ struct RootView: View {
         @Bindable var app = app
         TabView(selection: $app.tab) {
             Tab(value: AppTab.home) {
-                TabRoot(tab: .home, transition: transition) { PageScreen(route: .home, app: app) }
+                TabRoot(tab: .home, transition: transition) { PageScreen(route: .home) }
             } label: {
                 TabLabel(title: "Home", icon: app.tab == .home ? .home : .homeOutline)
             }
             Tab(value: AppTab.explore) {
-                TabRoot(tab: .explore, transition: transition) { PageScreen(route: .explore, app: app) }
+                TabRoot(tab: .explore, transition: transition) { PageScreen(route: .explore) }
             } label: {
                 TabLabel(title: "Explore", icon: .explore)
             }

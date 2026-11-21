@@ -8,16 +8,13 @@ struct Scrubber: View {
     @Environment(\.theme) private var theme
     /// Where the bar is being dragged to, as a fraction of the song.
     @State private var scrubbing: Double?
-    /// The place last sought, shown while paused as the engine's clock may not
-    /// have reached it and a paused bar is never pulled again.
-    @State private var sought: Double?
 
     var body: some View {
         let player = app.player
         let length = player.duration
         let total = Formatting.duration(Int(length))
-        TimelineView(.animation(minimumInterval: 0.25, paused: !player.isPlaying || scrubbing != nil)) { _ in
-            let position = scrubbing.map { $0 * length } ?? (player.isPlaying ? nil : sought) ?? player.currentTime
+        Playhead(interval: 0.25, held: scrubbing != nil) { time in
+            let position = scrubbing.map { $0 * length } ?? time
             let played = Formatting.duration(Int(position))
             VStack(spacing: 0) {
                 BarSlider(
@@ -41,8 +38,5 @@ struct Scrubber: View {
                 .accessibilityHidden(true)
             }
         }
-        .onChange(of: player.lastSeek) { _, seek in sought = seek.to }
-        .onChange(of: player.isPlaying) { sought = nil }
-        .onChange(of: player.current?.id) { sought = nil }
     }
 }

@@ -2,15 +2,15 @@ import Foundation
 
 extension Renderers {
     /// An album or playlist page's header renderer, from the two-column page's
-    /// first tab or else its own header; owned playlists wrap it as editable.
-    static func detailHeader(in response: JSON) -> (renderer: JSON, editable: Bool) {
+    /// first tab or else its own header, from inside the wrapper owned playlists add.
+    static func detailHeader(in response: JSON) -> JSON {
         let tab = response["contents", "twoColumnBrowseResultsRenderer", "tabs"][0]["tabRenderer", "content", "sectionListRenderer", "contents"][0]
         for wrapper in [tab, response["header"]] {
             let editable = wrapper["musicEditablePlaylistDetailHeaderRenderer", "header"]
             let renderer = (editable.exists ? editable : wrapper).first("musicResponsiveHeaderRenderer", "musicDetailHeaderRenderer")
-            if renderer.exists { return (renderer, editable.exists) }
+            if renderer.exists { return renderer }
         }
-        return (.missing, false)
+        return .missing
     }
 
     static func trackShelf(in response: JSON) -> JSON {

@@ -1,9 +1,11 @@
 import Foundation
+import os
 import Security
 
 /// Secrets (sign-in cookies, the Last.fm session) as device-only generic passwords.
 enum Keychain {
     private static let service = "Lily"
+    private static let log = Logger(subsystem: "Lily", category: "Keychain")
 
     private static func query(_ key: String) -> [CFString: Any] {
         [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key]
@@ -18,18 +20,21 @@ enum Keychain {
         return result as? Data
     }
 
-    /// Stores `data` under `key`, or deletes the item when `data` is nil.
+    /// Stores `data` under `key`, or deletes the item when `data` is nil. A failure is logged,
+    /// as otherwise it shows only at the next launch.
     static func set(_ data: Data?, for key: String) {
         let query = query(key)
-        guard let data else {
-            SecItemDelete(query as CFDictionary)
-            return
+        var status: OSStatus
+        if let data {
+            // Readable after first unlock, so songs resolve on the lock screen, and
+            // never restored to another device from a backup.
+            let update: [CFString: Any] = [kSecValueData: data, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+            status = SecItemUpdate(query as CFDictionary, update as CFDictionary)
+            if status == errSecItemNotFound { status = SecItemAdd(query.merging(update) { $1 } as CFDictionary, nil) }
+        } else {
+            status = SecItemDelete(query as CFDictionary)
+            if status == errSecItemNotFound { status = errSecSuccess }
         }
-        // Readable after first unlock, so songs resolve on the lock screen, and
-        // never restored to another device from a backup.
-        let update: [CFString: Any] = [kSecValueData: data, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
-        if SecItemUpdate(query as CFDictionary, update as CFDictionary) == errSecItemNotFound {
-            SecItemAdd(query.merging(update) { $1 } as CFDictionary, nil)
-        }
+        if status != errSecSuccess { log.error("Keychain item \(key, privacy: .public) not saved or deleted: \(status, privacy: .public)") }
     }
 }

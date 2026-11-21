@@ -1,7 +1,19 @@
 import SwiftUI
 import YTMCore
 
+/// Builds its model in its own body, not the parent's, so what building it reads (the account, and
+/// the history for Home) never re-runs the tab tree or Search.
 struct PageScreen: View {
+    let route: Route
+
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        PageBody(route: route, app: app)
+    }
+}
+
+private struct PageBody: View {
     let route: Route
 
     @State private var model: PageModel

@@ -89,7 +89,6 @@ enum CatalogueChecks {
             findings.expect(page.more == nil, "loadMore didn't finish in \(steps) steps")
             findings.expect(first == 100 && steps >= 1, "first batch \(first), \(steps) steps")
             findings.expect(total == min(stated, YTMusic.playlistLimit), "\(total) tracks loaded, the header says \(stated)")
-            findings.expect(page.headerTracks.allSatisfy { $0.setVideoId != nil }, "an entry without its set ID")
             findings.note("\(first) then \(total) tracks in \(steps) more steps; header \(page.header?.meta ?? "")")
         }
 

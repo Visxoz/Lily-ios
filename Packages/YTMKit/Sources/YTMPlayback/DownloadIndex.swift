@@ -34,7 +34,10 @@ struct DownloadedSong: Codable, Sendable {
     var stream: ResolvedStream
     var added: Date
 
-    var key: String { "\(track.id)-\(stream.itag)" }
+    var key: String { Self.key(videoId: track.id, itag: stream.itag) }
+
+    /// The file's name, shared with the play cache so a song played lately is adopted rather than fetched.
+    static func key(videoId: String, itag: Int) -> String { "\(videoId)-\(itag)" }
 }
 
 /// An album or playlist, kept in step with YouTube's once a day.

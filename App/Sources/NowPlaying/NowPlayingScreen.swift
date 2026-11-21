@@ -66,7 +66,7 @@ struct NowPlayingScreen: View {
         // Set here rather than as the lyrics appear, as opening or closing the
         // phone swaps one lyrics view for another in no set order.
         .onChange(of: lyricsShown, initial: true) { app.player.showsLyrics = $1 }
-        .modifier(FoldToScrub(isEnabled: app.settings.value.foldToScrub && layout == .sideBySide))
+        .modifier(FoldToScrub(isSideBySide: layout == .sideBySide))
     }
 
     private var layout: Layout {

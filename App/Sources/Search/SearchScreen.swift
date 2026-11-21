@@ -19,7 +19,7 @@ struct SearchScreen: View {
         // search shows them again in place, scrolled where they were.
         ZStack {
             if let shown {
-                PageScreen(route: .search(shown), app: app)
+                PageScreen(route: .search(shown))
                     .id(shown)
                     // Covered by the choices while searching, so VoiceOver skips it.
                     .accessibilityHidden(app.isSearching)

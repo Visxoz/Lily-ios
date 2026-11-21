@@ -72,7 +72,7 @@ struct QueueTests {
     @Test func unshuffleKeepsTracksAddedWhileShuffledBehindTheirNeighbour() throws {
         var q = queue(5)
         q.setShuffle(true)
-        q.append(99)
+        q.append(contentsOf: [99])
         let after = items(q)[4]
         q.setShuffle(false)
         let order = items(q)
@@ -276,7 +276,7 @@ struct QueueTests {
     @Test func emptyQueueStartsWithFirstPush() {
         var q = Queue<Int>(seed: 1)
         #expect(q.advance(user: false, repeat: .off) == nil)
-        q.append(4)
+        q.append(contentsOf: [4])
         #expect(q.current == 4)
     }
 
@@ -287,7 +287,7 @@ struct QueueTests {
         q.jump(to: 0)
         q.back(repeat: .off)
         #expect(q.revision == revision, "moving through the queue changes nothing")
-        q.append(9)
+        q.append(contentsOf: [9])
         #expect(q.revision != revision)
         revision = q.revision
         q.setShuffle(true)

@@ -46,23 +46,23 @@ private actor DownloadLog {
         let bright = try #require(ArtworkPalette.vivid(accent), "red artwork has a hue")
         #expect(bright.r > accent.r, "brighter")
         #expect(bright.r > bright.g && bright.r > bright.b, "same hue")
-        #expect(ArtworkPalette.vivid(try image { _, _ in (128, 128, 128) }) == nil, "no hue to follow")
+        #expect(ArtworkPalette.vivid(ArtworkPalette.accent(try image { _, _ in (128, 128, 128) })) == nil, "no hue to follow")
     }
 
     @Test func followsMutedAndMixedArtwork() throws {
-        let blue = try #require(ArtworkPalette.vivid(try image { _, _ in (90, 100, 130) }), "a bluish photo has a hue")
+        let blue = try #require(ArtworkPalette.vivid(ArtworkPalette.accent(try image { _, _ in (90, 100, 130) })), "a bluish photo has a hue")
         #expect(blue.b > blue.r && blue.b > blue.g)
 
         // Red and cyan halves, which average to grey.
-        let halves = try #require(ArtworkPalette.vivid(try image { x, _ in x < 4 ? (230, 20, 20) : (20, 230, 230) }))
+        let halves = try #require(ArtworkPalette.vivid(ArtworkPalette.accent(try image { x, _ in x < 4 ? (230, 20, 20) : (20, 230, 230) })))
         let hue = ArtworkPalette.hsl(halves).h
         #expect(!(15..<165).contains(hue) && !(195..<345).contains(hue), "red or cyan")
 
         // A quarter of sky over beige buildings, the dull area the larger.
-        let sky = try #require(ArtworkPalette.vivid(try image { _, y in y < 2 ? (90, 150, 220) : (200, 170, 130) }))
+        let sky = try #require(ArtworkPalette.vivid(ArtworkPalette.accent(try image { _, y in y < 2 ? (90, 150, 220) : (200, 170, 130) })))
         #expect(sky.b > sky.r, "the sky, not the beige")
 
-        #expect(ArtworkPalette.vivid(try image { _, _ in (40, 36, 32) }) == nil, "a cast isn't a colour")
+        #expect(ArtworkPalette.vivid(ArtworkPalette.accent(try image { _, _ in (40, 36, 32) })) == nil, "a cast isn't a colour")
         let yellow = ArtworkPalette.accent(try image { _, _ in (240, 220, 20) })
         #expect(ArtworkPalette.luminance(yellow) <= 0.18, "white text still reads on it")
     }

@@ -68,14 +68,10 @@ struct MiniPlayer: View {
 struct MiniProgress: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
-    /// The place last sought, shown while paused as the engine's clock may not
-    /// have reached it and a paused line is never pulled again.
-    @State private var sought: Double?
 
     var body: some View {
         let player = app.player
-        TimelineView(.animation(minimumInterval: 0.5, paused: !player.isPlaying)) { _ in
-            let time = (player.isPlaying ? nil : sought) ?? player.currentTime
+        Playhead(interval: 0.5) { time in
             let fraction = player.duration > 0 ? min(max(time / player.duration, 0), 1) : 0
             Capsule()
                 .fill(theme.ink.opacity(0.19))
@@ -85,10 +81,29 @@ struct MiniProgress: View {
                         .scaleEffect(x: fraction, anchor: .leading)
                 }
         }
+        .frame(height: 2)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The playing position, pulled every `interval` while playing and never while paused or `held`.
+struct Playhead<Content: View>: View {
+    let interval: Double
+    var held = false
+    @ViewBuilder let content: (Double) -> Content
+
+    @Environment(AppModel.self) private var app
+    /// The place last sought, shown while paused as the engine's clock may not
+    /// have reached it and a paused playhead is never pulled again.
+    @State private var sought: Double?
+
+    var body: some View {
+        let player = app.player
+        TimelineView(.animation(minimumInterval: interval, paused: !player.isPlaying || held)) { _ in
+            content((player.isPlaying ? nil : sought) ?? player.currentTime)
+        }
         .onChange(of: player.lastSeek) { _, seek in sought = seek.to }
         .onChange(of: player.isPlaying) { sought = nil }
         .onChange(of: player.current?.id) { sought = nil }
-        .frame(height: 2)
-        .accessibilityHidden(true)
     }
 }

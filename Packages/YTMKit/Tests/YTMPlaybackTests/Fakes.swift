@@ -137,20 +137,20 @@ final class FakeMusic: MusicService {
         return Page(
             header: PageHeader(title: id, playlistId: id),
             sections: [.tracks(TrackSection(title: "", tracks: batches.first ?? [], mode: .section))],
-            more: batches.count > 1 ? .tracks(token: "\(id)#1", sectionIndex: 0) : nil
+            more: batches.count > 1 ? .tracks(token: "\(id)#1") : nil
         )
     }
 
     func loadMore(_ page: Page) async throws -> Page {
-        guard case .tracks(let token, let index)? = page.more, let id = page.header?.playlistId,
-              let step = token.split(separator: "#").last.flatMap({ Int($0) }), page.sections.indices.contains(index),
-              case .tracks(var section) = page.sections[index] else { return page }
+        guard case .tracks(let token)? = page.more, let id = page.header?.playlistId,
+              let step = token.split(separator: "#").last.flatMap({ Int($0) }),
+              case .tracks(var section)? = page.sections.first else { return page }
         log("more \(token)")
         let batches = state.withLock { $0.playlistBatches[id] } ?? []
         var page = page
         section.tracks += batches.indices.contains(step) ? batches[step] : []
-        page.sections[index] = .tracks(section)
-        page.more = step + 1 < batches.count ? .tracks(token: "\(id)#\(step + 1)", sectionIndex: index) : nil
+        page.sections[0] = .tracks(section)
+        page.more = step + 1 < batches.count ? .tracks(token: "\(id)#\(step + 1)") : nil
         return page
     }
 

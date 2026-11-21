@@ -30,12 +30,17 @@ final class AudioCache {
         URL.cachesDirectory.appending(path: "audio", directoryHint: .isDirectory)
     }
 
-    /// The complete file for `key`, marked as just played, if it is there and
-    /// of the expected length. A file of another length is another encode.
+    /// Whether `url` holds a whole copy: there, and of the expected length, as a file
+    /// of another length is another encode.
+    static func isWhole(_ url: URL, length: Int64) -> Bool {
+        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return false }
+        return size > 0 && (length <= 0 || Int64(size) == length)
+    }
+
+    /// The complete file for `key`, marked as just played.
     func completeFile(for key: String, length: Int64) -> URL? {
         let url = file(for: key)
-        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-              size > 0, length <= 0 || Int64(size) == length else { return nil }
+        guard Self.isWhole(url, length: length) else { return nil }
         try? files.setAttributes([.modificationDate: Date.now], ofItemAtPath: url.path(percentEncoded: false))
         return url
     }

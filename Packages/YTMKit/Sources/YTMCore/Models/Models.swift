@@ -36,13 +36,11 @@ public struct Track: Codable, Hashable, Sendable, Identifiable {
     /// A music video, which may have an audio-only song version YouTube Music
     /// plays instead.
     public var isVideo: Bool
-    /// The entry's ID within a playlist, which removing it needs.
-    public var setVideoId: String?
 
     public init(
         id: String, title: String, artists: [ArtistRef] = [], album: AlbumRef? = nil,
         duration: Int? = nil, thumbnail: String? = nil, trackNumber: Int? = nil,
-        isVideo: Bool = false, setVideoId: String? = nil
+        isVideo: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -52,7 +50,6 @@ public struct Track: Codable, Hashable, Sendable, Identifiable {
         self.thumbnail = thumbnail
         self.trackNumber = trackNumber
         self.isVideo = isVideo
-        self.setVideoId = setVideoId
     }
 
     public var artistNames: String { ArtistRef.joined(artists) }
@@ -199,16 +196,14 @@ public struct PageHeader: Codable, Hashable, Sendable {
     /// Playlist whose tracks Shuffle loads when the page's are incomplete.
     public var shufflePlaylistId: String?
     public var radioId: String?
-    /// Albums and playlists that can be added to the library.
+    /// The playlist holding the page's songs, whose rest Play and Shuffle load when the page's are unfinished.
     public var playlistId: String?
-    /// A playlist the signed-in user owns, so its tracks can be removed.
-    public var editable: Bool
 
     public init(
         label: String = "", title: String, subtitle: String = "", meta: String = "",
         description: String? = nil, thumbnail: String? = nil,
         banner: Bool = false, shufflePlaylistId: String? = nil, radioId: String? = nil,
-        playlistId: String? = nil, editable: Bool = false
+        playlistId: String? = nil
     ) {
         self.label = label
         self.title = title
@@ -220,7 +215,6 @@ public struct PageHeader: Codable, Hashable, Sendable {
         self.shufflePlaylistId = shufflePlaylistId
         self.radioId = radioId
         self.playlistId = playlistId
-        self.editable = editable
     }
 }
 
@@ -228,7 +222,7 @@ public struct PageHeader: Codable, Hashable, Sendable {
 /// fetches one step of it at a time.
 public enum Continuation: Codable, Hashable, Sendable {
     /// The rest of a long playlist's tracks.
-    case tracks(token: String, sectionIndex: Int)
+    case tracks(token: String)
     /// The Home feed's further shelves, with those read but held back
     /// until the ones above them in `HomeFeed.shelfOrder` arrive.
     case shelves(token: String, pagesLeft: Int, held: [Section])
@@ -340,67 +334,6 @@ public struct Account: Codable, Hashable, Sendable {
         self.name = name
         self.handle = handle
         self.photo = photo
-    }
-}
-
-/// Low and Normal cap the bitrate for metered connections; High takes the
-/// best YouTube offers, 256 kbps Opus with Premium.
-public enum AudioQuality: String, Codable, CaseIterable, Hashable, Sendable {
-    case low, normal, high
-
-    /// The highest bitrate wanted, or nil for the best there is. YouTube's
-    /// Opus streams come at about 50, 70 and 130 kbps.
-    public var maxKbps: Int? {
-        switch self {
-        case .low: 64
-        case .normal: 192
-        case .high: nil
-        }
-    }
-}
-
-public enum AudioCodec: String, Codable, Hashable, Sendable {
-    /// In WebM, 48 kHz.
-    case opus
-    /// AAC-LC or HE-AAC in fragmented MP4.
-    case aac
-}
-
-public struct ResolvedStream: Codable, Hashable, Sendable {
-    public var url: URL
-    /// Headers the download must send, as the client that asked.
-    public var headers: [String: String]
-    public var itag: Int
-    public var codec: AudioCodec
-    public var contentLength: Int64
-    public var bitrate: Int
-    public var duration: Double?
-    /// YouTube's loudness measure in dB, for normalising.
-    public var loudnessDb: Double?
-    /// A Premium format (774 or 141). Free formats the web client gives a
-    /// Premium account are not.
-    public var isPremium: Bool
-
-    public init(
-        url: URL, headers: [String: String], itag: Int, codec: AudioCodec,
-        contentLength: Int64, bitrate: Int, duration: Double?, loudnessDb: Double?,
-        isPremium: Bool = false
-    ) {
-        self.url = url
-        self.headers = headers
-        self.itag = itag
-        self.codec = codec
-        self.contentLength = contentLength
-        self.bitrate = bitrate
-        self.duration = duration
-        self.loudnessDb = loudnessDb
-        self.isPremium = isPremium
-    }
-
-    /// "OPUS 165", with Premium formats at YouTube's nominal 256 kbps.
-    public var badge: String {
-        let kbps = PremiumResolver.premiumItags.contains(itag) ? 256 : (bitrate + 500) / 1000
-        return "\(codec.rawValue.uppercased()) \(kbps)"
     }
 }
 

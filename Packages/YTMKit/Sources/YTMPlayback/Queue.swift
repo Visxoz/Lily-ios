@@ -158,10 +158,6 @@ public struct Queue<Element: Hashable & Sendable>: Sendable {
         if currentIndex == nil { currentIndex = at }
     }
 
-    public mutating func append(_ item: Element) {
-        append(contentsOf: CollectionOfOne(item))
-    }
-
     /// Adds to the end; the first one added to an empty queue becomes current.
     public mutating func append(contentsOf items: some Sequence<Element>) {
         let start = entries.count

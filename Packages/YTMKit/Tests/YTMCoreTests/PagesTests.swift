@@ -57,15 +57,14 @@ private let editablePlaylist = #"""
     @Test func readsAnOwnedPlaylistsHeaderAndFirstBatch() throws {
         let page = try Renderers.playlistPage(try json(editablePlaylist), id: "PLroad")
         let header = try #require(page.header)
-        #expect(header.editable)
         #expect(header.title == "Road trip" && header.label == "Playlist" && header.subtitle == "Alex")
         #expect(header.meta == "1204 songs • 3 min", "the whole list's count, the loaded tracks' length")
         #expect(header.description == "For the car")
         #expect(header.radioId == "RDAMPLPLroad" && header.playlistId == "PLroad")
         #expect(header.thumbnail == "https://lh3.googleusercontent.com/p=w544-h544-l90-rj")
-        #expect(page.more == .tracks(token: "NEXT", sectionIndex: 0))
+        #expect(page.more == .tracks(token: "NEXT"))
         let tracks = page.headerTracks
-        #expect(tracks.count == 1 && tracks[0].setVideoId == "S1" && tracks[0].artistNames == "Band")
+        #expect(tracks.count == 1 && tracks[0].artistNames == "Band")
     }
 
     @Test func countsTracksFromEitherSubtitleShape() throws {

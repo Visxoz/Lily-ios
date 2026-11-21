@@ -156,7 +156,6 @@ public actor LastFM {
                 wait = generation == self.generation
                 failed(error, generation: generation)
             }
-            store.save(pending, to: .scrobbles)
             if wait {
                 retryLater()
                 return
@@ -164,10 +163,12 @@ public actor LastFM {
         }
     }
 
-    /// Drops `batch`, which Last.fm has taken or refused.
+    /// Drops `batch`, which Last.fm has taken or refused. Saved only here, so a pass
+    /// that changes nothing, as offline, rewrites nothing.
     private func sent(_ batch: [Play]) {
         pending.remove(batch)
         singles = max(singles - 1, 0)
+        store.save(pending, to: .scrobbles)
     }
 
     /// Tries the plays again in a while, as nothing else may send them until

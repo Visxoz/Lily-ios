@@ -26,7 +26,7 @@ struct TabRoot<Content: View>: View {
                 }
                 .navigationDestination(for: Route.self) { route in
                     Group {
-                        if route == .downloads { DownloadsScreen() } else { PageScreen(route: route, app: app) }
+                        if route == .downloads { DownloadsScreen() } else { PageScreen(route: route) }
                     }
                     .modifier(MiniPlayerRoom(tab: tab))
                 }

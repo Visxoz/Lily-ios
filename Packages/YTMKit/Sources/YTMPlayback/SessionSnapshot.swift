@@ -59,6 +59,7 @@ extension PlayerController {
         writeSession()
         history.saveNow()
         settings.saveNow()
+        downloads.saveIfPending()
     }
 
     private func writeSession() {

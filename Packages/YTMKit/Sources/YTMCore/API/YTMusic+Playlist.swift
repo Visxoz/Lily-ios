@@ -58,7 +58,7 @@ extension YTMusic {
 
 extension Renderers {
     static func playlistPage(_ response: JSON, id: String) throws -> Page {
-        let (header, editable) = detailHeader(in: response)
+        let header = detailHeader(in: response)
         let shelf = trackShelf(in: response)
         guard header.exists || shelf.exists else {
             throw YTMError(.notFound, "This playlist isn't available.")
@@ -76,13 +76,12 @@ extension Renderers {
             description: description(header),
             thumbnail: Thumbnail.pick(Thumbnail.list(in: header), edge: Thumbnail.header),
             radioId: YTMusic.radioId(forPlaylist: id),
-            playlistId: id,
-            editable: editable
+            playlistId: id
         )
         return Page(
             header: pageHeader,
             sections: [Section.tracks("", tracks, mode: .section)].compactMap(\.self),
-            more: token.flatMap { tracks.isEmpty ? nil : .tracks(token: $0, sectionIndex: 0) }
+            more: token.flatMap { tracks.isEmpty ? nil : .tracks(token: $0) }
         )
     }
 
