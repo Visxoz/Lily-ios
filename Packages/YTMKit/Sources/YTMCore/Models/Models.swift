@@ -242,8 +242,8 @@ public struct PageHeader: Codable, Hashable, Sendable {
 /// What a page still has to fetch after it shows; `YTMusic.loadMore`
 /// fetches one step of it at a time.
 public enum Continuation: Codable, Hashable, Sendable {
-    /// The rest of a long playlist's tracks, with the entries listed so far, so a batch repeating them drops
-    /// them, and how many tracks have come, repeats included, which `YTMusic.playlistLimit` caps.
+    /// The rest of a long playlist's tracks. `seen` holds the entry IDs listed so far, so a batch that repeats
+    /// them drops them. `fetched` counts the tracks so far, repeats included, against `YTMusic.playlistLimit`.
     case tracks(token: String, seen: Set<String> = [], fetched: Int = 0)
     /// The Home feed's further shelves, with those read but held back
     /// until the ones above them in `HomeFeed.shelfOrder` arrive.

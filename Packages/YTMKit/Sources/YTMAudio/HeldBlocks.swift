@@ -32,7 +32,8 @@ struct HeldBlocks {
         let count = Int((total + Self.length - 1) / Self.length)
         let from = min(Int(max(position, 0) / Self.length), count - 1)
         let missing = { (block: Int) in held(block) < min(total - Int64(block) * Self.length, Self.length) }
-        return (Array(from..<count) + Array(0..<from)).first(where: missing).map { Int64($0) * Self.length + held($0) }
+        let block = (from..<count).first(where: missing) ?? (0..<from).first(where: missing)
+        return block.map { Int64($0) * Self.length + held($0) }
     }
 
     /// Counts `count` bytes at `offset`, which follows what its block holds.

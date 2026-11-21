@@ -87,6 +87,10 @@ final class Track {
             }
             try bytes.withUnsafeBytes { try source?.parse($0) }
             parsed += Int64(bytes.count)
+            // Left here rather than at the next supply, so a fade planned before it sees one timeline.
+            if let run = seekRun, parsed >= run.parsed {
+                leaveRun()
+            }
             if decoder == nil, let format = source?.format {
                 let decoder = try PacketDecoder(source: format, file: loader.reader)
                 decoder.seek(to: Int64((startAt * format.sampleRate).rounded()))
@@ -173,8 +177,8 @@ final class Track {
     }
 
     /// Starts a seek run when the decoder seeks past the packets listed from the start and the file's index
-    /// has a point before it, reads what has arrived of the run, and ends it once the bytes from the start
-    /// catch up, so length, padding and sound end still wait for every byte.
+    /// has a point before it, and reads what has arrived of the run. `receive` ends it once the bytes from
+    /// the start catch up, so length, padding and sound end still wait for every byte.
     private func aim() {
         guard let source, let decoder else { return }
         if let from = decoder.seekingFrom {
@@ -191,10 +195,6 @@ final class Track {
             }
         }
         guard let run = seekRun else { return }
-        guard parsed < run.parsed else {
-            leaveRun()
-            return
-        }
         let end = loader.runEnd(from: run.parsed)
         var at = run.parsed
         do {

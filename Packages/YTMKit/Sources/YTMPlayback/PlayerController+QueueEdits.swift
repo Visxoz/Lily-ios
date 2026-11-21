@@ -31,18 +31,17 @@ extension PlayerController {
 
     /// Saves the queue as a private playlist, such as "Queue 14 November 2026", answering its card for Library to
     /// show at once, as YouTube's list of playlists takes a while to hold one just made. Signed in only.
-    @discardableResult
     public func saveQueueAsPlaylist() async -> Card? {
-        let tracks = Array(queue.items)
-        guard !tracks.isEmpty else { return nil }
+        let ids = Array(queue.items.map(\.id))
+        guard !ids.isEmpty else { return nil }
+        let thumbnail = queue.items.lazy.compactMap(\.thumbnail).first
         let title = Date.now.formatted(Self.playlistTitle)
-        say("Saving \(Formatting.songs(tracks.count)) as a playlist…")
+        say("Saving \(Formatting.songs(ids.count)) as a playlist…")
         do {
-            let id = try await music.createPlaylist(title: title, videoIds: tracks.map(\.id))
+            let id = try await music.createPlaylist(title: title, videoIds: ids)
             say("Saved as “\(title)”")
             return Card(
-                kind: .playlist, id: id, title: title, subtitle: "Playlist • \(Formatting.songs(tracks.count))",
-                thumbnail: tracks.lazy.compactMap(\.thumbnail).first
+                kind: .playlist, id: id, title: title, subtitle: "Playlist • \(Formatting.songs(ids.count))", thumbnail: thumbnail
             )
         } catch {
             say("Couldn't save the playlist: \(sentence(for: error))")

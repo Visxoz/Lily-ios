@@ -237,7 +237,7 @@ import YTMCore
     private func soundStarted() {
         playback.started = true
         playback.loading = false
-        // Not `failures`: a song that sounds then fails, as all do once googlevideo cuts every client off, counts.
+        // `failures` stays: once googlevideo cuts every client off, each song sounds and then fails, and those count.
         playback.resume = nil
         playback.reopen = nil
         let recorded = playback.playRecorded == playback.generation

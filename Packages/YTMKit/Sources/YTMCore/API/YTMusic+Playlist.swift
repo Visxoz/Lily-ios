@@ -102,21 +102,20 @@ extension Renderers {
         )
     }
 
-    /// A batch of a playlist's songs, without the entries `seen` already holds, which it then holds too: YouTube
-    /// sometimes answers a long curated playlist's next batch from its start again. By entry rather than song, so a
-    /// song the playlist holds twice keeps both. `fetched` counts the repeats too. `entries` keeps each song's entry
-    /// ID, for the account's own playlist.
+    /// Drops the entries `seen` already holds and adds the rest: YouTube sometimes answers a long playlist's next
+    /// batch from its start again. By entry, not song, so a song listed twice keeps both. `fetched` counts the
+    /// repeats too; `entries` keeps entry IDs, for the account's own playlist.
     static func playlistRows(_ items: [JSON], entries: Bool = false, seen: inout Set<String>) -> (tracks: [Track], fetched: Int) {
-        let rows = keepFirstEntries(items, seen: &seen) {
-            $0["musicResponsiveListItemRenderer", "playlistItemData", "playlistSetVideoId"].string
+        let rows = items.filter {
+            $0["musicResponsiveListItemRenderer", "playlistItemData", "playlistSetVideoId"].string.map { seen.insert($0).inserted } ?? true
         }
         let tracks = tracks(rows, context: ItemContext(entries: entries))
         return (tracks, tracks.count + items.count - rows.count)
     }
 
-    /// `page` with a later batch of its songs from `YTMusic.playlistBatch`, and the step after should one be due,
-    /// handing on `seen`. A batch of nothing but repeats carries on, as the next may hold new songs again; `fetched`,
-    /// the tracks come before the batch, repeats included, counts towards `YTMusic.playlistLimit`.
+    /// `page` with a later batch from `YTMusic.playlistBatch` and the next step, if one is due. A batch of only
+    /// repeats carries on, as the next may hold new songs. `fetched`, the tracks before this batch with repeats,
+    /// counts towards `YTMusic.playlistLimit`.
     static func addingBatch(
         _ batch: (tracks: [Track], fetched: Int, next: String?), to page: Page, seen: Set<String>, fetched: Int
     ) -> Page {
@@ -137,10 +136,6 @@ extension Renderers {
             page.header?.meta = Formatting.playlistMeta(count: count, tracks: section.tracks)
         }
         return page
-    }
-
-    static func keepFirstEntries<T>(_ items: [T], seen: inout Set<String>, entry: (T) -> String?) -> [T] {
-        items.filter { item in entry(item).map { seen.insert($0).inserted } ?? true }
     }
 
     /// The channel the facepile links to, else the one in the strapline or

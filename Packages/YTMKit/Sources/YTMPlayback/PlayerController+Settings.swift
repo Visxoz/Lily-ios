@@ -101,7 +101,7 @@ extension PlayerController {
         }
     }
 
-    /// The share of the loudness correction the engine plays.
+    /// The engine's gain on top of the loudness correction: Quiet's 0.5 is 6 dB under Normal before the boost cap.
     private static func level(_ normalise: Normalise) -> Float? {
         switch normalise {
         case .off: nil

@@ -151,8 +151,14 @@ struct PillGroup: View {
         ViewThatFits(in: .horizontal) {
             pills(compact: false)
             pills(compact: true)
-            ScrollView(.horizontal, showsIndicators: false) {
-                pills(compact: true)
+            // Unclipped, so the row runs on to the screen's edge, and kept on the pill chosen.
+            ScrollViewReader { scroller in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    pills(compact: true)
+                }
+                .scrollClipDisabled()
+                .onAppear { scroller.scrollTo(selection) }
+                .onChange(of: selection) { withAnimation(Theme.fast) { scroller.scrollTo(selection) } }
             }
         }
     }

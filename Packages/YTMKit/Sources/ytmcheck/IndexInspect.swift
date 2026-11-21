@@ -12,10 +12,21 @@ enum IndexInspect {
             let response = try PlayerResponse(json: await resolver.player(videoId: id, as: .visionOS))
             for format in response.formats where [251, 140].contains(format.itag) {
                 guard let url = format.url.flatMap(URL.init(string:)), HTTP.isAllowed(url) else { continue }
-                let file = try await download(url, length: format.contentLength ?? 0)
-                let line = try check(file)
-                exact = exact && line.exact
-                print("\(id) itag \(format.itag), \(file.count >> 10) KB: \(line.text)")
+                guard let length = format.contentLength else {
+                    exact = false
+                    print("\(id) itag \(format.itag): no content length")
+                    continue
+                }
+                // One bad file is reported rather than ending the run.
+                do {
+                    let file = try await download(url, length: length)
+                    let line = try check(file)
+                    exact = exact && line.exact
+                    print("\(id) itag \(format.itag), \(file.count >> 10) KB: \(line.text)")
+                } catch {
+                    exact = false
+                    print("\(id) itag \(format.itag): \(error)")
+                }
             }
         }
         return exact

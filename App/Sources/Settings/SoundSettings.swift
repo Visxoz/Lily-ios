@@ -6,7 +6,10 @@ struct SoundSettings: View {
 
     var body: some View {
         @Bindable var settings = app.settings
-        SettingRow(label: "Normalise volume", detail: Self.normaliseDetail(settings.value.normalise), stacked: true) {
+        SettingRow(
+            label: "Normalise volume", detail: Self.normaliseDetail(settings.value.normalise), detailRoom: Self.normaliseDetail(.off),
+            stacked: true
+        ) {
             ChoicePills(choices: [(Normalise.off, "Off"), (.quiet, "Quiet"), (.normal, "Normal")], selection: $settings.value.normalise)
         }
         SettingRow(label: "Equaliser", detail: EqualiserScreen.summary(settings.value)) {
@@ -45,7 +48,6 @@ struct SoundSettings: View {
 
     private static func normaliseDetail(_ normalise: Normalise) -> String {
         switch normalise {
-        // All three about as long, so the rows below stay put on a pick.
         case .off: "Plays every track as it was mastered, leaving loud ones loud and quiet ones quiet."
         case .quiet: "Plays every track at a similar loudness, a little quieter than Normal."
         case .normal: "Plays every track at a similar loudness, turning quiet ones up and loud ones down."

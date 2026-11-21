@@ -42,7 +42,7 @@ actor PlaybackEngine {
     var producing: Track?
     var next: Track?
     var warmed: Warmed?
-    /// The share of the loudness correction's gain played, or nil for none.
+    /// The level items are normalised to, as a gain on YouTube's reference loudness (0.5 is 6 dB under), or nil for none.
     var normalise: Float? = 1
     var pauseOnUnplug = true
     /// The crossfade into `next`, in seconds, or 0 to follow without a gap.

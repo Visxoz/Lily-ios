@@ -24,8 +24,12 @@ struct ProxyRow: View {
                     .padding(.horizontal, 14)
                     .frame(height: 32)
                     .background(Capsule().strokeBorder(theme.ink.opacity(0.44), lineWidth: 1))
-                    // A mistyped address stays to be corrected.
-                    .onSubmit { Task { if await save(text) { text = "" } } }
+                    // A mistyped address stays to be corrected. Done on an empty field only puts the keyboard
+                    // away, as the field looks filled in by the saved address: clearing is the Clear button's.
+                    .onSubmit {
+                        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                        Task { if await save(text) { text = "" } }
+                    }
                 if saved?.address != nil {
                     PillButton(title: "Clear", small: true) { Task { await save("") } }
                 }

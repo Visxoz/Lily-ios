@@ -40,9 +40,12 @@ public struct EqualiserBands {
         let top = rate * 0.45
         var (hz, peak) = (20.0, 1.0)
         for _ in 0..<64 {
+            // The same for every band, so worked out once: this runs on the render thread through a glide.
+            let w = 2 * Double.pi * min(hz, top) / rate
+            let (c1, s1, c2, s2) = (cos(w), sin(w), cos(2 * w), sin(2 * w))
             var power = 1.0
             for band in filters.indices {
-                power *= filters[band].power(at: min(hz, top), rate: rate)
+                power *= filters[band].power(c1, s1, c2, s2)
             }
             peak = max(peak, power.squareRoot())
             hz *= step
@@ -69,11 +72,9 @@ public struct EqualiserBands {
             a2 = Float((1 - alpha / a) / a0)
         }
 
-        /// The gain at `hz`, squared, from the transfer function
+        /// The gain at w, squared, from the cosines and sines of w and 2w and the transfer function
         /// H(e^jw) = (b0 + b1 e^-jw + b2 e^-2jw) / (1 + a1 e^-jw + a2 e^-2jw).
-        func power(at hz: Double, rate: Double) -> Double {
-            let w = 2 * Double.pi * hz / rate
-            let (c1, s1, c2, s2) = (cos(w), sin(w), cos(2 * w), sin(2 * w))
+        func power(_ c1: Double, _ s1: Double, _ c2: Double, _ s2: Double) -> Double {
             func part(_ k0: Float, _ k1: Float, _ k2: Float) -> Double {
                 let (k0, k1, k2) = (Double(k0), Double(k1), Double(k2))
                 let (re, im) = (k0 + k1 * c1 + k2 * c2, k1 * s1 + k2 * s2)

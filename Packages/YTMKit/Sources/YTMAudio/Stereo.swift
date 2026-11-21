@@ -52,9 +52,7 @@ struct Stereo {
             left[frame] = (fedL + shift) * (1 - max(now.balance, 0))
             right[frame] = (fedR - shift) * (1 + min(now.balance, 0))
         }
-        // As in the equaliser: denormal filter memory would slow every sample.
-        if abs(lows.left) < 1e-20 || !lows.left.isFinite { lows.left = 0 }
-        if abs(lows.right) < 1e-20 || !lows.right.isFinite { lows.right = 0 }
+        lows = (lows.left.flushed, lows.right.flushed)
     }
 
     private static func toward(_ now: Float, _ target: Float, by step: Float) -> Float {

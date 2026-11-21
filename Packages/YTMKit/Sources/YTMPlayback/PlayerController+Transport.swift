@@ -86,7 +86,7 @@ extension PlayerController {
         publishPlayback()
     }
 
-    /// Not the user's, the song played through, which starts the run of failures over.
+    /// With `user` false the song played through, which ends the run of failures.
     func next(user: Bool) {
         if !user { playback.failures = 0 }
         if queue.advance(user: user, repeat: repeatMode) != nil {

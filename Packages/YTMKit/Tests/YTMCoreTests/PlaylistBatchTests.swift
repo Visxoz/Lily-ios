@@ -4,15 +4,16 @@ import Testing
 
 /// A long playlist's later batches, as `YTMusic.loadStep` takes each one on from the step before.
 @Suite struct PlaylistBatchTests {
-    private func rows(_ entries: [(song: String, entry: String)]) throws -> [JSON] {
+    private func rows(_ entries: [(song: String, entry: String?)]) throws -> [JSON] {
         let rows = entries.map {
-            #"{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"\#($0.song)","playlistSetVideoId":"\#($0.entry)"},"#
+            #"{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"\#($0.song)""#
+                + ($0.entry.map { #","playlistSetVideoId":"\#($0)""# } ?? "") + "},"
                 + #""flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Song \#($0.song)"}]}}}]}}"#
         }
         return try JSON(data: Data(("[" + rows.joined(separator: ",") + "]").utf8)).array
     }
 
-    private func page(after entries: [(song: String, entry: String)], fetched: Int? = nil) throws -> Page {
+    private func page(after entries: [(song: String, entry: String?)], fetched: Int? = nil) throws -> Page {
         var seen = Set<String>()
         let first = Renderers.playlistRows(try rows(entries), seen: &seen)
         return Page(
@@ -22,13 +23,25 @@ import Testing
         )
     }
 
-    private func step(_ page: Page, _ entries: [(song: String, entry: String)], next: String?) throws -> Page {
+    private func step(_ page: Page, _ entries: [(song: String, entry: String?)], next: String?) throws -> Page {
         guard case .tracks(_, var seen, let fetched)? = page.more else {
             Issue.record("the page had no step left")
             return page
         }
         let batch = Renderers.playlistRows(try rows(entries), seen: &seen)
         return Renderers.addingBatch((batch.tracks, batch.fetched, next), to: page, seen: seen, fetched: fetched)
+    }
+
+    @Test func dropsRepeatedEntriesButNotSongsListedTwiceCountingThem() throws {
+        var seen = Set<String>()
+        let first = Renderers.playlistRows(try rows([("a", "S1"), ("b", "S2"), ("c", "S3")]), seen: &seen)
+        // Starting over at b, then a listed again under a new entry, and rows with no entry ID.
+        let next = Renderers.playlistRows(try rows([("b", "S2"), ("c", "S3"), ("a", "S4"), ("d", nil), ("d", nil)]), seen: &seen)
+        #expect(first.tracks.map(\.id) + next.tracks.map(\.id) == ["a", "b", "c", "a", "d", "d"])
+        #expect(next.fetched == 5, "the repeats count towards the playlist's cap")
+        #expect(next.tracks.allSatisfy { $0.setVideoId == nil }, "entry IDs only for the account's own")
+        let again = Renderers.playlistRows(try rows([("a", "S1")]), entries: true, seen: &seen)
+        #expect(again.tracks.isEmpty && again.fetched == 1)
     }
 
     @Test func carriesOnPastABatchOfRepeatsUntilOneOfNothing() throws {

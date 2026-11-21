@@ -46,3 +46,11 @@ struct EqualiserBandsTests {
         #expect(clamped.indices.map { clamped[$0] } == [12, -12, 0, 0, 0, 0, 0, 0, 0, 0])
     }
 }
+
+extension EqualiserBands.Peak {
+    /// The gain at `hz`, squared.
+    func power(at hz: Double, rate: Double) -> Double {
+        let w = 2 * Double.pi * hz / rate
+        return power(cos(w), sin(w), cos(2 * w), sin(2 * w))
+    }
+}

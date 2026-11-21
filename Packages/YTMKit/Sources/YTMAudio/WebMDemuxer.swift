@@ -35,7 +35,7 @@ final class WebMDemuxer: PacketSource {
             switch header.id {
             case EBML.info: try readInfo(body)
             case EBML.tracks: try readTracks(body)
-            case EBML.cues: try readCues(body)
+            case EBML.cues: readCues(body)
             case EBML.simpleBlock: try readBlock(body, at: offset)
             case EBML.blockGroup: try readGroup(body, at: offset)
             default: break
@@ -95,7 +95,7 @@ final class WebMDemuxer: PacketSource {
 
     /// Each CuePoint's time, in ticks from the first packet's frame, and its Cluster. A damaged index is
     /// ignored rather than failing the file, as only seeks ahead need it.
-    private func readCues(_ body: UnsafeRawBufferPointer) throws {
+    private func readCues(_ body: UnsafeRawBufferPointer) {
         var points: [SeekPoint] = []
         do {
             try ElementWalker.forEach(in: body, header: EBML.header) { header, point, _ in

@@ -74,6 +74,16 @@ final class PageModel {
         await load(in: app, cached: true)
     }
 
+    /// Shows a newer copy the cache holds, as one a playlist was put in, without loading: an expired copy's
+    /// refresh now would bring back YouTube's list from before the edit.
+    func adoptCached(in app: AppModel) {
+        guard shownFor == app.accountGeneration, let kept = app.keptPage(route), kept.at != shownAt else { return }
+        // A step of the page from before the edit, landing after, would show YouTube's list over it.
+        generation += 1
+        loadingMore = false
+        show(kept.page, for: app)
+    }
+
     /// The old page stays while the new one loads.
     func refresh(in app: AppModel) async {
         app.forget(route)

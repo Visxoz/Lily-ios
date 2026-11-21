@@ -51,8 +51,8 @@ import Network
         }
     }
 
-    /// The share of each item's loudness correction played: 1 for YouTube's reference loudness, 0.5 for 6 dB under
-    /// it, or nil to play items as they are. Boosts are capped at 3 dB, and a limiter keeps peaks under full scale.
+    /// The level each item is normalised to: 1 for YouTube's reference loudness, 0.5 for 6 dB under it, or nil
+    /// to play items as they are. Boosts are capped at 3 dB, and a limiter keeps peaks under full scale.
     /// A change reaches the item playing once the few seconds already scheduled have played.
     public var normalise: Float? = 1 {
         didSet {

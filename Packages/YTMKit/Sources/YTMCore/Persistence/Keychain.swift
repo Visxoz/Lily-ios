@@ -20,8 +20,8 @@ enum Keychain {
         return result as? Data
     }
 
-    /// Stores `data` under `key`, or deletes the item when `data` is nil. A failure is logged,
-    /// as otherwise it shows only at the next launch, and returns false.
+    /// Stores `data` under `key`, or deletes the item when `data` is nil. Returns false on failure, which is also
+    /// logged, as otherwise it shows only at the next launch.
     @discardableResult
     static func set(_ data: Data?, for key: String) -> Bool {
         let query = query(key)

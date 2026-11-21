@@ -70,12 +70,11 @@ struct WatchReport {
         stretches = []
         sent += 1
         nextAt = ping.due(sent, sent: elapsed)
-        // What it reports, without the ping's URL and its tokens.
-        let spans = watched.stretches.map { String(format: "%.1f-%.1f", $0.lowerBound, $0.upperBound) }.joined(separator: ", ")
-        let state = (paused ? ", paused" : "") + (flush == .last ? ", final" : "")
-        let (count, at) = (sent, position)
+        // What it reports, without the ping's URL and its tokens. A mutating func's log can't read `self`, and the
+        // spans are written out only with debug logging on.
+        let count = sent
         Logger.playback.debug(
-            "watch time \(count) at \(elapsed.seconds, format: .fixed(precision: 0)) s: heard [\(spans, privacy: .public)], at \(at, format: .fixed(precision: 1)) s\(state, privacy: .public)"
+            "watch time \(count) at \(elapsed.seconds, format: .fixed(precision: 0)) s: heard [\(watched.stretches.map { String(format: "%.1f-%.1f", $0.lowerBound, $0.upperBound) }.joined(separator: ", "), privacy: .public)], at \(watched.position, format: .fixed(precision: 1)) s\(watched.paused ? ", paused" : "", privacy: .public)\(watched.last ? ", final" : "", privacy: .public)"
         )
         return (ping, watched)
     }

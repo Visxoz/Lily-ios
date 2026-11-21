@@ -91,10 +91,8 @@ struct Equaliser {
         preamp = endPreamp
         // A tenth of a second takes even a full-scale bass note's ringing down to about -60 dB.
         ringing = isFlat ? max(ringing - (frames - gliding), 0) : Int(rate) / 10
-        // Memory this small is flushed, as denormal floats would slow every sample once the music goes quiet;
-        // a filter that blew up anyway is put back at rest rather than left sending infinities to the device.
-        for index in memory.indices where abs(memory[index]) < 1e-20 || !memory[index].isFinite {
-            memory[index] = 0
+        for index in memory.indices {
+            memory[index] = memory[index].flushed
         }
     }
 
@@ -119,4 +117,10 @@ struct Equaliser {
             return abs(gap) <= by ? to[band] : from[band] + (gap < 0 ? -by : by)
         }
     }
+}
+
+extension Float {
+    /// Filter memory this small is flushed, as denormal floats would slow every sample once the music goes quiet;
+    /// a filter that blew up anyway is put back at rest rather than left sending infinities to the device.
+    var flushed: Float { abs(self) < 1e-20 || !isFinite ? 0 : self }
 }

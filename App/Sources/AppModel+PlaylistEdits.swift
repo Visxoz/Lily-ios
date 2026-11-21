@@ -145,7 +145,6 @@ extension AppModel {
         let generation = accountGeneration
         Task {
             guard let card = await player.saveQueueAsPlaylist(), generation == accountGeneration else { return }
-            // A copy already expired stays so, rather than passing an old Library off as current.
             editLibraryPlaylists { cards in
                 guard !cards.contains(where: { $0.id == card.id }) else { return false }
                 // First among the account's own, after Liked music.
@@ -168,6 +167,7 @@ extension AppModel {
     /// as YouTube's lists can take a moment to. `edit` answers whether it changed the cards of a section of playlists.
     private func editLibraryPlaylists(_ edit: (inout [Card]) -> Bool) {
         for route in [Route.library, .libraryPlaylists] {
+            // An expired copy stays expired, rather than passing an old Library off as current.
             editPage(route, shown: nil, renewing: false) { page -> Void? in
                 var found = false
                 for index in page.sections.indices {

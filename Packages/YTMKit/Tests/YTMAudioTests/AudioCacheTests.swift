@@ -28,6 +28,7 @@ struct AudioCacheTests {
     @Test func keepsTheFileJustCommittedThoughItIsPastTheCap() throws {
         let cache = AudioCache(.init(directory: directory, limit: 15))
         try store("mix", bytes: 20, age: 0, in: cache)
+        #expect(cache.completeFile(for: "mix", length: 20) != nil, "spared though past the cap")
     }
 
     @Test func keepsAFileBeingReadThoughItIsPastTheCap() throws {

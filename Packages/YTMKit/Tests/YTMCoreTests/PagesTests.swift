@@ -128,34 +128,6 @@ private let editablePlaylist = #"""
         #expect(Renderers.trackCount(two) == 12)
         #expect(Renderers.trackCount(.missing) == nil)
     }
-
-    @Test func dropsABatchRepeatedFromTheStartButNotSongsListedTwice() {
-        // Entries a, b, c, then a next batch starting over at b with one new.
-        let entries: [(song: String, entry: String?)] = [
-            ("a", "1"), ("b", "2"), ("c", "3"), ("b", "2"), ("c", "3"), ("a", "4"), ("d", nil), ("d", nil),
-        ]
-        var seen = Set<String>()
-        let kept = Renderers.keepFirstEntries(entries, seen: &seen, entry: \.entry)
-        #expect(kept.map(\.song) == ["a", "b", "c", "a", "d", "d"])
-    }
-
-    @Test func dropsRepeatedEntriesAcrossBatchesCountingThem() throws {
-        func row(_ id: String, _ entry: String) -> String {
-            #"{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"\#(id)","playlistSetVideoId":"\#(entry)"},"#
-                + #""flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Song \#(id)"}]}}}]}}"#
-        }
-        func rows(_ list: [(String, String)]) throws -> [JSON] {
-            try json("[" + list.map { row($0.0, $0.1) }.joined(separator: ",") + "]").array
-        }
-        var seen = Set<String>()
-        let first = Renderers.playlistRows(try rows([("a", "S1"), ("b", "S2"), ("c", "S3")]), seen: &seen)
-        let next = Renderers.playlistRows(try rows([("b", "S2"), ("c", "S3"), ("d", "S4")]), seen: &seen)
-        #expect(first.tracks.map(\.id) + next.tracks.map(\.id) == ["a", "b", "c", "d"])
-        #expect(next.fetched == 3, "the repeats count towards the playlist's cap")
-        #expect(next.tracks.allSatisfy { $0.setVideoId == nil }, "entry IDs only for the account's own")
-        let again = Renderers.playlistRows(try rows([("a", "S1")]), entries: true, seen: &seen)
-        #expect(again.tracks.isEmpty && again.fetched == 1)
-    }
 }
 
 private let album = #"""
