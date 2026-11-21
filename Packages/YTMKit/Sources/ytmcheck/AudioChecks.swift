@@ -37,8 +37,8 @@ enum AudioChecks {
         let item = AudioItem(
             id: song.id, url: stream.url, headers: stream.headers, contentLength: stream.contentLength,
             cacheKey: "\(song.id)-\(itag)", loudnessDB: -Float(max(stream.loudnessDb ?? 0, 0))
-        ) {
-            let fresh = try await Live.api.stream(videoId: song.id, quality: .high)
+        ) { _ in
+            let fresh = try await Live.api.stream(videoId: song.id, quality: .high, itag: itag)
             guard fresh.itag == itag, HTTP.isAllowed(fresh.url) else { throw YTMError(.unplayable, "The refreshed stream isn't the same file.") }
             return (url: fresh.url, headers: fresh.headers)
         }
@@ -112,7 +112,7 @@ private struct Entry {
 private extension AudioEvent {
     var ends: Bool {
         switch self {
-        case .finished, .failed: true
+        case .finished, .failed, .dropped: true
         case .started, .advanced, .buffering, .nextDropped: false
         }
     }

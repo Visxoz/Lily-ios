@@ -39,7 +39,7 @@ struct StreamLoaderTests {
         let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?\(query)"))
         let fresh = try #require(URL(string: "https://rr2.googlevideo.com/videoplayback?\(query)&n=fresh"))
         let item = AudioItem(id: "x", url: stale, headers: ["User-Agent": "old"], contentLength: Int64(file.count),
-                             cacheKey: "x-\(UUID())", loudnessDB: 0) {
+                             cacheKey: "x-\(UUID())", loudnessDB: 0) { _ in
             (url: fresh, headers: ["User-Agent": "new"])
         }
         let source = AgentRecording(RefusingPartWay(files: ["song": file], after: 3_000))
@@ -50,17 +50,20 @@ struct StreamLoaderTests {
 
     @Test func givesUpWhenEveryURLIsRefused() async throws {
         let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=10000&lmt=1"))
-        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) {
-            (url: stale, headers: [:])
+        let asked = Asked()
+        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) { again in
+            asked.again.withLock { $0.append(again) }
+            return (url: stale, headers: [:])
         }
         let (loader, received, failure) = try await load(item, from: MemoryByteSource(files: [:], refuseFrom: 0))
         #expect(failure == .refused && received.isEmpty && !loader.isComplete)
+        #expect(asked.again.withLock { $0 } == [false, true, true], "the same client once more, then each of the others")
     }
 
     @Test func refusesAFreshURLForAnotherFile() async throws {
         let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=10000&lmt=1"))
         let other = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=10000&lmt=2&n=fresh"))
-        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) {
+        let item = AudioItem(id: "x", url: stale, headers: [:], contentLength: 10_000, cacheKey: "x-\(UUID())", loudnessDB: 0) { _ in
             (url: other, headers: [:])
         }
         let (_, _, failure) = try await load(item, from: MemoryByteSource(files: [:], refuseFrom: 0))
@@ -83,6 +86,28 @@ struct StreamLoaderTests {
         #expect(StreamLoader.rangeEnd(from: 0, total: 0) == .max, "of unknown length")
     }
 
+    @Test func retriesADroppedConnectionUntilItHasBeenGoneAWhile() {
+        #expect(StreamLoader.rideOutDelay(drops: 0, failingFor: .zero) == StreamLoader.retryDelay)
+        #expect(StreamLoader.rideOutDelay(drops: 1, failingFor: .seconds(1)) == StreamLoader.retryDelay * 2)
+        #expect(StreamLoader.rideOutDelay(drops: 40, failingFor: .seconds(30)) == StreamLoader.maxRetryDelay, "capped")
+        #expect(StreamLoader.rideOutDelay(drops: 0, failingFor: StreamLoader.rideOut) == nil, "given up")
+    }
+
+    @Test func tellsLostConnectionsFromOtherErrors() {
+        #expect(StreamLoader.isConnection(URLError(.networkConnectionLost)))
+        #expect(StreamLoader.isConnection(URLError(.notConnectedToInternet)))
+        #expect(!StreamLoader.isConnection(URLError(.cancelled)))
+        #expect(!StreamLoader.isConnection(ByteSourceError.status(503)), "an answer, not a lost connection")
+        #expect(!StreamLoader.isConnection(ByteSourceError.refused))
+        #expect(!StreamLoader.isConnection(ByteSourceError.empty))
+    }
+
+    @Test func carriesOnOnceTheConnectionIsBack() async throws {
+        let item = try AudioItem.fixture("song", length: file.count)
+        let (_, received, failure) = try await load(item, from: DroppingOnce(file: file))
+        #expect(failure == nil && received == file)
+    }
+
     @Test func warmsOnlyTheStartOfAWholeFileAnswer() async throws {
         let whole = Data(count: 200_000)
         let item = try AudioItem.fixture("song", length: whole.count)
@@ -98,6 +123,32 @@ private struct IgnoringRanges: ByteSource {
 
     func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
         MemoryByteSource(files: ["song": file]).bytes(of: url, headers: headers, range: 0..<Int64(file.count))
+    }
+}
+
+/// Whether each refresh was told the last fresh URL was refused too.
+private final class Asked: Sendable {
+    let again = Mutex<[Bool]>([])
+}
+
+/// Loses the connection on the first request, then serves the file.
+private final class DroppingOnce: ByteSource {
+    private let file: Data
+    private let dropped = Mutex(false)
+
+    init(file: Data) {
+        self.file = file
+    }
+
+    func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
+        let first = dropped.withLock { dropped in
+            defer { dropped = true }
+            return !dropped
+        }
+        if first {
+            return AsyncThrowingStream { $0.finish(throwing: URLError(.networkConnectionLost)) }
+        }
+        return MemoryByteSource(files: ["song": file]).bytes(of: url, headers: headers, range: range)
     }
 }
 

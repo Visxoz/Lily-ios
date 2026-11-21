@@ -161,7 +161,7 @@ import Foundation
         case .finished:
             currentID = nil
             isPlaying = false
-        case .failed(let id, _) where id == currentID:
+        case .failed(let id, _) where id == currentID, .dropped(let id) where id == currentID:
             currentID = nil
             isPlaying = false
         default:

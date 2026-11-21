@@ -95,6 +95,7 @@ struct PlayerControllerTests {
         await rig.soundStarts()
         #expect(await rig.lastFM.nowPlaying == ["a"], "one play")
         #expect(rig.music.calls.filter { $0 == "report a" }.count == 1)
+        #expect(rig.music.calls.filter { $0 == "suspect" }.count == 1, "the player is checked sooner")
     }
 
     @Test func stopsAfterThreeSongsInARowFail() async {
@@ -441,7 +442,10 @@ struct StreamChooserTests {
         music.set { $0.premiumFails = true }
         let chooser = StreamChooser(music: music)
         let stream = try await chooser.resolve(videoId: "a", wantPremium: true, signedIn: true, quality: .high)
-        #expect(!stream.isPremium && music.calls == ["premium a", "stream a"])
+        #expect(!stream.isPremium && music.calls == ["premium a", "suspect", "stream a"], "the player is checked sooner")
+        music.set { $0.calls = [] }
+        _ = try await chooser.resolve(videoId: "a", wantPremium: true, signedIn: true, quality: .high, reopening: true)
+        #expect(music.calls == ["premium a", "stream a"], "a song opened again after a drop says nothing of Premium")
     }
 
     @Test func aPlayerThatCantBePreparedIsNotCountedAsAPremiumError() async throws {

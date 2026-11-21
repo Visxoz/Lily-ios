@@ -298,7 +298,7 @@ struct PlaybackEngineTests {
 
     @Test func reportsAStreamThatWillNotDownload() async throws {
         let stale = try #require(URL(string: "https://rr1.googlevideo.com/videoplayback?itag=251&clen=100&lmt=1&file=gone"))
-        let item = AudioItem(id: "gone", url: stale, headers: [:], contentLength: 100, cacheKey: "gone-\(UUID())", loudnessDB: 0) {
+        let item = AudioItem(id: "gone", url: stale, headers: [:], contentLength: 100, cacheKey: "gone-\(UUID())", loudnessDB: 0) { _ in
             (url: stale, headers: [:])
         }
         let (stream, sink) = AsyncStream.makeStream(of: PlaybackEngine.Stamped.self)

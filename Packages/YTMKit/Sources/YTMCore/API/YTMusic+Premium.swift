@@ -28,6 +28,11 @@ extension YTMusic {
         )
     }
 
+    /// A Premium stream failed, so the held player script is checked against YouTube's sooner.
+    public func suspectPremiumPlayer() async {
+        await PlayerScripts.shared.suspect()
+    }
+
     /// So the first song doesn't wait for the player script. A failure is left
     /// for the song to meet, after the script's own back-off.
     @concurrent

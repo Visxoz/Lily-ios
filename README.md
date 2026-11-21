@@ -123,6 +123,7 @@ Lily starts in pure black with its own orchid. Pick another look and accent in *
 | **Equaliser** | Six bands from 60 Hz to 15 kHz, ±12 dB each, with presets: Flat, Bass boost, Treble boost, Vocal, Rock, Electronic and Acoustic. Boosting turns the rest down to leave headroom. |
 | **Normalise volume** | Plays every track at a similar loudness, from YouTube's own measurement, as YouTube Music does. |
 | **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music pauses rather than carrying on through the speaker; plug a pair in and it plays on through them. |
+| **Rides out a lost connection** | A connection that drops is waited on for a minute. Gone longer, the song opens again where it stopped, a few times, then waits for you to press play, rather than skipping. |
 
 ## Take it offline
 
@@ -211,7 +212,7 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 
 ## Your account
 
-Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations, unless you turn off **YouTube history** in **Settings ▸ Account**.
+Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations, with the time you listened, as on the web, unless you turn off **YouTube history** in **Settings ▸ Account**.
 
 The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews it every 10 minutes, as an open YouTube tab does, and should YouTube sign you out, it says so.
 
@@ -263,7 +264,7 @@ flowchart LR
 | Offline and Wi-Fi only | The Network framework |
 | Google sign-in | WebKit, only while signing in |
 
-Most YouTube clients get stream URLs that YouTube's player JavaScript has to unscramble. The visionOS client gets plain ones, so the app asks as that client and needs no JavaScript engine, falling back to Android VR and iOS if YouTube changes it. With Premium, the app unscrambles the web player's URLs itself, in a short-lived JavaScriptCore context with a cut-down copy of the player.
+Most YouTube clients get stream URLs that YouTube's player JavaScript has to unscramble. The visionOS client gets plain ones, so the app asks as that client and needs no JavaScript engine, falling back to Android VR and iOS if YouTube changes it. A client whose streams are cut off partway is asked last from then on, and the song carries on from the same byte with another client's copy. With Premium, the app unscrambles the web player's URLs itself, in a short-lived JavaScriptCore context with a cut-down copy of the player.
 
 Apple's AudioToolbox decodes Opus, but can't read the WebM files YouTube keeps it in, so the app reads them itself and hands AudioToolbox the packets as they download.
 

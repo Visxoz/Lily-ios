@@ -80,14 +80,16 @@ struct PlayerScript: Codable, Sendable {
 }
 
 /// Shared by every song, with a pause after a failure so a broken player isn't fetched for each one.
-/// A phone app can run for days, so the version is rechecked every few hours in the background.
+/// Songs a running session solves with an old player start failing once YouTube moves on, so the
+/// version is checked hourly in the background, or sooner once a Premium stream fails.
 actor PlayerScripts {
     static let shared = PlayerScripts()
 
-    private static let backoff: Duration = .seconds(10 * 60)
-    private static let recheck: Duration = .seconds(6 * 60 * 60)
+    /// Also the floor before a failing Premium stream has the player checked again.
+    static let backoff: Duration = .seconds(10 * 60)
+    static let recheck: Duration = .seconds(60 * 60)
 
-    private var current: (script: PlayerScript, checked: ContinuousClock.Instant)?
+    private var current: (script: PlayerScript, check: Check)?
     /// The load in flight, which callers await only while no player is known.
     private var loading: Task<PlayerScript, any Error>?
     private var failed: ContinuousClock.Instant?
@@ -95,10 +97,10 @@ actor PlayerScripts {
     func player(store: FileStore) async throws -> PlayerScript {
         let now = ContinuousClock.now
         let backingOff = failed.map { now - $0 < Self.backoff } ?? false
-        if let current {
+        if let script = current?.script {
             // A known script keeps solving while a newer one is fetched, so no song waits for the recheck.
-            if now - current.checked >= Self.recheck, loading == nil, !backingOff { refresh(store: store) }
-            return current.script
+            if loading == nil, !backingOff, current?.check.take(at: now) == true { refresh(store: store) }
+            return script
         }
         if backingOff {
             throw YTMError.playerUnprepared
@@ -113,7 +115,11 @@ actor PlayerScripts {
             defer { loading = nil }
             do {
                 let script = try await PlayerScript.load(store: store)
-                current = (script, .now)
+                if let old = current?.script.id, old != script.id {
+                    Logger.premium.info("player \(script.id, privacy: .public) replaces \(old, privacy: .public)")
+                }
+                // A recheck keeps its claim's time and any failure since, which asks for the next one sooner.
+                current = (script, current?.check ?? Check(checked: .now))
                 failed = nil
                 return script
             } catch {
@@ -124,6 +130,29 @@ actor PlayerScripts {
         }
         loading = task
         return task
+    }
+
+    /// A Premium stream failed, which an outdated player can cause, so it is checked sooner.
+    func suspect() {
+        current?.check.suspect = true
+    }
+
+    /// When the held player is due a check against YouTube's current one.
+    struct Check {
+        /// When it was loaded or last checked.
+        var checked: ContinuousClock.Instant
+        /// A Premium stream failed since.
+        var suspect = false
+
+        /// Due hourly, or after the floor once suspect, claiming it so only one runs and a failed
+        /// check waits for the next.
+        mutating func take(at now: ContinuousClock.Instant) -> Bool {
+            let age = now - checked
+            guard age >= PlayerScripts.recheck || (suspect && age >= PlayerScripts.backoff) else { return false }
+            checked = now
+            suspect = false
+            return true
+        }
     }
 }
 

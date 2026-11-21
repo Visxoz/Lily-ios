@@ -287,7 +287,7 @@ actor PlaybackEngine {
     func prepareNext() {
         guard let next else { return }
         if let failure = next.failure {
-            emit(.failed(id: next.item.id, message: failure.message))
+            emit(Self.event(next, failure))
             dropNext()
             if awaitingNext {
                 awaitingNext = false

@@ -300,7 +300,7 @@ import YTMCore
     }
 
     private static func isNetwork(_ error: any Error) -> Bool {
-        error is URLError || (error as? YTMError)?.kind == .network || (error as? AudioFailure) == .download
+        error is URLError || (error as? YTMError)?.kind == .network || [.download, .dropped].contains(error as? AudioFailure)
     }
 
     // MARK: The network

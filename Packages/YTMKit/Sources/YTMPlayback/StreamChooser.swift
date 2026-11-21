@@ -101,13 +101,14 @@ final class StreamChooser: Sendable {
 
     /// `wantPremium` means signed in at High quality. Downloads pass `counting` false: a
     /// playlist of music videos, which have no Premium formats, says nothing of the account.
+    /// `reopening` a song whose connection dropped, its failures say nothing of Premium either.
     @concurrent
     func resolve(
-        videoId: String, wantPremium: Bool, signedIn: Bool, quality: AudioQuality, counting: Bool = true
+        videoId: String, wantPremium: Bool, signedIn: Bool, quality: AudioQuality, counting: Bool = true, reopening: Bool = false
     ) async throws -> ResolvedStream {
         if wantPremium {
             if !counters.withLock({ $0.skipped(at: .now) }) {
-                if let stream = try await premium(videoId, counting: counting) { return stream }
+                if let stream = try await premium(videoId, counting: counting, reopening: reopening) { return stream }
             } else if counting, counters.withLock({ $0.takeRecheck(at: .now) }) {
                 // Checked off the playback path: this song plays the free
                 // stream at once, and the next one gets Premium if it is back.
@@ -117,12 +118,19 @@ final class StreamChooser: Sendable {
         return try await free(videoId, signedIn: signedIn, quality: quality)
     }
 
-    /// Asks the path that gave the stream, so it comes back as the same file.
-    /// Counts nothing, as the song already counted when first resolved.
+    /// Asks the path that gave the stream, so it comes back as the same file: a free stream, web-client
+    /// ones too, is asked of the plain-URL clients in format `itag`, so one googlevideo refuses still
+    /// plays. `cutOff` names the client whose fresh URL was refused too, asked last from now on.
+    /// Counts nothing towards the Premium counters, as the song already counted when first resolved,
+    /// but has the player checked sooner.
     @concurrent
-    func refresh(videoId: String, wasPremium: Bool, signedIn: Bool, quality: AudioQuality) async throws -> ResolvedStream {
+    func refresh(
+        videoId: String, wasPremium: Bool, itag: Int, cutOff: String?, signedIn: Bool, quality: AudioQuality
+    ) async throws -> ResolvedStream {
         Logger.playback.info("\(videoId, privacy: .public): stream refused partway; asking for a fresh URL")
-        guard wasPremium else { return try await free(videoId, signedIn: signedIn, quality: quality) }
+        if let cutOff { music.cutOffStreams(of: cutOff) }
+        guard wasPremium else { return try await free(videoId, signedIn: signedIn, quality: quality, itag: itag) }
+        await music.suspectPremiumPlayer()
         guard signedIn, case .stream(let stream) = try await music.premiumStream(videoId: videoId, anyFormat: false, maxKbps: nil) else {
             throw YTMError(.unplayable, "The Premium stream couldn't be had again.")
         }
@@ -131,7 +139,7 @@ final class StreamChooser: Sendable {
 
     /// Nil to play the free stream. A known Premium account takes any format
     /// from the same answer, which saves asking the free clients.
-    private func premium(_ videoId: String, counting: Bool) async throws -> ResolvedStream? {
+    private func premium(_ videoId: String, counting: Bool, reopening: Bool) async throws -> ResolvedStream? {
         let known = status == .premium
         do {
             switch try await music.premiumStream(videoId: videoId, anyFormat: known, maxKbps: nil) {
@@ -148,8 +156,11 @@ final class StreamChooser: Sendable {
             Logger.playback.info("\(videoId, privacy: .public): could not prepare the player; using the free stream")
         } catch {
             Logger.playback.info("\(videoId, privacy: .public): Premium path failed, using the free stream: \(sentence(for: error), privacy: .public)")
-            if counting, counters.withLock({ $0.recordError(at: .now) }) {
-                Logger.playback.info("Premium requests keep failing; using free streams for 10 minutes")
+            if counting, !reopening {
+                await music.suspectPremiumPlayer()
+                if counters.withLock({ $0.recordError(at: .now) }) {
+                    Logger.playback.info("Premium requests keep failing; using free streams for 10 minutes")
+                }
             }
         }
         return nil
@@ -168,9 +179,10 @@ final class StreamChooser: Sendable {
 
     /// YTMCore retries a bot-checked visitor ID itself. Signed in, falls back to
     /// the web client's scrambled URLs through the Premium solver, Premium or not.
-    private func free(_ videoId: String, signedIn: Bool, quality: AudioQuality) async throws -> ResolvedStream {
+    /// `itag` holds the plain-URL clients to that format, but not the web client.
+    private func free(_ videoId: String, signedIn: Bool, quality: AudioQuality, itag: Int? = nil) async throws -> ResolvedStream {
         do {
-            return try await music.stream(videoId: videoId, quality: quality)
+            return try await music.stream(videoId: videoId, quality: quality, itag: itag)
         } catch is CancellationError {
             throw CancellationError()
         } catch {

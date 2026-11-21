@@ -55,6 +55,11 @@ struct Format: Sendable, Hashable {
         isDefaultAudio = track.exists ? track["audioIsDefault"].bool ?? false : true
     }
 
+    /// Not a dynamic-range compressed variant, dubbed track or surround mix, which the decoders can't play.
+    var isPlain: Bool {
+        !isDrc && channels.map { $0 <= 2 } ?? true && isDefaultAudio
+    }
+
     /// Opus in WebM, or AAC-LC in MP4: the quotes keep out `mp4a.40.29`, and HE-AAC
     /// (`mp4a.40.5`, itag 139) is left out.
     private static func codec(mime: String) -> AudioCodec? {
@@ -69,11 +74,7 @@ struct Format: Sendable, Hashable {
 func bestAudio(_ formats: [Format], maxKbps: Int?) -> Format? {
     func pick(_ codec: AudioCodec) -> Format? {
         let candidates = formats.filter { format in
-            format.codec == codec
-                && (format.url != nil || format.signatureCipher != nil)
-                && !format.isDrc
-                && format.channels.map { $0 <= 2 } ?? true
-                && format.isDefaultAudio
+            format.codec == codec && (format.url != nil || format.signatureCipher != nil) && format.isPlain
         }
         let within = maxKbps.map { kbps in candidates.filter { $0.bitrate <= kbps * 1000 } } ?? candidates
         return within.max { ($0.bitrate, $0.itag) < ($1.bitrate, $1.itag) }

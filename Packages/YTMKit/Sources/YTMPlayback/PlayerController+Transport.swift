@@ -5,6 +5,9 @@ import YTMCore
 extension PlayerController {
     /// Pressing previous later than this into a song restarts it instead.
     static let restartAfterSeconds = 3.0
+    /// Opening a song again after its connection dropped, each try waiting `reopenAfter` longer than the last.
+    static let maxReopens = 3
+    static let reopenAfter = Duration.seconds(5)
 
     public func togglePlayPause() {
         setPaused(isPlaying)
@@ -30,13 +33,14 @@ extension PlayerController {
     }
 
     /// Moves to `seconds` into the song, kept short of its very end. With
-    /// nothing loaded yet, the song starts there when played.
+    /// nothing loaded yet, or while it is opened again, it starts there.
     public func seek(to seconds: Double) {
         guard let current else { return }
         let length = playback.duration
         let target = length > 0 ? max(min(seconds, length - 0.5), 0) : max(seconds, 0)
+        if playback.itemID == nil || playback.reopening(current.id) { playback.resume = (current.id, target) }
+        recorder.seeked()
         if playback.itemID == nil {
-            playback.resume = (current.id, target)
             playback.heldPosition = target
         } else {
             audio.seek(to: target)
@@ -67,6 +71,7 @@ extension PlayerController {
             audio.resume()
         }
         isPlaying = !paused
+        if paused { recorder.flushWatch(.now, paused: true, reporting: reportsToYouTube) }
         updateBuffering()
         publishPlayback()
     }
@@ -117,7 +122,14 @@ extension PlayerController {
             stop()
             return
         }
+        let recorded = playback.playRecorded == playback.generation
         playback.generation += 1
+        // A song opened again carries on without a second play.
+        if !playback.reopening(track.id) {
+            playback.reopen = nil
+        } else if recorded {
+            playback.playRecorded = playback.generation
+        }
         playback.started = false
         playback.loading = true
         playback.stalled = false
@@ -131,7 +143,7 @@ extension PlayerController {
         } else {
             gapless.forget()
         }
-        for task in [resolving, queueing, autoplay] { task?.cancel() }
+        for task in [resolving, queueing, autoplay, reopenWait] { task?.cancel() }
         // Before the stop, which forgets how much of the song the engine holds.
         let held = heldStream(track.id)
         // The output runs on while the stream resolves, so iOS keeps the app
@@ -161,6 +173,8 @@ extension PlayerController {
             guard let self, !Task.isCancelled, playback.generation == generation else { return }
             switch result {
             case .success(let prefetched): load(track, prefetched)
+            // Still offline.
+            case .failure where playback.reopening(track.id): connectionLost()
             case .failure(let error): playbackFailed(track.title, sentence(for: error))
             }
         }
@@ -168,7 +182,7 @@ extension PlayerController {
 
     private func load(_ track: Track, _ prefetched: StreamPrefetcher.Prefetched) {
         show(prefetched.stream)
-        let start = takeResumePosition()
+        let start = resumePosition()
         do {
             let item = try audioItem(for: track, stream: prefetched.stream)
             playback.itemID = item.id
@@ -182,10 +196,49 @@ extension PlayerController {
         }
     }
 
-    private func takeResumePosition() -> Double {
-        defer { playback.resume = nil }
+    private func resumePosition() -> Double {
         guard let resume = playback.resume, resume.id == queue.current?.id else { return 0 }
         return resume.position
+    }
+
+    /// Opens the song again where it stopped, a few times while the connection
+    /// is gone, then stops on it, so Play carries on.
+    func connectionLost() {
+        guard let id = queue.current?.id else { return }
+        Logger.playback.warning("lost the connection")
+        let tries = playback.reopenTry(id, position: currentTime)
+        playback.started = false
+        // Resolved afresh, as on Windows, which offline fails at once rather than riding out another minute.
+        prefetcher.remove(id)
+        let held = resumePosition()
+        guard isPlaying, tries <= Self.maxReopens else {
+            if tries > Self.maxReopens { say("Lost the connection. Press play to carry on.") }
+            stop()
+            playback.heldPosition = held
+            publishPlayback()
+            return
+        }
+        if tries == 1 { say("Lost the connection; trying again") }
+        playback.loading = true
+        playback.itemID = nil
+        playback.heldPosition = held
+        updateBuffering()
+        publishPlayback()
+        let generation = playback.generation
+        reopenWait?.cancel()
+        reopenWait = Task { [weak self] in
+            try? await Task.sleep(for: Self.reopenAfter * tries)
+            // A late event may have sent it after the song played on.
+            guard let self, !Task.isCancelled, playback.generation == generation, !playback.started, playback.reopen != nil
+            else { return }
+            if isPlaying {
+                startCurrent()
+            } else {
+                // Play then opens it.
+                playback.loading = false
+                updateBuffering()
+            }
+        }
     }
 
     /// A Premium stream or a downloaded file gets one retry on the free stream
@@ -194,6 +247,7 @@ extension PlayerController {
         Logger.playback.warning("playback failed: \(message, privacy: .public)")
         if let id = queue.current?.id { prefetcher.remove(id) }
         if let id = queue.current?.id, playback.currentPremium || stream?.url.isFileURL == true, playback.forceFree != id {
+            if playback.currentPremium { Task { [music] in await music.suspectPremiumPlayer() } }
             playback.currentPremium = false
             playback.forceFree = id
             prefetcher.clear()
@@ -239,9 +293,13 @@ extension PlayerController {
         playback.loading = false
         playback.itemID = nil
         resolving?.cancel()
+        reopenWait?.cancel()
         gapless.unqueue(into: &prefetcher)
         audio.stop(keepingOutput: false)
         isPlaying = false
+        // Play carries on a song stopped on a dropped connection as the same play.
+        let reopening = queue.current.map { playback.reopening($0.id) } ?? false
+        recorder.flushWatch(reopening ? .now : .last, paused: true, reporting: reportsToYouTube)
         updateBuffering()
         publishPlayback()
     }

@@ -225,7 +225,7 @@ extension AudioItem {
             contentLength: Int64(length),
             cacheKey: "\(name)-\(UUID().uuidString)",
             loudnessDB: loudnessDB,
-            refresh: { (url: fresh, headers: [:]) }
+            refresh: { _ in (url: fresh, headers: [:]) }
         )
     }
 }

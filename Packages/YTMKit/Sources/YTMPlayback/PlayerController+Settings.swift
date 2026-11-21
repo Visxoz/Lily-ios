@@ -28,9 +28,13 @@ extension PlayerController {
         apply(settings.value)
     }
 
+    /// Plays go to the account's YouTube history, and their watch time with them.
+    var reportsToYouTube: Bool { signedIn && settings.value.youtubeHistory }
+
     /// Call after signing in or out. Dropping the saved Home, the old account's,
     /// is the caller's job.
     public func accountDidChange() async {
+        recorder.forgetWatch()
         chooser.reset()
         premiumStatus = .unknown
         settings.value.premiumAccount = false

@@ -218,7 +218,7 @@ extension PlaybackEngine {
         if let failure = track.failure {
             next?.cancel()
             next = nil
-            emit(.failed(id: track.item.id, message: failure.message))
+            emit(Self.event(track, failure))
             // A next that failed before a sound of it was heard leaves the item heard to end as usual.
             if let heard, heard !== track {
                 producing = heard
@@ -239,6 +239,11 @@ extension PlaybackEngine {
         } else {
             finish()
         }
+    }
+
+    /// An item's failure, as a dropped connection when its download says so.
+    static func event(_ track: Track, _ failure: AudioFailure) -> AudioEvent {
+        failure == .dropped ? .dropped(id: track.item.id) : .failed(id: track.item.id, message: failure.message)
     }
 
     /// A silent item's failure may go unanswered by the player, so the output still

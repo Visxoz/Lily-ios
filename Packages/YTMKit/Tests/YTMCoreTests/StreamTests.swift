@@ -71,6 +71,30 @@ import Testing
         #expect(try stream(response(dubbed, original)).itag == 250)
     }
 
+    @Test func carriesOnWithTheSameFormatOnly() throws {
+        let all = try response(aac, opus, opusLow)
+        let pinned = { (json: JSON, itag: Int) in try StreamResolver.stream(in: json, userAgent: "test", maxKbps: nil, itag: itag) }
+        #expect(try pinned(all, 249).url.absoluteString == "https://r1.googlevideo.com/249", "not the best")
+        #expect(throws: StreamResolver.noAudio, "not offered") { try pinned(all, 250) }
+        #expect(throws: StreamResolver.noAudio, "scrambled") { try pinned(response(premium), 774) }
+        #expect(try pinned(response(opusDrc, opus), 251).url.absoluteString == "https://r1.googlevideo.com/251", "not the compressed variant")
+    }
+
+    @Test func asksCutOffClientsLastRefusedLongestAgoFirst() {
+        let names = { (cut: [String]) in StreamResolver.clients(cut: cut).map(\.name) }
+        #expect(names([]) == ["VISIONOS", "ANDROID_VR", "IOS"])
+        #expect(names(["ANDROID_VR"]) == ["VISIONOS", "IOS", "ANDROID_VR"])
+
+        // Only iOS works, and was refused once before: a download walking on from visionOS and Android VR still reaches it.
+        var cut = ["IOS"]
+        #expect(StreamResolver.mark(&cut, "VISIONOS"))
+        #expect(names(cut).first == "ANDROID_VR")
+        #expect(StreamResolver.mark(&cut, "ANDROID_VR"))
+        #expect(names(cut) == ["IOS", "VISIONOS", "ANDROID_VR"])
+        #expect(!StreamResolver.mark(&cut, "IOS"), "already marked")
+        #expect(cut == ["VISIONOS", "ANDROID_VR", "IOS"], "but now refused last")
+    }
+
     @Test func scrambledURLsCountAsNone() throws {
         #expect(throws: StreamResolver.noAudio) { try stream(response(premium)) }
     }

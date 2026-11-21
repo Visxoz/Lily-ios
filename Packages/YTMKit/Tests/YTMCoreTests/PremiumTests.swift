@@ -134,6 +134,27 @@ private func trimmed(_ player: String) throws -> String {
         #expect(PlayerScript.signatureTimestamp(in: Array("x={signatureTimestamp:20744,y:1}".utf8)) == 20744)
         #expect(PlayerScript.signatureTimestamp(in: Array("a={sts:19876}".utf8)) == 19876)
     }
+
+    @Test func checksThePlayerHourlyOrSoonerAfterAFailure() {
+        let loaded = ContinuousClock.now
+        var check = PlayerScripts.Check(checked: loaded)
+        let fresh = check.take(at: loaded)
+        #expect(!fresh, "just loaded")
+        check.suspect = true
+        let floor = check.take(at: loaded)
+        #expect(!floor, "a failure waits out the floor")
+
+        let first = loaded + PlayerScripts.backoff
+        let sooner = check.take(at: first)
+        #expect(sooner, "a failure brings it forward")
+        let again = check.take(at: first)
+        #expect(!again, "only one check at a time")
+
+        let cleared = check.take(at: first + PlayerScripts.backoff)
+        #expect(!cleared, "the check cleared the failure")
+        let hourly = check.take(at: first + PlayerScripts.recheck)
+        #expect(hourly, "due hourly regardless")
+    }
 }
 
 @Suite struct SolverTests {

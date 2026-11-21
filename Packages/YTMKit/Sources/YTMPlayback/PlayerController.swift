@@ -118,6 +118,8 @@ import YTMCore
     @ObservationIgnored var continuing: Task<Void, Never>?
     @ObservationIgnored var lyricsLoad: Task<Void, Never>?
     @ObservationIgnored var ratingLoad: Task<Void, Never>?
+    /// The wait before opening a song again after its connection dropped.
+    @ObservationIgnored var reopenWait: Task<Void, Never>?
 
     public convenience init(
         api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared,
@@ -160,7 +162,7 @@ import YTMCore
     }
 
     isolated deinit {
-        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, continuing, lyricsLoad, ratingLoad] {
+        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, continuing, lyricsLoad, ratingLoad, reopenWait] {
             task?.cancel()
         }
         toastSink.finish()
@@ -217,6 +219,10 @@ import YTMCore
             } else if id == playback.itemID {
                 playbackFailed(current?.title ?? "", message)
             }
+        case .dropped(let id):
+            // The queued song's stream is kept, unlike for `failed`, so it rides out the drop as it
+            // plays rather than failing to resolve offline.
+            if id == playback.itemID { connectionLost() }
         case .buffering(let stalled):
             playback.stalled = stalled
             updateBuffering()
@@ -232,6 +238,8 @@ import YTMCore
         playback.started = true
         playback.loading = false
         playback.failures = 0
+        playback.resume = nil
+        playback.reopen = nil
         let recorded = playback.playRecorded == playback.generation
         playback.playRecorded = nil
         if !recorded { recordPlay() }
@@ -251,7 +259,7 @@ import YTMCore
     /// The one place a play is recorded.
     func recordPlay() {
         guard let track = queue.current else { return }
-        recorder.record(track, reportToYouTube: signedIn && settings.value.youtubeHistory)
+        recorder.record(track, reportToYouTube: reportsToYouTube, paused: !isPlaying)
         persistSoon()
     }
 
@@ -277,7 +285,7 @@ import YTMCore
         syncPremiumStatus()
         guard playback.started else { return }
         let position = audio.currentTime
-        recorder.heard(position: position, length: playback.duration, speed: audio.speed)
+        recorder.heard(position: position, length: playback.duration, speed: audio.speed, reporting: reportsToYouTube)
         updateGapless(at: position)
         nowPlaying?.keep(elapsed: position, advancing: isAdvancing)
     }
@@ -318,7 +326,8 @@ import YTMCore
     func resolver(for videoId: String) -> @Sendable () async throws -> ResolvedStream {
         let (chooser, quality, signedIn) = (chooser, settings.value.quality, signedIn)
         let wantPremium = signedIn && quality == .high && playback.forceFree != videoId
-        return { try await chooser.resolve(videoId: videoId, wantPremium: wantPremium, signedIn: signedIn, quality: quality) }
+        let reopening = playback.reopening(videoId)
+        return { try await chooser.resolve(videoId: videoId, wantPremium: wantPremium, signedIn: signedIn, quality: quality, reopening: reopening) }
     }
 
     /// A downloaded song plays its file even online, until the file fails to play; then it streams.
@@ -348,11 +357,17 @@ import YTMCore
         guard local || HostAllowlist.allows(stream.url) else { throw Self.blocked }
         // Only ever turned down: YouTube's loudness above its reference level.
         let loudness = -Float(max(stream.loudnessDb ?? 0, 0))
+        // The client of the URL last given, cut off should its fresh one be refused too.
+        let client = OSAllocatedUnfairLock(initialState: stream.client)
         return AudioItem(
             id: id, url: stream.url, headers: stream.headers, contentLength: stream.contentLength,
             cacheKey: DownloadedSong.key(videoId: videoId, itag: stream.itag), loudnessDB: loudness
-        ) {
-            let fresh = try await chooser.refresh(videoId: videoId, wasPremium: stream.isPremium, signedIn: signedIn, quality: quality)
+        ) { again in
+            let fresh = try await chooser.refresh(
+                videoId: videoId, wasPremium: stream.isPremium, itag: stream.itag,
+                cutOff: again ? client.withLock { $0 } : nil, signedIn: signedIn, quality: quality
+            )
+            client.withLock { $0 = fresh.client }
             guard fresh.itag == stream.itag, fresh.contentLength == stream.contentLength else { throw Self.otherFile }
             guard HostAllowlist.allows(fresh.url) else { throw Self.blocked }
             return (url: fresh.url, headers: fresh.headers)
@@ -364,6 +379,11 @@ import YTMCore
 
     /// Also drops what was on its way for the old queue.
     func replaceQueue(with tracks: [Track], start: Int, shuffle: Bool) {
+        // Chosen afresh, a song that dropped starts over.
+        if playback.reopen != nil {
+            playback.reopen = nil
+            playback.resume = nil
+        }
         queue.set(items: tracks, start: start, shuffle: shuffle)
         smart.reset()
         for task in [extending, autoplay, pendingPlay, continuing] { task?.cancel() }

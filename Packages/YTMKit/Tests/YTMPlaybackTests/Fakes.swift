@@ -32,6 +32,8 @@ final class FakeMusic: MusicService {
         /// Playlists as `page` and `loadMore` serve them, a batch at a time.
         var playlistBatches: [String: [[Track]]] = [:]
         var ratings: [String: Rating] = [:]
+        /// Where a play reported goes on to send its watch time.
+        var watchTime: WatchTime?
         /// Streams and cards' tracks held back until `release`, as a slow network.
         var held: Set<String> = []
         var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
@@ -67,7 +69,7 @@ final class FakeMusic: MusicService {
         ResolvedStream(
             url: URL(string: "https://rr1.googlevideo.com/videoplayback?id=\(videoId)") ?? URL(filePath: "/"),
             headers: [:], itag: premium ? 774 : 251, codec: .opus, contentLength: 1000, bitrate: 160_000,
-            duration: 200, loudnessDb: 3, isPremium: premium
+            duration: 200, loudnessDb: 3, isPremium: premium, client: premium ? nil : "VISIONOS"
         )
     }
 
@@ -83,11 +85,15 @@ final class FakeMusic: MusicService {
         }
     }
 
-    func stream(videoId: String, quality: AudioQuality) async throws -> ResolvedStream {
-        log("stream \(videoId)")
+    func stream(videoId: String, quality: AudioQuality, itag: Int?) async throws -> ResolvedStream {
+        log(itag.map { "stream \(videoId) \($0)" } ?? "stream \(videoId)")
         await waitWhileHeld(videoId)
         if state.withLock({ $0.failing.contains(videoId) }) { throw YTMError(.unplayable, "No audio.") }
         return Self.stream(videoId)
+    }
+
+    func cutOffStreams(of client: String) {
+        log("cut off \(client)")
     }
 
     func premiumStream(videoId: String, anyFormat: Bool, maxKbps: Int?) async throws -> PremiumOutcome {
@@ -103,6 +109,10 @@ final class FakeMusic: MusicService {
 
     func preparePremium() async {
         log("prepare")
+    }
+
+    func suspectPremiumPlayer() async {
+        log("suspect")
     }
 
     func radio(videoId: String) async throws -> [Track] {
@@ -178,8 +188,13 @@ final class FakeMusic: MusicService {
         return "PL1"
     }
 
-    func reportPlay(videoId: String) async throws {
+    func reportPlay(videoId: String) async throws -> WatchTime? {
         log("report \(videoId)")
+        return state.withLock(\.watchTime)
+    }
+
+    func reportWatchTime(_ ping: WatchTime, _ watched: Watched) async throws {
+        log("watchtime \(ping.url(for: watched).query(percentEncoded: true) ?? "")")
     }
 }
 

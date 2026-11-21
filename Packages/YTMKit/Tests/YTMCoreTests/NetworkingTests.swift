@@ -361,6 +361,19 @@ private final class FlakyServer: URLProtocol {
         await auth.signOut()
     }
 
+    @Test func sendsNoWatchTimeWithAnotherLoginsCookie() async throws {
+        let auth = GoogleAuth()
+        try await auth.signIn(cookies: [try cookie("SAPISID", "abc", ".youtube.com")])
+        #expect(await auth.sessionCookie == "SAPISID=abc", "signed in, so only the login can refuse it")
+        let api = YTMusic(auth: auth, store: FileStore(directory: .temporaryDirectory.appending(path: "ytm-watch-\(UUID().uuidString)")))
+        let url = try #require(URL(string: "https://s.youtube.com/api/stats/watchtime"))
+        let ping = WatchTime(url: url, scheduled: [], every: 40, login: PlayReport.login("SAPISID=xyz"))
+        let watched = Watched(stretches: [0...1], position: 1, elapsed: .seconds(1), paused: true, last: false)
+        let refusal = await #expect(throws: YTMError.self) { try await api.reportWatchTime(ping, watched) }
+        #expect(refusal?.kind == .notSignedIn, "refused before anything is sent")
+        await auth.signOut()
+    }
+
     @Test func noticesAnswersServedSignedOut() {
         let context = { (loggedIn: String) in
             Data(#"""

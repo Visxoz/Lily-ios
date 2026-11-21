@@ -6,9 +6,14 @@ import os
 final class StreamLoader {
     static let rangeLength: Int64 = 1 << 20
     private static let maxRetries = 4
-    private static let retryDelay = Duration.milliseconds(500)
-    /// Fresh URLs asked for in a row without a whole range arriving from them.
-    private static let maxRefreshes = 2
+    static let retryDelay = Duration.milliseconds(500)
+    static let maxRetryDelay = Duration.seconds(5)
+    /// How long a connection that stops answering is retried, so one that comes back within it plays on.
+    static let rideOut = Duration.seconds(60)
+    /// Fresh URLs asked for in a row without a whole range arriving from them: the same client once
+    /// more, then each of the others. YTMCore names them, as this module can't see its list, so a
+    /// test keeps the two in step.
+    static let maxRefreshes = 3
     private static let replayLength: Int64 = 256 << 10
     static let warmLength: Int64 = 64 << 10
 
@@ -74,7 +79,12 @@ final class StreamLoader {
             return failure
         }
         var retries = 0
+        // Kept apart, so a stray error once a lost connection is back gets its own tries.
+        var drops = 0
         var refreshes = 0
+        // From the first failure in a row, not the last byte, as a phone coming back
+        // from a dead zone fails at once while its network returns.
+        var failingSince: ContinuousClock.Instant?
         // The range after the one arriving, asked for already so it follows with no round trip.
         var ahead: (start: Int64, bytes: AsyncThrowingStream<Data, any Error>)?
         while total <= 0 || available < total {
@@ -101,7 +111,9 @@ final class StreamLoader {
                     total = available
                 }
                 retries = 0
+                drops = 0
                 refreshes = 0
+                failingSince = nil
             } catch {
                 ahead = nil
                 guard !Task.isCancelled else { return nil }
@@ -109,15 +121,29 @@ final class StreamLoader {
                     return failure
                 }
                 // A range that broke off after some bytes still got somewhere,
-                // so only failures in a row that bring nothing give up.
+                // so only a stretch with nothing arriving gives up.
                 if available > start {
                     retries = 0
+                    drops = 0
+                    failingSince = nil
                 }
                 if error as? ByteSourceError == .refused {
-                    guard refreshes < Self.maxRefreshes, let fresh = await refreshed() else { return .refused }
+                    guard refreshes < Self.maxRefreshes, let fresh = await refreshed(again: refreshes > 0) else { return .refused }
                     refreshes += 1
                     url = fresh.url
                     headers = fresh.headers
+                    continue
+                }
+                if Self.isConnection(error) {
+                    let since = failingSince ?? .now
+                    failingSince = since
+                    guard let delay = Self.rideOutDelay(drops: drops, failingFor: .now - since) else {
+                        Logger.audio.warning("A download lost its connection for good: \(Self.reason(error), privacy: .public)")
+                        return .dropped
+                    }
+                    drops += 1
+                    Logger.audio.debug("Download lost its connection, retry \(drops): \(Self.reason(error), privacy: .public)")
+                    try? await Task.sleep(for: delay)
                     continue
                 }
                 guard retries < Self.maxRetries else {
@@ -190,9 +216,11 @@ final class StreamLoader {
     }
 
     /// Taken only if it serves the same encode, as the bytes already held must line up.
-    private func refreshed(isolation: isolated (any Actor)? = #isolation) async -> (url: URL, headers: [String: String])? {
+    private func refreshed(
+        isolation: isolated (any Actor)? = #isolation, again: Bool
+    ) async -> (url: URL, headers: [String: String])? {
         do {
-            let fresh = try await item.refresh()
+            let fresh = try await item.refresh(again)
             guard Self.sameFile(url, fresh.url) else {
                 Logger.audio.warning("A refreshed stream URL serves a different file")
                 return nil
@@ -209,6 +237,18 @@ final class StreamLoader {
         let first = parameters(a)
         let second = parameters(b)
         return first["itag"] != nil && ["itag", "clen", "lmt"].allSatisfy { first[$0] == second[$0] }
+    }
+
+    /// The wait before retrying after `drops` lost connections in a row, doubling, or nil once
+    /// they have gone on for `rideOut`.
+    static func rideOutDelay(drops: Int, failingFor: Duration) -> Duration? {
+        failingFor < rideOut ? min(retryDelay * (1 << min(drops, 16)), maxRetryDelay) : nil
+    }
+
+    /// Whether the connection failed, rather than googlevideo answering with an error or bytes
+    /// that don't fit: URLSession reports an answer's status through `ByteSourceError`.
+    static func isConnection(_ error: any Error) -> Bool {
+        (error as? URLError).map { $0.code != .cancelled } ?? false
     }
 
     /// Why a range failed, without the error itself: a URLError's

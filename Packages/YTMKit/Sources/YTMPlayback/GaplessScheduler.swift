@@ -127,6 +127,7 @@ extension PlayerController {
         playback.duration = track.seconds
         playback.requestedAt = nil
         playback.resume = nil
+        playback.reopen = nil
         playback.itemID = queued.itemID
         present(track, at: 0)
         recordPlay()

@@ -7,9 +7,11 @@ import YTMCore
 
 protocol MusicService: Sendable {
     var isSignedIn: Bool { get async }
-    func stream(videoId: String, quality: AudioQuality) async throws -> ResolvedStream
+    func stream(videoId: String, quality: AudioQuality, itag: Int?) async throws -> ResolvedStream
+    func cutOffStreams(of client: String)
     func premiumStream(videoId: String, anyFormat: Bool, maxKbps: Int?) async throws -> PremiumOutcome
     func preparePremium() async
+    func suspectPremiumPlayer() async
     func radio(videoId: String) async throws -> [Track]
     func radio(playlistId: String) async throws -> [Track]
     func tracks(of card: Card) async throws -> [Track]
@@ -22,7 +24,8 @@ protocol MusicService: Sendable {
     func rating(videoId: String) async throws -> Rating
     func rate(videoId: String, _ rating: Rating) async throws
     func createPlaylist(title: String, videoIds: [String]) async throws -> String
-    func reportPlay(videoId: String) async throws
+    func reportPlay(videoId: String) async throws -> WatchTime?
+    func reportWatchTime(_ ping: WatchTime, _ watched: Watched) async throws
 }
 
 extension YTMusic: MusicService {
