@@ -55,12 +55,14 @@ final class StreamLoader {
         } catch {
             throw .storage
         }
+        if !item.url.isFileURL { cache.hold(item.cacheKey) }
     }
 
     deinit {
         if let part, !isComplete {
             cache.discard(part)
         }
+        if !item.url.isFileURL { cache.release(item.cacheKey) }
     }
 
     /// The file's length, or 0 until a download of unknown length ends.

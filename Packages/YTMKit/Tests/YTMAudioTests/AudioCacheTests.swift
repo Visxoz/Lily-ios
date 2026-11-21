@@ -25,6 +25,23 @@ struct AudioCacheTests {
         #expect(cache.size() == 20)
     }
 
+    @Test func keepsTheFileJustCommittedThoughItIsPastTheCap() throws {
+        let cache = AudioCache(.init(directory: directory, limit: 15))
+        try store("mix", bytes: 20, age: 0, in: cache)
+    }
+
+    @Test func keepsAFileBeingReadThoughItIsPastTheCap() throws {
+        let cache = AudioCache(.init(directory: directory, limit: 15))
+        cache.hold("mix")
+        try store("mix", bytes: 20, age: 600, in: cache)
+        try store("song", bytes: 10, age: 0, in: cache)
+        #expect(cache.completeFile(for: "mix", length: 20) != nil, "not evicted by the next commit")
+        cache.release("mix")
+        try store("other", bytes: 10, age: 0, in: cache)
+        #expect(cache.completeFile(for: "mix", length: 20) == nil, "read no more, the cap holds again")
+        #expect(cache.size() <= 15)
+    }
+
     @Test func takesOnlyCompleteFilesOfTheRightLength() throws {
         let cache = AudioCache(.init(directory: directory, limit: 1 << 20))
         let part = try cache.makePart(for: "song-251")

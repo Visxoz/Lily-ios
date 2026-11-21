@@ -84,8 +84,7 @@ struct StreamLoaderTests {
         let file = Data((0..<Int(5 * megabyte + 100)).map { UInt8(truncatingIfNeeded: $0 &* 31) })
         let item = try AudioItem.fixture("song", length: file.count)
         let source = RecordingByteSource(files: ["song": file])
-        // Room for the file, which is past this suite's cap.
-        let cache = AudioCache(.init(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), limit: 64 << 20))
+        // Past this suite's cap, which must not evict the file it has just finished.
         let loader = try StreamLoader(item: item, cache: cache)
         loader.readPosition = 3 * megabyte + 10
         var received = Data()
@@ -98,6 +97,20 @@ struct StreamLoaderTests {
         #expect(received == file && elsewhere > 0, "the bytes past the gap wait for it")
         let cached = try #require(cache.completeFile(for: item.cacheKey, length: Int64(file.count)))
         #expect(try Data(contentsOf: cached) == file)
+    }
+
+    @Test func keepsTheFileItPlaysPastTheCap() async throws {
+        let cache = AudioCache(.init(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), limit: 15_000))
+        let source = MemoryByteSource(files: ["a": file, "b": file, "c": file])
+        let (a, b, c) = try (AudioItem.fixture("a", length: file.count), AudioItem.fixture("b", length: file.count),
+                             AudioItem.fixture("c", length: file.count))
+        var playing: StreamLoader? = try StreamLoader(item: a, cache: cache)
+        _ = await playing?.run(source: source) { _ in }
+        _ = try await StreamLoader(item: b, cache: cache).run(source: source) { _ in }
+        #expect(cache.completeFile(for: a.cacheKey, length: Int64(file.count)) != nil, "still playing")
+        playing = nil
+        _ = try await StreamLoader(item: c, cache: cache).run(source: source) { _ in }
+        #expect(cache.completeFile(for: a.cacheKey, length: Int64(file.count)) == nil)
     }
 
     @Test func rangesEndOnAMegabyte() {

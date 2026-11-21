@@ -12,6 +12,8 @@ final class AudioCache {
     let directory: URL
     let limit: Int64
     private let files = FileManager.default
+    /// Loaders on each file name, as the same song can play twice at once.
+    private var reading: [String: Int] = [:]
     private static let partExtension = "part"
 
     /// Works on the disk, so it is made on the engine's queue. Trims to the cap,
@@ -62,7 +64,7 @@ final class AudioCache {
             discard(part)
             return
         }
-        evict(sparing: url)
+        evict(sparing: url.lastPathComponent)
     }
 
     func discard(_ part: URL) {
@@ -100,14 +102,26 @@ final class AudioCache {
         }
     }
 
-    private func evict(sparing kept: URL? = nil) {
+    /// A file being read stays past the cap, so a mix over it is not fetched again on a replay.
+    func hold(_ key: String) {
+        reading[Self.safeName(key), default: 0] += 1
+    }
+
+    func release(_ key: String) {
+        let name = Self.safeName(key)
+        if let count = reading[name] { reading[name] = count > 1 ? count - 1 : nil }
+    }
+
+    /// By name, as the listing's URLs start /private/var where a built one has /var.
+    private func evict(sparing kept: String? = nil) {
         guard limit < .max else { return }
-        var entries = completeFiles().sorted { $0.used < $1.used }
+        let entries = completeFiles().sorted { $0.used < $1.used }
         var total = entries.reduce(0) { $0 + $1.size }
-        while total > limit, let oldest = entries.first, oldest.url != kept {
-            entries.removeFirst()
-            try? files.removeItem(at: oldest.url)
-            total -= oldest.size
+        for entry in entries where total > limit {
+            let name = entry.url.lastPathComponent
+            guard name != kept, reading[name] == nil else { continue }
+            try? files.removeItem(at: entry.url)
+            total -= entry.size
         }
     }
 
