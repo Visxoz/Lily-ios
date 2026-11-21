@@ -31,6 +31,12 @@ struct Toast: Equatable {
 @Observable
 final class AppModel {
     static let toastFor: Duration = .seconds(5)
+    /// After the launch's first page has had the network.
+    static let renewSignInAfter: Duration = .seconds(10)
+    /// As often as an open YouTube tab renews its session cookies.
+    static let renewSignInEvery: Duration = .seconds(10 * 60)
+    /// The least time between cookie checks, after one that didn't find the cookie rejected.
+    static let signInRecheckAfter: Duration = .seconds(10 * 60)
 
     let api: YTMusic
     let player: PlayerController
@@ -102,6 +108,17 @@ final class AppModel {
         isSignedIn = await api.auth.isSignedIn
         // Before the load, which belongs to the generation it starts in.
         accountGeneration += 1
+        // Read from here, once the sign-in is known; an answer that came before waits in the stream.
+        Task { [weak self, lost = api.auth.signInLost] in
+            for await _ in lost { await self?.checkSignIn() }
+        }
+        Task { [api] in
+            try? await Task.sleep(for: Self.renewSignInAfter)
+            while !Task.isCancelled {
+                await api.renewSignIn()
+                try? await Task.sleep(for: Self.renewSignInEvery)
+            }
+        }
         let home = isSignedIn ? Task { try await fetchPage(.home) } : nil
         Task { await ImagePipeline.preconnect() }
         let homeSettled = Task { await Self.settled(home, within: .seconds(2)) }
@@ -148,7 +165,7 @@ final class AppModel {
         artwork = colours
     }
 
-    /// Should YouTube no longer take the stored sign-in, it is dropped.
+    /// A signed-out menu leaves the sign-in to `checkSignIn`, which its answer sets off.
     func refreshAccount() async {
         guard isSignedIn else {
             account = nil
@@ -163,12 +180,32 @@ final class AppModel {
             return
         }
         guard generation == accountGeneration else { return }
-        guard let found else {
-            // The menu came back signed out.
+        account = found
+    }
+
+    /// Once YouTube answers a signed-in request as signed out: checks the cookie, as the session
+    /// can end at any time, and drops a dead one.
+    private func checkSignIn() async {
+        // An answer to a request sent before the cookie was removed.
+        guard isSignedIn else { return }
+        let generation = accountGeneration
+        var valid = await api.isSessionValid()
+        // A stale cookie may only need renewing.
+        if valid == false {
+            await api.renewSignIn()
+            valid = await api.isSessionValid()
+        }
+        // Signing in or out meanwhile makes the answer another account's.
+        guard generation == accountGeneration else { return }
+        if valid == false {
             await signOut(quietly: true)
+            showToast("YouTube signed you out")
             return
         }
-        account = found
+        // A renewed session has its name and picture back.
+        if account == nil { await refreshAccount() }
+        // Otherwise the cookie isn't checked again at every answer.
+        try? await Task.sleep(for: Self.signInRecheckAfter)
     }
 
     /// Drops everything the last account loaded. `quietly`, as for a sign-in YouTube rejected,

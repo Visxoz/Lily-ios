@@ -63,22 +63,33 @@ enum HTTP {
     }()
 
     /// Checks the host and fails outside 2xx. Errors omit the URL, which may
-    /// carry stream signatures. `retries` re-asks a 5xx, 429 or timeout.
+    /// carry stream signatures. `retries` re-asks a 5xx, 429, stray 403 or timeout.
+    /// With `refusals`, as signed-in requests have, each attempt waits out a pause and is counted.
+    /// `sign` sets each attempt's headers once its turn comes; `answered` sees every answer, whatever its status.
     static func data(
-        for request: URLRequest, session: URLSession = api, retries: Int = 0
+        for request: URLRequest, session: URLSession = api, retries: Int = 0, refusals: Refusals? = nil,
+        sign: (inout URLRequest) async -> Void = { _ in },
+        answered: (HTTPURLResponse) async -> Void = { _ in }
     ) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url, isAllowed(url) else {
             throw YTMError(.refused, "The app blocked a request to a site it doesn't use.")
         }
         var attempt = 0
         while true {
+            let paused = await refusals?.waitForTurn() ?? false
+            var signed = request
+            await sign(&signed)
             do {
-                let (data, response) = try await session.data(for: request)
+                let (data, response) = try await session.data(for: signed)
                 guard let http = response as? HTTPURLResponse else {
                     throw YTMError(.network, "The server's answer couldn't be read.")
                 }
+                await answered(http)
+                let refused = isStrayRefusal(status: http.statusCode, body: data)
+                refusals?.answered(refused: refused)
                 if (200..<300).contains(http.statusCode) { return (data, http) }
-                guard attempt < retries, isTransient(status: http.statusCode) else {
+                // Refused even after a pause: failing beats holding the caller through another.
+                guard attempt < retries, isTransient(status: http.statusCode, body: data), !(paused && refused) else {
                     throw YTMError(status: http.statusCode)
                 }
             } catch let error as URLError {
@@ -90,8 +101,16 @@ enum HTTP {
         }
     }
 
-    static func isTransient(status: Int) -> Bool {
-        status == 429 || (500..<600).contains(status)
+    static func isTransient(status: Int, body: Data) -> Bool {
+        status == 429 || (500..<600).contains(status) || isStrayRefusal(status: status, body: body)
+    }
+
+    /// A 403 not for want of permission, as to someone else's private playlist: YouTube refuses
+    /// a share of requests so, at random and in runs, and answers the same request moments later.
+    static func isStrayRefusal(status: Int, body: Data) -> Bool {
+        guard status == 403 else { return false }
+        let message = (try? JSON(data: body))?["error", "message"].string ?? ""
+        return !message.lowercased().contains("permission")
     }
 
     /// 3^n seconds, jittered so callers refused together don't retry together.

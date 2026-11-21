@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import os
 
 /// YouTube's cookies, kept in the Keychain as one `Cookie` header, and the
 /// `Authorization` hashes derived from them for each request.
@@ -7,6 +8,7 @@ public actor GoogleAuth {
     public static let shared = GoogleAuth()
 
     private static let keychainKey = "google.cookie"
+    private static let log = Logger(subsystem: "Lily", category: "GoogleAuth")
     /// The cookies the Authorization hashes are made from, in the order
     /// YouTube's web client sends the schemes.
     private static let sessionCookies = ["SAPISID", "__Secure-1PAPISID", "__Secure-3PAPISID"]
@@ -14,9 +16,21 @@ public actor GoogleAuth {
     /// Read lazily, on this actor rather than whichever thread made the instance.
     private lazy var cookie: String? = Keychain.data(for: Self.keychainKey).map { String(decoding: $0, as: UTF8.self) }
 
-    public init() {}
+    /// Yields when YouTube answers a signed-in request as signed out, as it does once the session
+    /// has ended. Answers arriving while nothing waits wake the next wait. One reader, the app.
+    public nonisolated let signInLost: AsyncStream<Void>
+    private nonisolated let lost: AsyncStream<Void>.Continuation
+
+    public init() {
+        let (stream, continuation) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        signInLost = stream
+        lost = continuation
+    }
 
     public var isSignedIn: Bool { cookie != nil }
+
+    /// The stored `Cookie` header, kept current by the cookies signed-in answers set.
+    var sessionCookie: String? { cookie }
 
     /// Keeps the session cookies of .youtube.com / .google.com read from the sign-in web view.
     public func signIn(cookies: [HTTPCookie]) throws {
@@ -40,6 +54,32 @@ public actor GoogleAuth {
         return headers
     }
 
+    /// Takes in the `Set-Cookie`s of an answer to a request that sent `sent`, as a browser does,
+    /// so the stored session keeps up with Google rotating it. Answers for another login are left out.
+    func take(_ response: HTTPURLResponse, sent: String) {
+        guard let setCookie = response.value(forHTTPHeaderField: "Set-Cookie"), let url = response.url,
+              let stored = cookie, let login = Self.login(sent), Self.login(stored) == login
+        else { return }
+        // Foundation splits the joined header, whose Expires dates hold commas too.
+        let cookies = HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": setCookie], for: url)
+        guard let merged = Self.merge(stored, setting: cookies, now: .now) else { return }
+        cookie = merged
+        Keychain.set(Data(merged.utf8), for: Self.keychainKey)
+    }
+
+    /// Takes in the body of a successful answer to a signed-in request.
+    nonisolated func checkSignedIn(_ body: Data) {
+        guard Self.answeredSignedOut(body) else { return }
+        Self.log.warning("YouTube answered a signed-in request as signed out")
+        lost.yield()
+    }
+
+    /// Whether an answer says it was served signed out, as YouTube answers a request whose
+    /// cookie belongs to a session that has ended.
+    static func answeredSignedOut(_ body: Data) -> Bool {
+        body.range(of: Data(#""key":"logged_in","value":"0""#.utf8)) != nil
+    }
+
     /// Unexpired youtube.com and google.com cookies, each name once with
     /// YouTube's first; nil without a session cookie to sign requests with.
     static func cookieHeader(_ cookies: [HTTPCookie]) -> String? {
@@ -60,20 +100,54 @@ public actor GoogleAuth {
         return pairs.joined(separator: "; ")
     }
 
+    /// `cookie` with the youtube.com-wide ones of `cookies` put in by name, or nil when that
+    /// changes nothing. Deletions are left out, so a session is only ever ended by signing out.
+    static func merge(_ cookie: String, setting cookies: [HTTPCookie], now: Date) -> String? {
+        var jar = pairs(cookie).map { (name: String($0.name), value: String($0.value)) }
+        var changed = false
+        for new in cookies {
+            // Host-only cookies carry the full host, such as music.youtube.com.
+            let domainWide = new.domain.lowercased().trimmingPrefix(".") == "youtube.com"
+            let deleted = new.value.isEmpty || new.expiresDate.map { $0 <= now } == true
+            guard domainWide, !deleted, !new.name.isEmpty else { continue }
+            let same = jar.indices.filter { jar[$0].name == new.name }
+            for index in same where jar[index].value != new.value {
+                jar[index].value = new.value
+                changed = true
+            }
+            if same.isEmpty {
+                jar.append((new.name, new.value))
+                changed = true
+            }
+        }
+        return changed ? jar.map { "\($0.name)=\($0.value)" }.joined(separator: "; ") : nil
+    }
+
+    /// What tells apart the logins `Cookie` headers are for.
+    static func login(_ cookie: String) -> Substring? {
+        value("SAPISID", in: cookie) ?? value("__Secure-3PAPISID", in: cookie)
+    }
+
+    private static func value(_ name: String, in cookie: String) -> Substring? {
+        pairs(cookie).first { $0.name == name }?.value
+    }
+
+    /// The `name=value` pairs of a `Cookie` header.
+    private static func pairs(_ cookie: String) -> [(name: Substring, value: Substring)] {
+        cookie.split(separator: ";").compactMap { pair in
+            let pair = pair.trimmingPrefix(" ")
+            guard let eq = pair.firstIndex(of: "=") else { return nil }
+            return (pair[..<eq], pair[pair.index(after: eq)...])
+        }
+    }
+
     /// Per session cookie, `SCHEME <time>_<sha1("<time> <cookie> <origin>")>`,
     /// space-separated; SAPISIDHASH falls back to the 3P cookie.
     static func authorization(cookie: String, origin: String, time: Int) -> String? {
-        let value = { (name: String) in
-            cookie.split(separator: ";").lazy.compactMap { pair -> Substring? in
-                let pair = pair.trimmingPrefix(" ")
-                guard let eq = pair.firstIndex(of: "="), pair[..<eq] == name else { return nil }
-                return pair[pair.index(after: eq)...]
-            }.first
-        }
         let schemes: [(String, Substring?)] = [
-            ("SAPISIDHASH", value("SAPISID") ?? value("__Secure-3PAPISID")),
-            ("SAPISID1PHASH", value("__Secure-1PAPISID")),
-            ("SAPISID3PHASH", value("__Secure-3PAPISID")),
+            ("SAPISIDHASH", login(cookie)),
+            ("SAPISID1PHASH", value("__Secure-1PAPISID", in: cookie)),
+            ("SAPISID3PHASH", value("__Secure-3PAPISID", in: cookie)),
         ]
         let parts = schemes.compactMap { scheme, id -> String? in
             guard let id else { return nil }

@@ -213,7 +213,7 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 
 Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations, unless you turn off **YouTube history** in **Settings ▸ Account**.
 
-The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in.
+The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews it every 10 minutes, as an open YouTube tab does, and should YouTube sign you out, it says so.
 
 <details>
 <summary><b>Connecting Last.fm</b></summary>

@@ -69,14 +69,19 @@ import Testing
     }
 }
 
-/// Answers each request with the next status queued, then with 200.
+/// Answers each request with the next status queued, then with 200, each with `body`.
 private final class FlakyServer: URLProtocol {
     static let statuses = Mutex<[Int]>([])
+    static let body = Mutex("{}")
     static let requests = Mutex(0)
+    /// Each request's `X-Attempt` header.
+    static let attempts = Mutex<[String?]>([])
 
-    static func reset(_ statuses: [Int]) {
+    static func reset(_ statuses: [Int], body: String) {
         self.statuses.withLock { $0 = statuses }
+        self.body.withLock { $0 = body }
         requests.withLock { $0 = 0 }
+        attempts.withLock { $0 = [] }
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -85,12 +90,13 @@ private final class FlakyServer: URLProtocol {
 
     override func startLoading() {
         Self.requests.withLock { $0 += 1 }
+        Self.attempts.withLock { $0.append(request.value(forHTTPHeaderField: "X-Attempt")) }
         let status = Self.statuses.withLock { $0.isEmpty ? 200 : $0.removeFirst() }
         guard let url = request.url,
               let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)
         else { return }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data("{}".utf8))
+        client?.urlProtocol(self, didLoad: Data(Self.body.withLock(\.self).utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
 }
@@ -102,10 +108,36 @@ private final class FlakyServer: URLProtocol {
         return URLSession(configuration: config)
     }()
 
-    private func ask(_ statuses: [Int], retries: Int) async throws -> Int {
-        FlakyServer.reset(statuses)
+    private func ask(_ statuses: [Int], retries: Int, body: String = "{}", refusals: Refusals? = nil) async throws -> Int {
+        FlakyServer.reset(statuses, body: body)
         let url = try #require(URL(string: "https://music.youtube.com/youtubei/v1/browse"))
-        return try await HTTP.data(for: URLRequest(url: url), session: session, retries: retries).1.statusCode
+        return try await HTTP.data(for: URLRequest(url: url), session: session, retries: retries, refusals: refusals).1.statusCode
+    }
+
+    @Test func signsEachAttemptAndSeesEveryAnswer() async throws {
+        FlakyServer.reset([403], body: "{}")
+        let url = try #require(URL(string: "https://music.youtube.com/youtubei/v1/browse"))
+        var signed = 0
+        var answers: [Int] = []
+        let (_, response) = try await HTTP.data(
+            for: URLRequest(url: url), session: session, retries: 1,
+            sign: { request in
+                signed += 1
+                request.setValue("\(signed)", forHTTPHeaderField: "X-Attempt")
+            },
+            answered: { answers.append($0.statusCode) }
+        )
+        #expect(response.statusCode == 200 && answers == [403, 200])
+        #expect(FlakyServer.attempts.withLock(\.self) == ["1", "2"])
+    }
+
+    @Test func countsAnswersAndFailsAtOnceWhenRefusedAfterAPause() async throws {
+        let refusals = Refusals { $0 >= Refusals.run ? .milliseconds(300) : nil }
+        for _ in 1..<Refusals.run { refusals.answered(refused: true) }
+        // The run's last refusal, which pauses what follows.
+        await #expect(throws: YTMError(status: 403)) { try await ask([403], retries: 0, refusals: refusals) }
+        await #expect(throws: YTMError(status: 403)) { try await ask([403, 403], retries: 2, refusals: refusals) }
+        #expect(FlakyServer.requests.withLock(\.self) == 1, "refused after the pause, so not retried")
     }
 
     @Test func asksAgainAfterAServerError() async throws {
@@ -120,15 +152,62 @@ private final class FlakyServer: URLProtocol {
         #expect(FlakyServer.requests.withLock(\.self) == 1)
     }
 
+    @Test func asksAgainAfterAStrayRefusal() async throws {
+        #expect(try await ask([403], retries: 1) == 200)
+        #expect(FlakyServer.requests.withLock(\.self) == 2)
+    }
+
+    @Test func failsAtOnceWhenRefusedForWantOfPermission() async {
+        let denied = #"{"error":{"code":403,"message":"The caller does not have permission"}}"#
+        await #expect(throws: YTMError(status: 403)) { try await ask([403], retries: 2, body: denied) }
+        #expect(FlakyServer.requests.withLock(\.self) == 1)
+    }
+
     @Test func retriesAsRustypipeDoes() {
-        #expect(HTTP.isTransient(status: 429) && HTTP.isTransient(status: 500) && HTTP.isTransient(status: 503))
-        #expect(!HTTP.isTransient(status: 400) && !HTTP.isTransient(status: 404))
+        let transient = { (status: Int, message: String) in
+            HTTP.isTransient(status: status, body: Data(#"{"error":{"message":"\#(message)"}}"#.utf8))
+        }
+        #expect(transient(429, "") && transient(500, "") && transient(503, ""))
+        #expect(!transient(400, "") && !transient(404, ""))
+        #expect(transient(403, ""))
+        #expect(HTTP.isTransient(status: 403, body: Data("not json".utf8)))
+        #expect(HTTP.isStrayRefusal(status: 403, body: Data(#"{"error":{"message":"Request refused"}}"#.utf8)))
+        let denied = Data(#"{"error":{"message":"The caller does not have permission"}}"#.utf8)
+        #expect(!HTTP.isTransient(status: 403, body: denied) && !HTTP.isStrayRefusal(status: 403, body: denied))
+        #expect(!HTTP.isStrayRefusal(status: 404, body: Data()))
         #expect(InnerTube.retries == 2)
         for _ in 0..<20 {
             #expect((Duration.seconds(1)...Duration.milliseconds(1500)).contains(HTTP.retryDelay(after: 0)))
             #expect((Duration.milliseconds(2400)...Duration.milliseconds(4500)).contains(HTTP.retryDelay(after: 1)))
             #expect(HTTP.retryDelay(after: 8) == .seconds(60), "at most a minute")
         }
+    }
+}
+
+@Suite struct RefusalsTests {
+    @Test func pausesOnlyAfterARunOfRefusals() {
+        #expect(Refusals.pause(after: Refusals.run - 1) == nil, "stray ones only retry")
+        #expect(Refusals.pause(after: Refusals.run) == .seconds(5))
+        #expect(Refusals.pause(after: Refusals.run + 1) == .seconds(10))
+        #expect(Refusals.pause(after: .max) == .seconds(40), "capped")
+    }
+
+    @Test func anAnswerEndsTheRun() async {
+        let refusals = Refusals()
+        for refused in Array(repeating: true, count: Refusals.run - 1) + [false] + Array(repeating: true, count: Refusals.run - 1) {
+            refusals.answered(refused: refused)
+        }
+        #expect(await !refusals.waitForTurn())
+    }
+
+    @Test func aRunPausesAndAPauseIsOnlyExtended() async {
+        // Shorter past the run, so a later refusal would cut the first pause short.
+        let refusals = Refusals { $0 >= Refusals.run ? .milliseconds($0 == Refusals.run ? 300 : 1) : nil }
+        for _ in 0...Refusals.run { refusals.answered(refused: true) }
+        let clock = ContinuousClock()
+        let started = clock.now
+        #expect(await refusals.waitForTurn())
+        #expect(clock.now - started > .milliseconds(200))
     }
 }
 
@@ -245,5 +324,53 @@ private final class FlakyServer: URLProtocol {
         #expect(headers["Authorization"]?.hasPrefix("SAPISIDHASH ") == true)
         await auth.signOut()
         #expect(await !auth.isSignedIn)
+    }
+
+    private func setCookies(_ lines: [String]) throws -> [HTTPCookie] {
+        let url = try #require(URL(string: "https://music.youtube.com/"))
+        // As URLSession hands over several Set-Cookie headers: joined by commas.
+        return HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": lines.joined(separator: ", ")], for: url)
+    }
+
+    @Test func takesRenewedCookiesButNotDeletions() throws {
+        let cookie = "SID=a; __Secure-1PSIDTS=old; SAPISID=s"
+        let cookies = try setCookies([
+            "__Secure-1PSIDTS=new; Domain=.youtube.com; Path=/; Secure; HttpOnly",
+            "SIDCC=c; expires=Fri, 19-Nov-2099 10:00:00 GMT; path=/; domain=youtube.com",
+            "SID=EXPIRED; Domain=.youtube.com; Expires=Thu, 01-Jan-1970 00:00:10 GMT",
+            "SAPISID=gone; Domain=.youtube.com; Max-Age=0",
+            "YSC=host-only; Path=/",
+            "NID=z; Domain=.google.com",
+        ])
+        #expect(GoogleAuth.merge(cookie, setting: cookies, now: .now) == "SID=a; __Secure-1PSIDTS=new; SAPISID=s; SIDCC=c")
+        #expect(try GoogleAuth.merge(cookie, setting: setCookies(["SID=a; Domain=.youtube.com"]), now: .now) == nil, "nothing changed")
+        #expect(try GoogleAuth.merge(cookie, setting: setCookies(["SID=; Domain=.youtube.com"]), now: .now) == nil)
+    }
+
+    @Test func takesOnlyTheSameLoginsCookies() async throws {
+        let auth = GoogleAuth()
+        try await auth.signIn(cookies: [try cookie("SAPISID", "abc", ".youtube.com")])
+        let url = try #require(URL(string: "https://music.youtube.com/youtubei/v1/browse"))
+        let response = try #require(HTTPURLResponse(
+            url: url, statusCode: 200, httpVersion: nil, headerFields: ["Set-Cookie": "SIDCC=new; Domain=.youtube.com"]
+        ))
+        await auth.take(response, sent: "SAPISID=xyz")
+        #expect(await auth.sessionCookie == "SAPISID=abc", "another login's answer")
+        await auth.take(response, sent: "SAPISID=abc")
+        #expect(await auth.sessionCookie == "SAPISID=abc; SIDCC=new")
+        await auth.signOut()
+    }
+
+    @Test func noticesAnswersServedSignedOut() {
+        let context = { (loggedIn: String) in
+            Data(#"""
+            {"responseContext":{"serviceTrackingParams":[{"service":"GFEEDBACK",
+            "params":[{"key":"browse_id","value":"FEmusic_home"},
+            {"key":"logged_in","value":"\#(loggedIn)"}]}]}}
+            """#.utf8)
+        }
+        #expect(GoogleAuth.answeredSignedOut(context("0")))
+        #expect(!GoogleAuth.answeredSignedOut(context("1")))
+        #expect(!GoogleAuth.answeredSignedOut(Data("{}".utf8)))
     }
 }

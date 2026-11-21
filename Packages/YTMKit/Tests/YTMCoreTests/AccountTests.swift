@@ -29,6 +29,12 @@ import Testing
         #expect(Account.photo(.missing) == nil)
     }
 
+    @Test func readsTheSessionFromTheResultsPage() {
+        #expect(Account.isSignedIn(page: #"ytcfg.set({"SESSION_INDEX":"0","USER_SESSION_ID":"1234567890"});"#))
+        #expect(!Account.isSignedIn(page: #"ytcfg.set({"LOGGED_IN":false});"#))
+        #expect(!Account.isSignedIn(page: #"{"USER_SESSION_ID":""}"#))
+    }
+
     @Test func readsTheStatsURL() throws {
         let player = try json(#"""
             {"playabilityStatus":{"status":"OK"},"playbackTracking":{

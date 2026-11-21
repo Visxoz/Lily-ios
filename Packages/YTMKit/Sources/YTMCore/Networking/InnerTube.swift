@@ -3,6 +3,7 @@ import Foundation
 final class InnerTube: Sendable {
     let auth: GoogleAuth
     private let visitor: VisitorData
+    private let refusals = Refusals()
 
     /// English, so parsers can read YouTube's labels ("Song", "1.2M"); the
     /// country picks charts and catalogue.
@@ -22,11 +23,14 @@ final class InnerTube: Sendable {
 
     /// Keys `body` gives in `context.client` override the client's own.
     /// `authenticated` only affects web clients; `visitorData` tries an ID
-    /// before keeping it. Requests with a fallback of their own pass `retries: 0`.
+    /// before keeping it. Requests with a fallback of their own pass `retries: 0`. Unless
+    /// `watchesSession` is false, signed-in requests wait out and count refusals, take in the
+    /// cookies their answers set and watch them for a sign-out.
     @concurrent
     func post(
         _ endpoint: String, body: [String: Any] = [:], client: ClientProfile = .webRemix,
-        authenticated: Bool = true, visitorData: String? = nil, retries: Int = InnerTube.retries
+        authenticated: Bool = true, visitorData: String? = nil, retries: Int = InnerTube.retries,
+        watchesSession: Bool = true
     ) async throws -> JSON {
         guard let url = client.url(endpoint) else {
             throw YTMError(.parse, "The request couldn't be made.")
@@ -44,16 +48,32 @@ final class InnerTube: Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        var headers = client.headers(visitorData: visitorData)
-        if client.isWeb {
-            if authenticated, let origin = client.origin, let account = await auth.headers(origin: origin) {
-                headers.merge(account) { $1 }
-            } else {
-                headers["Cookie"] = Self.consentCookie
-            }
-        }
+        let headers = client.headers(visitorData: visitorData)
         request.allHTTPHeaderFields = headers
-        let (data, _) = try await HTTP.data(for: request, retries: retries)
+        let watched = watchesSession && client.isWeb && authenticated && client.origin != nil
+        let counted = watched ? await auth.isSignedIn : false
+        // The account's cookie the latest attempt sent: only those answers are taken in.
+        var sent: String?
+        let (data, _) = try await HTTP.data(
+            for: request, retries: retries, refusals: counted ? refusals : nil,
+            // Signed for each attempt, as the header carries the time, and a pause may have seen the cookie
+            // renewed or removed: signed out meanwhile, the attempt goes as a signed-out one.
+            sign: { request in
+                sent = nil
+                guard client.isWeb else { return }
+                if authenticated, let origin = client.origin, let account = await auth.headers(origin: origin) {
+                    request.allHTTPHeaderFields = headers.merging(account) { $1 }
+                    sent = account["Cookie"]
+                } else {
+                    request.setValue(Self.consentCookie, forHTTPHeaderField: "Cookie")
+                }
+            },
+            // Whatever the status, as a browser takes them in.
+            answered: { response in
+                if watched, let sent { await auth.take(response, sent: sent) }
+            }
+        )
+        if watched, sent != nil { auth.checkSignedIn(data) }
         return try JSON(data: data)
     }
 

@@ -63,6 +63,8 @@ struct PremiumResolver: Sendable {
     /// Quotes the player's signature timestamp so the URLs match its scrambling.
     func request(videoId: String, as client: ClientProfile) async throws -> JSON {
         // Not retried: the next client is the retry, so a broken one costs a request rather than the song.
+        // Nor held by a run of refusals, nor taken in or watched for a sign-out, as Windows sends it
+        // outside rustypipe: a song never waits 40 s.
         try await innerTube.post("player", body: [
             "playbackContext": [
                 "contentPlaybackContext": [
@@ -73,7 +75,7 @@ struct PremiumResolver: Sendable {
             "videoId": videoId,
             "contentCheckOk": true,
             "racyCheckOk": true,
-        ], client: client, retries: 0)
+        ], client: client, retries: 0, watchesSession: false)
     }
 
     /// Premium formats come first, so a song with AAC 141 but no Opus 774 doesn't fall to the
