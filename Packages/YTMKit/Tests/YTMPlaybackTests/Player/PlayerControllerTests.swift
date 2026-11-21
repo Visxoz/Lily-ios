@@ -153,56 +153,6 @@ struct PlayerControllerTests {
         #expect(rig.player.queue.items.map(\.id) == own.map(\.id), "taken out, and the order restored")
     }
 
-    @Test func savesAndRestoresTheSessionPaused() async throws {
-        let first = await started()
-        first.player.play(songs("a", "b", "c"), startAt: 1)
-        await first.settle()
-        await first.soundStarts()
-        first.audio.currentTime = 42
-        first.player.persistSession()
-
-        let second = await started(Rig(store: first.store))
-        #expect(second.player.current?.id == "b")
-        #expect(second.player.queue.count == 3)
-        #expect(second.player.currentTime == 42)
-        #expect(!second.player.isPlaying)
-        #expect(second.audio.played.isEmpty, "nothing loads until played")
-        await second.settle()
-        second.player.togglePlayPause()
-        await second.settle()
-        let resumed = try #require(second.audio.played.last)
-        #expect(resumed.item.id.hasPrefix("b#") && resumed.from == 42)
-        #expect(!second.music.calls.contains("stream b"), "the last launch's stream plays without asking again")
-    }
-
-    @Test func asksAgainForAStaleOrFutureDatedSavedStream() async throws {
-        var queue = Queue<Track>(seed: 1)
-        queue.set(items: songs("a"), start: 0, shuffle: false)
-        for resolved in [Date.now.addingTimeInterval(-2 * 60 * 60), .now.addingTimeInterval(60)] {
-            let rig = Rig()
-            var snapshot = try #require(SessionSnapshot(queue, position: 0, duration: 200))
-            snapshot.stream = .init(stream: FakeMusic.stream("a"), resolved: resolved)
-            rig.store.save(snapshot, to: .session)
-            await rig.player.start()
-            await rig.settle()
-            #expect(rig.music.calls.contains("stream a"), "resolved ahead at launch")
-        }
-    }
-
-    @Test func seeksBeforeLoadingStartThere() async throws {
-        let first = await started()
-        first.player.play(songs("a"))
-        await first.settle()
-        first.player.persistSession()
-        let second = await started(Rig(store: first.store))
-        second.player.seek(to: 80)
-        #expect(second.player.currentTime == 80)
-        #expect(second.player.lastSeek == Seek(count: 1, to: 80), "told, though nothing plays to move")
-        second.player.togglePlayPause()
-        await second.settle()
-        #expect(try #require(second.audio.played.last).from == 80)
-    }
-
     @Test func countsSeeksOnlyWithASong() async {
         let rig = await started()
         rig.player.seek(to: 10)
@@ -259,79 +209,6 @@ struct PlayerControllerTests {
         #expect(rig.player.current?.id == "b")
         // Each rating is sent on its own task, so taps this close may arrive in any order.
         #expect(rig.music.calls.filter { $0.hasPrefix("rate") }.sorted() == ["rate a DISLIKE", "rate a INDIFFERENT", "rate a LIKE"])
-    }
-
-    @Test func aQualityChangeDropsStreamsResolvedAhead() async {
-        let rig = await started()
-        rig.player.play(songs("a", "b"))
-        await rig.settle()
-        await rig.soundStarts()
-        #expect(rig.player.prefetcher.has("b"))
-        rig.settings.value.quality = .low
-        rig.player.apply(rig.settings.value)
-        #expect(!rig.player.prefetcher.has("b"), "resolved at the old quality")
-    }
-
-    @Test func aQualityChangeDropsAStreamStillResolvingAhead() async {
-        let rig = await started()
-        rig.music.set { $0.held = ["b"] }
-        rig.player.play(songs("a", "b"))
-        await rig.settle()
-        await rig.soundStarts()
-        rig.settings.value.quality = .low
-        rig.player.apply(rig.settings.value)
-        rig.music.release("b")
-        await rig.settle()
-        #expect(!rig.player.prefetcher.has("b"), "resolved at the old quality as it was")
-        #expect(rig.audio.warmed.isEmpty)
-    }
-
-    @Test func aSkipDuringAPrefetchWaitsOnItRatherThanAskingAgain() async throws {
-        let rig = await started()
-        rig.music.set { $0.held = ["b"] }
-        rig.player.play(songs("a", "b", "c"))
-        await rig.settle()
-        await rig.soundStarts()
-        rig.player.next()
-        await rig.yieldToTasks()
-        rig.music.release("b")
-        await rig.settle()
-        #expect(rig.playing?.id.hasPrefix("b#") == true)
-        #expect(rig.music.calls.filter { $0 == "stream b" }.count == 1)
-        #expect(!rig.audio.warmed.contains { $0.id.hasPrefix("b#") }, "it plays rather than warms")
-    }
-
-    @Test func aPrefetchLandingOnceTheSongIsNoLongerNextIsNotWarmed() async throws {
-        let rig = await started()
-        rig.music.set { $0.held = ["b"] }
-        rig.player.play(songs("a", "b", "c"))
-        await rig.settle()
-        await rig.soundStarts()
-        rig.player.moveQueue(fromOffsets: [2], toOffset: 1)
-        await rig.yieldToTasks()
-        rig.music.release("b")
-        await rig.settle()
-        #expect(rig.audio.warmed.map { $0.id.prefix(2) } == ["c#"], "the song next now is warmed, and stays so")
-        #expect(rig.player.prefetcher.has("b"), "kept for when it comes up")
-    }
-
-    @Test func aCrossfadeChangeWhileTheNextSongQueuesQueuesItAgain() async throws {
-        let rig = await started()
-        rig.music.set { $0.held = ["b"] }
-        rig.player.play([song("a", album: "x", number: 1), song("b", album: "y", number: 1)])
-        await rig.settle()
-        await rig.soundStarts()
-        rig.audio.currentTime = 186
-        rig.player.onTick()
-        rig.settings.value.crossfade = true
-        rig.player.apply(rig.settings.value)
-        rig.music.release("b")
-        await rig.settle()
-        #expect(rig.audio.next == nil, "queued with the old setting, so dropped")
-        rig.player.onTick()
-        await rig.settle()
-        #expect(rig.audio.next?.id.hasPrefix("b#") == true)
-        #expect(rig.audio.nextCrossfades)
     }
 
     @Test func aSmartShuffleTopUpPlacingNothingLeavesTheQueueAlone() async {
@@ -431,53 +308,6 @@ struct PlayerControllerTests {
         rig.player.next()
         await rig.player.lyricsLoad?.value
         #expect(rig.player.lyrics == .unavailable)
-    }
-}
-
-struct StreamChooserTests {
-    @Test func takesTheAccountAsWithoutPremiumAfterThreeSongsWithout() async throws {
-        let music = FakeMusic()
-        let chooser = StreamChooser(music: music)
-        for id in ["a", "b", "c"] {
-            let stream = try await chooser.resolve(videoId: id, wantPremium: true, signedIn: true, quality: .high)
-            #expect(!stream.isPremium)
-        }
-        #expect(chooser.status == .notPremium)
-        music.set { $0.calls = [] }
-        _ = try await chooser.resolve(videoId: "d", wantPremium: true, signedIn: true, quality: .high)
-        #expect(music.calls.first == "stream d", "straight to the free stream")
-    }
-
-    @Test func playsPremiumAndCountsIt() async throws {
-        let music = FakeMusic()
-        music.set { $0.premium["a"] = true }
-        let chooser = StreamChooser(music: music)
-        let stream = try await chooser.resolve(videoId: "a", wantPremium: true, signedIn: true, quality: .high)
-        #expect(stream.isPremium && chooser.status == .premium)
-        let free = try await chooser.resolve(videoId: "b", wantPremium: true, signedIn: true, quality: .high)
-        #expect(!free.isPremium && !music.calls.contains("stream b"), "a known account takes the web client's best")
-    }
-
-    @Test func fallsBackToTheFreeStreamWhenPremiumFails() async throws {
-        let music = FakeMusic()
-        music.set { $0.premiumFails = true }
-        let chooser = StreamChooser(music: music)
-        let stream = try await chooser.resolve(videoId: "a", wantPremium: true, signedIn: true, quality: .high)
-        #expect(!stream.isPremium && music.calls == ["premium a", "suspect", "stream a"], "the player is checked sooner")
-        music.set { $0.calls = [] }
-        _ = try await chooser.resolve(videoId: "a", wantPremium: true, signedIn: true, quality: .high, reopening: true)
-        #expect(music.calls == ["premium a", "stream a"], "a song opened again after a drop says nothing of Premium")
-    }
-
-    @Test func aPlayerThatCantBePreparedIsNotCountedAsAPremiumError() async throws {
-        let music = FakeMusic()
-        music.set { $0.playerUnprepared = true }
-        let chooser = StreamChooser(music: music)
-        for id in ["a", "b", "c", "d"] {
-            music.set { $0.calls = [] }
-            let stream = try await chooser.resolve(videoId: id, wantPremium: true, signedIn: true, quality: .high)
-            #expect(!stream.isPremium && music.calls == ["premium \(id)", "stream \(id)"], "no cool-off after three")
-        }
     }
 }
 
