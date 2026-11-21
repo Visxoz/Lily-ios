@@ -18,7 +18,11 @@ public final class ImagePipeline: Sendable {
 
     /// Decoded artwork kept, in bytes: enough for a Home feed's cards and the
     /// player's 1080-pixel copy to outlast a scroll.
-    private static let memoryLimit = 96 << 20
+    static let memoryLimit = 96 << 20
+    /// The limit while the app is in the background, where nothing draws artwork: the playing song's player and row
+    /// copies, kept for its return, and the next song's, which `StreamPrefetcher` decodes for the lock screen
+    /// (4.5 MB each at 1080 pixels, over Windows's whole 2 MB).
+    static let hiddenLimit = 10 << 20
     /// Prefetches at once per page, besides any its last run left finishing: few, so the
     /// artwork a view asks for itself never queues behind a page's worth for the media host's connections.
     private static let prefetchWidth = 4
@@ -33,7 +37,7 @@ public final class ImagePipeline: Sendable {
         locale: Locale(identifier: "en_US_POSIX"), timeZone: .gmt
     )
 
-    private let memory = MemoryCache(limit: memoryLimit)
+    let memory = MemoryCache(limit: memoryLimit)
     private let downloads = Downloads()
 
     /// Artwork from `url` scaled so its shorter side is `pixelEdge` pixels,
@@ -48,6 +52,15 @@ public final class ImagePipeline: Sendable {
             memory.insert(image, for: key)
             return image
         }
+    }
+
+    /// Empties the memory cache but for `playing`'s player and row copies, which Now Playing and the mini player
+    /// show on the app's return, and holds it to `hiddenLimit` while the app is in the background; once back, it
+    /// grows again. Artwork on screen stays, as its views hold it, so only what Back or a scroll would reuse goes,
+    /// to be read from disk again.
+    public func setHidden(_ hidden: Bool, keeping playing: String? = nil) {
+        let kept = playing.map { url in [Self.playerEdge, Self.smallEdge].map { Self.key(url, $0) } } ?? []
+        memory.setLimit(hidden ? Self.hiddenLimit : Self.memoryLimit, keeping: kept)
     }
 
     /// Artwork already decoded at `pixelEdge`, without fetching.
@@ -219,7 +232,7 @@ public final class ImagePipeline: Sendable {
     }
 }
 
-private final class MemoryCache: @unchecked Sendable {
+final class MemoryCache: @unchecked Sendable {
     // `@unchecked`: NSCache is thread-safe, and this holds nothing else.
     private let cache = NSCache<NSString, CGImage>()
 
@@ -229,6 +242,17 @@ private final class MemoryCache: @unchecked Sendable {
 
     subscript(key: String) -> CGImage? {
         cache.object(forKey: key as NSString)
+    }
+
+    /// A lower limit needn't evict anything, nor in any set order, so lowering it empties the cache but for `kept`.
+    /// The limit drops first, so an image a fetch inserts meanwhile is held to it.
+    func setLimit(_ limit: Int, keeping kept: [String] = []) {
+        let lowered = limit < cache.totalCostLimit
+        let keep = lowered ? kept.compactMap { key in self[key].map { (key, $0) } } : []
+        cache.totalCostLimit = limit
+        guard lowered else { return }
+        cache.removeAllObjects()
+        for (key, image) in keep { insert(image, for: key) }
     }
 
     func insert(_ image: CGImage, for key: String) {

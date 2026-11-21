@@ -37,6 +37,8 @@ final class AppModel {
     static let renewSignInEvery: Duration = .seconds(10 * 60)
     /// The least time between cookie checks, after one that didn't find the cookie rejected.
     static let signInRecheckAfter: Duration = .seconds(10 * 60)
+    /// How long music plays on in the background before the artwork cache shrinks, as Windows waits once minimised.
+    static let trimArtworkAfter: Duration = .seconds(60)
 
     let api: YTMusic
     let player: PlayerController
@@ -99,6 +101,7 @@ final class AppModel {
     /// The wait for Last.fm access, which outlives Settings.
     private var lastFMWait: Task<Void, Never>?
     @ObservationIgnored private var downloadTime = UIBackgroundTaskIdentifier.invalid
+    @ObservationIgnored private var artworkTrim: Task<Void, Never>?
 
     init(api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared) {
         self.api = api
@@ -324,6 +327,25 @@ final class AppModel {
         } else if !active, downloadTime != .invalid {
             UIApplication.shared.endBackgroundTask(downloadTime)
             downloadTime = .invalid
+        }
+    }
+
+    /// Shrinks the artwork cache in the background, keeping the playing song's: after `trimArtworkAfter` while music
+    /// plays on, so a quick look elsewhere doesn't cost Back its art, and at once otherwise, as a suspended app runs
+    /// no timer to do it later.
+    func hideArtwork(_ hidden: Bool) {
+        artworkTrim?.cancel()
+        artworkTrim = nil
+        if !hidden {
+            ImagePipeline.shared.setHidden(false)
+        } else if !player.isPlaying {
+            ImagePipeline.shared.setHidden(true, keeping: player.current?.thumbnail)
+        } else {
+            artworkTrim = Task { [weak self] in
+                try? await Task.sleep(for: Self.trimArtworkAfter)
+                guard let self, !Task.isCancelled else { return }
+                ImagePipeline.shared.setHidden(true, keeping: player.current?.thumbnail)
+            }
         }
     }
 

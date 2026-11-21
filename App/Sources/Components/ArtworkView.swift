@@ -65,6 +65,9 @@ struct ArtworkImage: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: key) { await load(key) }
+        // A lazy list can keep its rows' state once scrolled past, so a long one would hold every row's art beyond
+        // the memory cache's budget; shown again, the cache's copy draws on the first frame.
+        .onDisappear { loaded = nil }
     }
 
     private var pixels: Int {

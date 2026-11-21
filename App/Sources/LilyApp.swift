@@ -21,6 +21,7 @@ struct LilyApp: App {
                 .environment(app)
         }
         .onChange(of: scenePhase) { _, phase in
+            app.hideArtwork(phase == .background)
             switch phase {
             case .background:
                 app.player.persistSession()

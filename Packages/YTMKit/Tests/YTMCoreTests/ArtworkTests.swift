@@ -117,6 +117,43 @@ private actor DownloadLog {
         #expect(ImagePipeline.key(banner, 360) != ImagePipeline.key(row, 360), "a banner keeps its own rendition")
     }
 
+    @Test func keepsOnlyThePlayingSongsArtworkWhileHidden() throws {
+        let pipeline = ImagePipeline()
+        // Blank, as only its cost counts here.
+        func art(_ edge: Int) throws -> CGImage {
+            let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+            let provider = try #require(CGDataProvider(data: Data(count: edge * edge * 4) as CFData))
+            return try #require(CGImage(
+                width: edge, height: edge, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: edge * 4, space: space,
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue), provider: provider,
+                decode: nil, shouldInterpolate: false, intent: .defaultIntent
+            ))
+        }
+        let player = try art(ImagePipeline.playerEdge), small = try art(ImagePipeline.smallEdge)
+        func store(_ url: String) {
+            pipeline.memory.insert(player, for: ImagePipeline.key(url, ImagePipeline.playerEdge))
+            pipeline.memory.insert(small, for: ImagePipeline.key(url, ImagePipeline.smallEdge))
+        }
+        func held(_ url: String) -> Bool {
+            [ImagePipeline.playerEdge, ImagePipeline.smallEdge].allSatisfy { pipeline.cachedImage(for: url, pixelEdge: $0) != nil }
+        }
+        let earlier = "https://i.ytimg.com/vi/earlier/hqdefault.jpg"
+        let playing = "https://i.ytimg.com/vi/playing/hqdefault.jpg"
+        let next = "https://i.ytimg.com/vi/next/hqdefault.jpg"
+        store(earlier)
+        store(playing)
+        pipeline.setHidden(true, keeping: playing)
+        #expect(pipeline.cachedImage(for: earlier, pixelEdge: ImagePipeline.playerEdge) == nil)
+        #expect(pipeline.cachedImage(for: earlier, pixelEdge: ImagePipeline.smallEdge) == nil)
+        #expect(held(playing), "Now Playing has its cover on the app's return")
+        // NSCache enforces its limit lazily, so the room is checked by sum.
+        let song = player.bytesPerRow * player.height + small.bytesPerRow * small.height
+        #expect(2 * song <= ImagePipeline.hiddenLimit, "the next song's prefetch fits beside it")
+        store(next)
+        pipeline.setHidden(false)
+        #expect(held(playing) && held(next), "growing again drops nothing")
+    }
+
     @Test func aRequestDuringAPrefetchWaitsForItsDownload() async {
         let downloads = Downloads()
         let log = DownloadLog()
