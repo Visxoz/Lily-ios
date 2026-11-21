@@ -78,7 +78,9 @@ import YTMCore
         self.history = history
         self.store = store
         self.toasts = toasts
-        audio = AudioDownloader(directory: store.downloads.appending(path: "Audio", directoryHint: .isDirectory))
+        audio = AudioDownloader(directory: store.downloads.appending(path: "Audio", directoryHint: .isDirectory)) {
+            Proxy.configurations
+        }
     }
 
     isolated deinit {

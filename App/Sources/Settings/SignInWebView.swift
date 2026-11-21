@@ -1,3 +1,4 @@
+import Network
 import SwiftUI
 import WebKit
 import os
@@ -9,6 +10,8 @@ struct SignInWebView: UIViewRepresentable {
     let onSession: ([HTTPCookie]) -> Void
     /// A sentence for the user when the page can't go on.
     let onFailure: (String) -> Void
+    /// The user's own proxy, which the page would otherwise go around for iOS's.
+    let proxies: [ProxyConfiguration]
 
     private static let startURL = URL(
         string: "https://accounts.google.com/ServiceLogin?service=youtube&passive=true"
@@ -23,7 +26,9 @@ struct SignInWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         // The page's cookies stay in memory and go with the view, so each
         // attempt starts signed out.
-        configuration.websiteDataStore = .nonPersistent()
+        let store = WKWebsiteDataStore.nonPersistent()
+        store.proxyConfigurations = proxies
+        configuration.websiteDataStore = store
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = Self.userAgent
         webView.navigationDelegate = context.coordinator

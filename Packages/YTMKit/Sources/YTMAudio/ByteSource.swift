@@ -1,4 +1,6 @@
 import Foundation
+import Network
+import Synchronization
 
 protocol ByteSource: Sendable {
     /// An upper bound of `Int64.max` asks for the rest of a file of unknown length.
@@ -14,17 +16,31 @@ enum ByteSourceError: Error, Equatable {
     case empty
 }
 
-struct HTTPByteSource: ByteSource {
+final class HTTPByteSource: ByteSource {
+    /// Asked for at the first request rather than when made, as reading them may touch the Keychain.
+    private let proxies: @Sendable () -> [ProxyConfiguration]
+    private let made = Mutex<URLSession?>(nil)
+
+    init(proxies: @escaping @Sendable () -> [ProxyConfiguration] = { [] }) {
+        self.proxies = proxies
+    }
+
     /// The audio cache keeps the files, so nothing is cached or remembered here.
-    static let session: URLSession = {
-        let configuration = URLSessionConfiguration.default
-        configuration.urlCache = nil
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.timeoutIntervalForRequest = 20
-        return URLSession(configuration: configuration)
-    }()
+    private var session: URLSession {
+        made.withLock { made in
+            if let made { return made }
+            let configuration = URLSessionConfiguration.default
+            configuration.urlCache = nil
+            configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+            configuration.httpCookieStorage = nil
+            configuration.httpShouldSetCookies = false
+            configuration.timeoutIntervalForRequest = 20
+            configuration.proxyConfigurations = proxies()
+            let session = URLSession(configuration: configuration)
+            made = session
+            return session
+        }
+    }
 
     func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
         var request = URLRequest(url: url)
@@ -34,7 +50,7 @@ struct HTTPByteSource: ByteSource {
         let last = range.upperBound == .max ? "" : String(range.upperBound - 1)
         request.setValue("bytes=\(range.lowerBound)-\(last)", forHTTPHeaderField: "Range")
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: Data.self)
-        let task = Self.session.dataTask(with: request)
+        let task = session.dataTask(with: request)
         task.delegate = RangeDelegate(continuation: continuation, partial: range.lowerBound > 0, domain: url.host().map(Self.domain))
         continuation.onTermination = { _ in task.cancel() }
         task.resume()

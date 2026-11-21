@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Every URL taken from a response, and every redirect, is checked with
 /// `isAllowed`, so a hostile or broken response can never send the app elsewhere.
@@ -42,6 +43,7 @@ enum HTTP {
         // A request that has not answered in 15 s is not going to.
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 60
+        config.proxyConfigurations = Proxy.configurations
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
     }()
 
@@ -65,6 +67,7 @@ enum HTTP {
         config.httpCookieAcceptPolicy = .never
         config.httpMaximumConnectionsPerHost = 8
         config.timeoutIntervalForRequest = 20
+        config.proxyConfigurations = Proxy.configurations
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
     }()
 

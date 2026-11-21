@@ -2,7 +2,7 @@ import Foundation
 import os
 import Security
 
-/// Secrets (sign-in cookies, the Last.fm session) as device-only generic passwords.
+/// Secrets (sign-in cookies, the Last.fm session, the user's proxy) as device-only generic passwords.
 enum Keychain {
     private static let service = "Lily"
     private static let log = Logger(subsystem: "Lily", category: "Keychain")
@@ -21,8 +21,9 @@ enum Keychain {
     }
 
     /// Stores `data` under `key`, or deletes the item when `data` is nil. A failure is logged,
-    /// as otherwise it shows only at the next launch.
-    static func set(_ data: Data?, for key: String) {
+    /// as otherwise it shows only at the next launch, and returns false.
+    @discardableResult
+    static func set(_ data: Data?, for key: String) -> Bool {
         let query = query(key)
         var status: OSStatus
         if let data {
@@ -36,5 +37,6 @@ enum Keychain {
             if status == errSecItemNotFound { status = errSecSuccess }
         }
         if status != errSecSuccess { log.error("Keychain item \(key, privacy: .public) not saved or deleted: \(status, privacy: .public)") }
+        return status == errSecSuccess
     }
 }

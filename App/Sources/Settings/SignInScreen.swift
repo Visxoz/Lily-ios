@@ -1,3 +1,4 @@
+import Network
 import SwiftUI
 import YTMCore
 
@@ -17,6 +18,8 @@ struct SignInScreen: View {
     /// Leaving `.browsing` drops the page with its private session, so
     /// Try again starts signed out on a fresh one.
     @State private var phase = Phase.browsing
+    /// Read before the page loads, so it goes through the user's proxy.
+    @State private var proxies: [ProxyConfiguration]?
 
     init(onSignedIn: @escaping () -> Void) {
         self.onSignedIn = onSignedIn
@@ -43,9 +46,12 @@ struct SignInScreen: View {
         case .browsing:
             ZStack {
                 spinner
-                SignInWebView(onSession: signIn) { phase = .failed($0) }
-                    .ignoresSafeArea(edges: .bottom)
+                if let proxies {
+                    SignInWebView(onSession: signIn, onFailure: { phase = .failed($0) }, proxies: proxies)
+                        .ignoresSafeArea(edges: .bottom)
+                }
             }
+            .task { proxies = await Self.proxiesInUse() }
         case .signingIn:
             spinner
         case .failed(let message):
@@ -64,6 +70,12 @@ struct SignInScreen: View {
         ProgressView()
             .controlSize(.large)
             .tint(theme.accent)
+    }
+
+    /// Off the main actor, as the first read touches the Keychain.
+    @concurrent
+    private static func proxiesInUse() async -> [ProxyConfiguration] {
+        Proxy.configurations
     }
 
     private func signIn(with cookies: [HTTPCookie]) {

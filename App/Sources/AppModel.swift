@@ -101,7 +101,7 @@ final class AppModel {
         self.api = api
         self.settings = settings
         self.history = history
-        audio = AudioPlayer()
+        audio = AudioPlayer { Proxy.configurations }
         player = PlayerController(api: api, settings: settings, history: history, audio: audio)
         theme = Theme(settings: settings.value, artworkAccent: nil)
         // Detached, as the main actor builds the first frame before any task of its own runs.

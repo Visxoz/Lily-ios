@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Every call returns at once; the work happens on the engine's own queue, in the order called.
 @MainActor public final class AudioPlayer {
@@ -75,9 +76,10 @@ import Foundation
     private var session: UInt64 = 0
     private var currentID: String?
 
-    public convenience init(cacheLimitBytes: Int64 = 40 << 20) {
+    /// `proxies` is asked for at the first download, off the main actor.
+    public convenience init(cacheLimitBytes: Int64 = 40 << 20, proxies: @escaping @Sendable () -> [ProxyConfiguration] = { [] }) {
         let cache = AudioCache.Location(directory: AudioCache.defaultDirectory, limit: cacheLimitBytes)
-        self.init(output: .device, source: HTTPByteSource(), cache: cache)
+        self.init(output: .device, source: HTTPByteSource(proxies: proxies), cache: cache)
     }
 
     init(output: PlaybackEngine.Output, source: any ByteSource, cache: AudioCache.Location) {

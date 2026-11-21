@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Keeps songs on the phone for good, outside the play cache and its cap.
 public actor AudioDownloader {
@@ -9,10 +10,12 @@ public actor AudioDownloader {
     private let directory: URL
     /// Made on first use, as it clears unfinished parts from the disk.
     private lazy var cache = AudioCache(.init(directory: directory, limit: .max))
-    private let source: any ByteSource = HTTPByteSource()
+    private let source: any ByteSource
 
-    public init(directory: URL) {
+    /// `proxies` is asked for at the first download, off the main actor.
+    public init(directory: URL, proxies: @escaping @Sendable () -> [ProxyConfiguration] = { [] }) {
         self.directory = directory
+        source = HTTPByteSource(proxies: proxies)
     }
 
     public nonisolated func file(for key: String) -> URL {
