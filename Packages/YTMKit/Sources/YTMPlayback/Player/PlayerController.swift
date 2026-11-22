@@ -282,7 +282,7 @@ import YTMCore
         id: String, videoId: String, stream: ResolvedStream, chooser: StreamChooser, quality: AudioQuality, signedIn: Bool,
         local: Bool
     ) throws(YTMError) -> AudioItem {
-        guard local || HostAllowlist.allows(stream.url) else { throw Self.blocked }
+        guard local || HostAllowlist.allows(stream.url) else { throw YTMError.blocked }
         // YouTube's loudness against its reference level, turned down or up while normalising.
         let loudness = -Float(stream.loudnessDb ?? 0)
         // The client of the URL last given, cut off should its fresh one be refused too.
@@ -297,12 +297,11 @@ import YTMCore
             )
             client.withLock { $0 = fresh.client }
             guard fresh.itag == stream.itag, fresh.contentLength == stream.contentLength else { throw Self.otherFile }
-            guard HostAllowlist.allows(fresh.url) else { throw Self.blocked }
+            guard HostAllowlist.allows(fresh.url) else { throw YTMError.blocked }
             return (url: fresh.url, headers: fresh.headers)
         }
     }
 
-    private nonisolated static let blocked = YTMError(.refused, "The app blocked a request to a site it doesn't use.")
     private nonisolated static let otherFile = YTMError(.unplayable, "YouTube offered a different file partway through the song.")
 
     /// Also drops what was on its way for the old queue.

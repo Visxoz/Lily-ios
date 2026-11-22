@@ -79,9 +79,7 @@ enum HTTP {
         sign: (inout URLRequest) async -> Void = { _ in },
         answered: (HTTPURLResponse) async -> Void = { _ in }
     ) async throws -> (Data, HTTPURLResponse) {
-        guard let url = request.url, isAllowed(url) else {
-            throw YTMError(.refused, "The app blocked a request to a site it doesn't use.")
-        }
+        guard let url = request.url, isAllowed(url) else { throw YTMError.blocked }
         var attempt = 0
         while true {
             let paused = await refusals?.waitForTurn() ?? false
@@ -148,6 +146,8 @@ private final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
 }
 
 extension YTMError {
+    public static let blocked = YTMError(.refused, "The app blocked a request to a site it doesn't use.")
+
     init(_ error: URLError) {
         let message = switch error.code {
         case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:

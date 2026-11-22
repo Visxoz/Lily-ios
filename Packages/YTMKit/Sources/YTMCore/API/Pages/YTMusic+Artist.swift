@@ -162,10 +162,7 @@ extension Renderers {
 
     /// Field 3 of the base64 protobuf: the artist's own ID when the page was asked for by an alias.
     static func sharedChannelId(_ serialized: String) -> String? {
-        guard var base64 = serialized.removingPercentEncoding else { return nil }
-        base64 = base64.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
-        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
-        guard let data = Data(base64Encoded: base64) else { return nil }
+        guard let data = serialized.removingPercentEncoding.flatMap(Data.init(base64URLEncoded:)) else { return nil }
         var bytes = data[...]
         while let key = varint(&bytes) {
             let length: UInt64

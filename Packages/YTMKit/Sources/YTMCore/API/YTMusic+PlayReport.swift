@@ -122,7 +122,7 @@ enum PlayReport {
     /// A GET as the web client, with the account's cookie. `HTTP` keeps the URL, which carries the
     /// session's tracking tokens, out of its errors.
     static func ping(_ url: URL, cookie: String) async throws {
-        guard HTTP.isYouTube(url.host()) else { throw YTMError(.refused, "The app blocked a request to a site it doesn't use.") }
+        guard HTTP.isYouTube(url.host()) else { throw YTMError.blocked }
         var request = URLRequest(url: url)
         request.allHTTPHeaderFields = ["User-Agent": ClientProfile.webRemix.userAgent, "Cookie": cookie]
         _ = try await HTTP.data(for: request)
