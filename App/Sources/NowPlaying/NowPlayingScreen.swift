@@ -1,5 +1,6 @@
 import SwiftUI
 import YTMCore
+import YTMPlayback
 
 /// The two pages scroll natively, so a swipe follows the finger and can't be
 /// lost to the zoom's own close. A regular width, iPhone Duo's inner display,
@@ -20,13 +21,18 @@ struct NowPlayingScreen: View {
     private nonisolated struct Shape: Equatable {
         var isWide = false
         var isStood = false
+        /// Until measured, a regular width may yet turn out side by side or stood.
+        var measured = false
     }
 
     @Environment(AppModel.self) private var app
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var page: Page? = .artwork
     @State private var tab = PanelTab.upNext
     @State private var shape = Shape()
+    /// Off the artwork page, which the fixed clip behind the pager can't follow, so it gives way to the still on the page.
+    @State private var paging = false
 
     var body: some View {
         @Bindable var app = app
@@ -35,7 +41,7 @@ struct NowPlayingScreen: View {
                 if #available(iOS 27.1, *), layout == .stand {
                     stand(track)
                 } else {
-                    NowPlayingTopBar(track: track)
+                    NowPlayingTopBar(track: track, overClip: tallMotionShown)
                     if #available(iOS 27.1, *), layout == .sideBySide {
                         sideBySide(track)
                     } else {
@@ -46,18 +52,34 @@ struct NowPlayingScreen: View {
         }
         .padding(.bottom, 8)
         .onGeometryChange(for: Shape.self) { proxy in
-            Shape(isWide: proxy.size.width > proxy.size.height, isStood: Fold.isStood(proxy))
+            Shape(isWide: proxy.size.width > proxy.size.height, isStood: Fold.isStood(proxy), measured: true)
         } action: { shape = $0 }
         // Each layout starts at the artwork; stood, a tab left on lyrics would open them.
         .onChange(of: layout) {
             page = .artwork
+            // A pager gone mid-swipe never says it stopped.
+            paging = false
             if $1 == .stand { tab = .upNext }
         }
-        .background { NowPlayingBackground() }
+        // The clip is dark or bright whatever the look, so the bar and status bar over it are light, as in Apple Music.
+        .preferredColorScheme(tallMotionShown ? .dark : app.theme.colorScheme)
+        .background {
+            NowPlayingBackground()
+            ZStack {
+                if let tallClip {
+                    // By album, so another's crossfades in place rather than through the still.
+                    TallMotion(clip: tallClip, active: tallMotionShown, onPage: page == .artwork)
+                        .id(tallClip.album)
+                        .transition(.opacity)
+                }
+            }
+            .animation(MotionArtworkView.fade, value: tallClip?.album)
+        }
         // On the panel, or stood lyrics, a pull down goes back to the artwork
         // rather than closing the screen.
         .interactiveDismissDisabled((page == .panel && layout != .sideBySide) || (layout == .stand && lyricsShown))
-        .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0) }
+        // In the look's own scheme, not the dark one over the clip.
+        .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0).preferredColorScheme(app.theme.colorScheme) }
         .onAppear { app.nowPlayingShown = true }
         .onDisappear {
             app.nowPlayingShown = false
@@ -72,6 +94,16 @@ struct NowPlayingScreen: View {
     private var layout: Layout {
         if Fold.isSplit(sizeClass, isWide: shape.isWide) { return .sideBySide }
         return sizeClass == .regular && shape.isStood ? .stand : .pager
+    }
+
+    /// The player's, from its first frame before the clip lands, so the screen opens laid out for it; on a regular
+    /// width only once measured, or the pager guessed at first would start it only to fade it out.
+    private var tallClip: MotionClip? {
+        layout == .pager && (shape.measured || sizeClass == .compact) && !reduceMotion ? app.player.motionClip : nil
+    }
+
+    private var tallMotionShown: Bool {
+        tallClip != nil && page == .artwork && !paging
     }
 
     private var lyricsShown: Bool {
@@ -99,6 +131,8 @@ struct NowPlayingScreen: View {
         // The page counts as shown once past halfway, so a swipe
         // down from the panel stays one page until it settles.
         .scrollPosition(id: $page, anchor: .center)
+        // Off the artwork page, not merely touched or dragged by the zoom's close, which leaves the pager still.
+        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { paging = $1 }
         .scrollIndicators(.hidden)
     }
 
@@ -120,7 +154,7 @@ struct NowPlayingScreen: View {
             if lyricsShown {
                 LyricsPanel { standSelect(.lyrics) }
             } else {
-                LargeArtwork(url: track.thumbnail)
+                LargeArtwork(track: track, moves: true)
                     .padding(Self.padding)
             }
         } secondary: {
@@ -153,7 +187,7 @@ struct NowPlayingScreen: View {
 
     private func artworkPage(_ track: Track, open: @escaping (PanelTab) -> Void) -> some View {
         VStack(spacing: 0) {
-            LargeArtwork(url: track.thumbnail)
+            LargeArtwork(track: track, moves: layout != .pager, stillHidden: tallMotionShown)
                 .accessibilityAction(named: "Up next") { open(.upNext) }
                 .padding(.vertical, 12)
                 .padding(.horizontal, Self.padding)
@@ -244,14 +278,16 @@ private struct CompactControls: View {
 /// has no use for the song playing.
 private struct NowPlayingTopBar: View {
     let track: Track
+    var overClip = false
 
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let colour = overClip ? .white : theme.text
         HStack {
-            IconButton(icon: .close, size: 40, iconSize: 22, colour: theme.text) { dismiss() }
+            IconButton(icon: .close, size: 40, iconSize: 22, colour: colour) { dismiss() }
                 .accessibilityLabel("Close")
             Spacer()
             Menu {
@@ -261,7 +297,7 @@ private struct NowPlayingTopBar: View {
                 TrackDownloadItem(track: track)
                 TrackLinks(track: track)
             } label: {
-                IconView(icon: .more, size: 22, colour: theme.text)
+                IconView(icon: .more, size: 22, colour: colour)
                     .frame(width: 40, height: 40)
                     .contentShape(Circle())
             }
@@ -274,16 +310,81 @@ private struct NowPlayingTopBar: View {
 
 /// Decoded at the player's shared size, which is fetched ahead with the song.
 private struct LargeArtwork: View {
-    let url: String?
+    static let radius: CGFloat = 8
+
+    let track: Track
+    /// With the square clip over it, beside the panel or stood, where the pager's tall one isn't.
+    let moves: Bool
+    /// The pager's tall clip stands in for it; only the image goes, so the page keeps its place and its action.
+    var stillHidden = false
 
     @Environment(\.theme) private var theme
 
     var body: some View {
         GeometryReader { space in
             let edge = min(space.size.width, space.size.height)
-            ArtworkView(url: url, size: edge, radius: 8, pixelEdge: ImagePipeline.playerEdge, shadow: (theme.shadowSoft, 16, 8))
+            ArtworkView(url: track.thumbnail, size: edge, radius: Self.radius, pixelEdge: ImagePipeline.playerEdge, shadow: (theme.shadowSoft, 16, 8))
+                .opacity(stillHidden ? 0 : 1)
+                .animation(MotionArtworkView.fade, value: stillHidden)
+                .overlay {
+                    if moves {
+                        MotionArtworkView(track: track)
+                            .clipShape(RoundedRectangle(cornerRadius: Self.radius))
+                    }
+                }
                 .frame(width: space.size.width, height: space.size.height)
         }
+    }
+}
+
+/// Apple Music's way: the whole width at the top, under the bar, fading into the background below.
+private struct TallMotion: View {
+    let clip: MotionClip
+    let active: Bool
+    /// Off the page, the player and its buffers go, made again from the file on return.
+    let onPage: Bool
+
+    @Environment(AppModel.self) private var app
+    @Environment(\.scenePhase) private var scenePhase
+    /// The video has drawn, and fades in over its first frame only to hide the frame's lower resolution.
+    @State private var drawn = false
+
+    private static let mask = LinearGradient(
+        stops: [.init(color: .black, location: 0.6), .init(color: .clear, location: 1)],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
+    /// Shades the clip under the status bar and the top bar's light icons, as a bright clip would hide them.
+    private static let scrim = LinearGradient(colors: [.black.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
+
+    var body: some View {
+        GeometryReader { space in
+            ZStack {
+                Image(decorative: clip.frame, scale: 1)
+                    .resizable()
+                    .scaledToFill()
+                // Likewise in the background.
+                if let file = clip.file, onPage, scenePhase != .background {
+                    LoopingVideo(url: file, playing: active && app.player.isPlaying && scenePhase == .active) {
+                        drawn = true
+                    }
+                    .opacity(drawn ? 1 : 0)
+                    .animation(MotionArtworkView.fade, value: drawn)
+                    .onDisappear { drawn = false }
+                }
+            }
+            // A shorter screen, as iPhone Duo's outer one, crops it rather than run it under the controls.
+            .frame(width: space.size.width, height: min(space.size.width * 4 / 3, space.size.height * 0.62))
+            .clipped()
+            .overlay(alignment: .top) { Self.scrim.frame(height: 160) }
+            .mask(Self.mask)
+        }
+        .ignoresSafeArea()
+        .opacity(active ? 1 : 0)
+        .animation(MotionArtworkView.fade, value: active)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

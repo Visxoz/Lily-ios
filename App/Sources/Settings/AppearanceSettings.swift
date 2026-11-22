@@ -21,6 +21,9 @@ struct AppearanceSettings: View {
                 }
             }
         }
+        SettingRow(label: "Animated art", detail: "Album covers that move, where Apple Music has one: the album and artist playing are looked up there.", stacked: true) {
+            ChoicePills(choices: [(AnimatedArt.on, "On"), (.wifi, "Wi-Fi only"), (.off, "Off")], selection: $settings.value.animatedArt)
+        }
     }
 }
 
