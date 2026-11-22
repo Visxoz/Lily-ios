@@ -90,7 +90,7 @@ public actor MotionArtwork {
 
     /// The tall shape's Canvas where it has one, else the album's Apple cover; unless `fetching`, only a kept Canvas.
     public func source(_ shape: MotionShape, for track: Track, fetching: Bool, cellular: Bool) async -> MotionSource? {
-        if shape == .tall, let name = Self.clipName(track.id, "canvas"), await canvas.isSignedIn {
+        if shape == .tall, let name = Self.clipName(track.id, "canvas3x4"), await canvas.isSignedIn {
             let source = MotionSource(name: name, shape: shape, track: track, canvas: true)
             if Self.touch(clip(source)) { return source }
             if fetching, await covers(of: source, cellular: cellular)?[shape] != nil { return source }
@@ -210,18 +210,23 @@ public actor MotionArtwork {
         if downloads[file]?.id == id, downloads[file]?.joins == joins { downloads.removeValue(forKey: file)?.task.cancel() }
     }
 
-    /// A Canvas's file, or the one file an Apple cover's segments are ranges of, moved into place so it's whole or absent.
+    /// A Canvas's file cut to 3:4, or the one file an Apple cover's segments are ranges of, moved into place so it's
+    /// whole or absent.
     @concurrent
     private static func download(_ video: URL, to file: URL, in directory: URL, cellular: Bool) async -> URL? {
         do {
-            let media = video.pathExtension == "m3u8" ? try await mediaFile(of: video, cellular: cellular) : video
+            let playlist = video.pathExtension == "m3u8"
+            let media = playlist ? try await mediaFile(of: video, cellular: cellular) : video
             let downloaded = try await HTTP.download(MotionLookup.request(media, cellular: cellular))
-            // Gone once moved; left behind only by a failure.
+            // Gone once moved or cut into another file.
             defer { try? FileManager.default.removeItem(at: downloaded) }
+            // Apple's covers come in 3:4 already.
+            let clip = try (playlist ? nil : CleanAperture.tall(downloaded)) ?? downloaded
+            defer { if clip != downloaded { try? FileManager.default.removeItem(at: clip) } }
             // Recreated each time, as the system may empty Caches.
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             do {
-                try FileManager.default.moveItem(at: downloaded, to: file)
+                try FileManager.default.moveItem(at: clip, to: file)
             } catch where FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) {
                 // An earlier download of it landed first, as whole as this one.
             }
@@ -252,7 +257,7 @@ public actor MotionArtwork {
         (try? Data(contentsOf: file)).flatMap { ImagePipeline.decode($0, edge: stillEdge) }
     }
 
-    /// For a clip with no still beside it, as where Apple has none or the clip landed first.
+    /// For a clip with no still beside it, as a Canvas, or where Apple has none or the clip landed first.
     @concurrent
     private static func still(of clip: URL, savingTo file: URL) async -> CGImage? {
         let frames = AVAssetImageGenerator(asset: AVURLAsset(url: clip))

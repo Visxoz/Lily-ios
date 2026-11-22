@@ -63,32 +63,28 @@ import Testing
     private func varint(_ number: UInt8, _ value: UInt8) -> Data { Data([number << 3, value]) }
     private func text(_ number: UInt8, _ value: String) -> Data { Protobuf.field(number, Data(value.utf8)) }
 
-    private func canvas(_ uri: String, type: UInt8, url: String, thumbnails: [(UInt8, String)] = []) -> Data {
+    private func canvas(_ uri: String, type: UInt8, url: String, still: String? = nil) -> Data {
         // A fixed64 and a fixed32 field the reader must step over.
         var body = text(1, "id") + Data([3 << 3 | 1] + [UInt8](repeating: 7, count: 8)) + Data([10 << 3 | 5, 1, 2, 3, 4])
         body += text(2, url) + varint(4, type) + text(5, uri)
-        for (height, still) in thumbnails {
-            body += Protobuf.field(13, varint(1, height) + varint(2, height / 2) + text(3, still))
-        }
+        // A `Thumbnail`, which the reader steps over.
+        if let still { body += Protobuf.field(13, varint(1, 120) + varint(2, 60) + text(3, still)) }
         return Protobuf.field(1, body)
     }
 
     private var response: Data {
         canvas("spotify:track:image", type: 0, url: "https://canvaz.scdn.co/upload/a.jpg")
-            + canvas("spotify:track:song", type: 3, url: "https://canvaz.scdn.co/upload/b.cnvs.mp4", thumbnails: [
-                (64, "https://i.scdn.co/image/small"), (120, "https://i.scdn.co/image/large"), (127, "https://example.com/image/foreign"),
-            ])
+            + canvas("spotify:track:song", type: 3, url: "https://canvaz.scdn.co/upload/b.cnvs.mp4", still: "https://i.scdn.co/image/large")
             + canvas("spotify:track:other", type: 1, url: "https://canvaz.scdn.co/upload/c.cnvs.mp4")
             + canvas("spotify:track:foreign", type: 2, url: "https://example.com/upload/d.cnvs.mp4")
             + varint(2, 60)
     }
 
-    @Test func readsLoopingVideosByTrackWithTheirTallestAllowedStill() throws {
+    @Test func readsLoopingVideosByTrackWithoutSpotifysStills() throws {
         let found = try #require(SpotifyCanvas.canvases(in: response))
         #expect(Set(found.keys) == ["spotify:track:song", "spotify:track:other"], "an image and a foreign host are passed over")
         #expect(found["spotify:track:song"]?.video.absoluteString == "https://canvaz.scdn.co/upload/b.cnvs.mp4")
-        #expect(found["spotify:track:song"]?.still?.absoluteString == "https://i.scdn.co/image/large")
-        #expect(found["spotify:track:other"]?.still == nil)
+        #expect(found.values.allSatisfy { $0.still == nil }, "9:16 stills are passed over")
     }
 
     @Test func readsHostileBytesAsMalformedWithoutTrapping() {

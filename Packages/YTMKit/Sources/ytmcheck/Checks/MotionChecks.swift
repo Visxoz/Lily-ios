@@ -23,7 +23,7 @@ enum MotionChecks {
             guard let clip = await artwork.video(source, cellular: true) else {
                 return findings.fail("SOS: the tall clip didn't download")
             }
-            let (videos, seconds) = try await inspect(clip)
+            let (videos, seconds, _) = try await inspect(clip)
             findings.expect(videos > 0, "SOS: no video track")
             findings.expect(seconds > 5, "SOS: \(seconds) s long")
             let size = (try? clip.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
@@ -49,20 +49,29 @@ enum MotionChecks {
             let clip = if let source { await artwork.video(source, cellular: true) } else { nil as URL? }
             // Not left in this Mac's keychain.
             await artwork.signOutOfSpotify()
-            findings.expect(source?.name == "snooze-canvas", "Snooze: the tall source isn't its Canvas")
+            findings.expect(source?.name == "snooze-canvas3x4", "Snooze: the tall source isn't its Canvas")
             guard let clip else { return findings.fail("Snooze: the Canvas didn't download") }
-            let (videos, seconds) = try await inspect(clip)
+            let (videos, seconds, frame) = try await inspect(clip)
             findings.expect(videos > 0, "Snooze: no video track in the Canvas")
+            // The lock screen shows only 3:4.
+            findings.expect(abs(frame.width / frame.height - 0.75) < 0.01, "Snooze: a Canvas of \(frame), not 3:4")
+            if let source, let still = await artwork.still(source, fetching: false, cellular: false) {
+                findings.expect(abs(Double(still.width) / Double(still.height) - 0.75) < 0.01, "Snooze: a still of \(still.width)x\(still.height), not 3:4")
+            } else {
+                findings.fail("Snooze: no still made from the Canvas")
+            }
             let size = (try? clip.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-            findings.note("Snooze: a Canvas of \(size >> 10) KB, \(Int(seconds)) s")
+            findings.note("Snooze: a Canvas of \(Int(frame.width))x\(Int(frame.height)), \(size >> 10) KB, \(Int(seconds)) s")
         }
     }
 
     /// Off the main actor, as an asset isn't Sendable and its loads aren't isolated to it.
     @concurrent
-    private static func inspect(_ clip: URL) async throws -> (videos: Int, seconds: Double) {
+    private static func inspect(_ clip: URL) async throws -> (videos: Int, seconds: Double, frame: CGSize) {
         let asset = AVURLAsset(url: clip)
-        let videos = try await asset.loadTracks(withMediaType: .video).count
-        return (videos, try await asset.load(.duration).seconds)
+        let videos = try await asset.loadTracks(withMediaType: .video)
+        let (size, transform) = try await videos.first?.load(.naturalSize, .preferredTransform) ?? (.zero, .identity)
+        let upright = size.applying(transform)
+        return (videos.count, try await asset.load(.duration).seconds, CGSize(width: abs(upright.width), height: abs(upright.height)))
     }
 }

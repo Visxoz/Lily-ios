@@ -186,7 +186,7 @@ import AppKit
                 // A clip on the phone never waits on the network, as its still is made from it where there is none.
                 let first = await MotionArtwork.shared.still(source, fetching: fetching && kept == nil, cellular: cellular)
                 guard !Task.isCancelled else { return }
-                // Laid out for from the first frame before the clip lands, but only while one is on the phone or coming.
+                // Laid out for from the first frame, before an Apple clip lands, but only while one is on the phone or coming.
                 if shape == .tall {
                     player?.motionClip = kept != nil || fetching ? first.map { MotionClip(id: source.name, file: kept, frame: $0) } : nil
                 }

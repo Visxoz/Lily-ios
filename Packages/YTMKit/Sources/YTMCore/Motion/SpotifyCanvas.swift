@@ -367,36 +367,26 @@ extension SpotifyCanvas {
         uris.reduce(into: Data()) { body, uri in body += Protobuf.field(1, Protobuf.field(1, Data(uri.utf8))) }
     }
 
-    /// `EntityCanvazResponse`'s looping videos by track, each with its tallest still; nil when it isn't protobuf.
+    /// `EntityCanvazResponse`'s looping videos by track; nil when it isn't protobuf. Spotify's 9:16 stills are passed
+    /// over, as the still is made from the clip once cropped to 3:4.
     static func canvases(in response: Data) -> [String: MotionCover]? {
         guard let fields = Protobuf.fields(of: Array(response)[...]) else { return nil }
         var covers: [String: MotionCover] = [:]
         for case (1, .bytes(let canvas)) in fields {
             guard let fields = Protobuf.fields(of: canvas) else { return nil }
-            var video: URL?, uri: String?, type: UInt64 = 0, still: (height: UInt64, url: URL)?
+            var video: URL?, uri: String?, type: UInt64 = 0
             for field in fields {
                 switch field {
                 case (2, .bytes(let bytes)): video = URL(string: String(decoding: bytes, as: UTF8.self))
                 case (4, .varint(let value)): type = value
                 case (5, .bytes(let bytes)): uri = String(decoding: bytes, as: UTF8.self)
-                case (13, .bytes(let bytes)):
-                    // `Thumbnail { height = 1; width = 2; url = 3 }`, the height being the longer side.
-                    var height: UInt64 = 0, url: URL?
-                    for thumbnail in Protobuf.fields(of: bytes) ?? [] {
-                        switch thumbnail {
-                        case (1, .varint(let value)): height = value
-                        case (3, .bytes(let bytes)): url = URL(string: String(decoding: bytes, as: UTF8.self))
-                        default: break
-                        }
-                    }
-                    if let url, HTTP.isAllowed(url), height > still?.height ?? 0 { still = (height, url) }
                 default: break
                 }
             }
             // 1 to 3 are videos; 0 is a still image and 4 a GIF.
             guard let uri, covers[uri] == nil, (1...3).contains(type), let video, video.pathExtension == "mp4", HTTP.isAllowed(video)
             else { continue }
-            covers[uri] = MotionCover(video: video, still: still?.url)
+            covers[uri] = MotionCover(video: video, still: nil)
         }
         return covers
     }

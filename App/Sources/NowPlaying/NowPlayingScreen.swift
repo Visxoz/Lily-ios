@@ -96,7 +96,7 @@ struct NowPlayingScreen: View {
         return sizeClass == .regular && shape.isStood ? .stand : .pager
     }
 
-    /// The player's, from its first frame before the clip lands, so the screen opens laid out for it; on a regular
+    /// The player's, from its first frame (before an Apple clip lands), so the screen opens laid out for it; on a regular
     /// width only once measured, or the pager guessed at first would start it only to fade it out.
     private var tallClip: MotionClip? {
         layout == .pager && (shape.measured || sizeClass == .compact) && !reduceMotion ? app.player.motionClip : nil
