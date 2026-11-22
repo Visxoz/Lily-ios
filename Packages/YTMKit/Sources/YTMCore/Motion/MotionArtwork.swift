@@ -21,7 +21,7 @@ public struct MotionSource: Sendable {
     public let name: String
     let shape: MotionShape
     let track: Track
-    let canvas: Bool
+    public let canvas: Bool
 }
 
 /// Moving art kept on disk as clips and stills: a song's Spotify Canvas once signed in, and its album's Apple cover.

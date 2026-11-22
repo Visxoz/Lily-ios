@@ -136,8 +136,8 @@ import AppKit
     }
 
     /// Offered only once on the phone, so the lock screen plays them at once; a clip the last song shares plays on, the
-    /// rest go with their downloads. Without `fetching`, only clips on the phone, kept while playing runs again for the
-    /// rest; `again` runs even for the same song, as its sources changed.
+    /// rest go as this one starts, with their downloads. Without `fetching`, only clips on the phone, kept while playing
+    /// runs again for the rest; `again` runs even for the same song, as its sources changed.
     func showMotion(of track: Track, _ setting: AnimatedArt, fetching: Bool = true, again: Bool = false) {
         let wanted = setting == .off ? nil : "\(track.id) \(setting)"
         // Nothing wanted always runs, so a cover left up is cleared.
@@ -162,58 +162,75 @@ import AppKit
             keepMotion()
         }
         motion = Task { [weak self] in
-            // What's on the phone first, so a clip this song shares outlasts the lapse while Spotify is asked.
-            var sources = await Self.motionSources(shapes, of: track, fetching: false, cellular: cellular)
-            guard let self, !Task.isCancelled else { return }
-            motionWanted = sources.mapValues(\.name)
-            if fetching {
-                sources = await Self.motionSources(shapes, of: track, fetching: true, cellular: cellular)
-                guard !Task.isCancelled else { return }
-                motionWanted = sources.mapValues(\.name)
-            }
-            // Now Playing's goes once replaced, or at the lapse, so one clip goes straight to the next.
-            keepMotion(clip: sources[Self.tallKey] == nil)
             var shown = false
-            for (shape, key) in shapes {
-                guard let source = sources[key] else { continue }
-                let onLockScreen = !supported.contains(key) || motionNames[key] == source.name
-                let inNowPlaying = shape != .tall || player?.motionClip.map { $0.id == source.name && $0.file != nil } == true
-                if onLockScreen, inNowPlaying {
-                    shown = true
-                    continue
-                }
-                let kept = await MotionArtwork.shared.kept(source)
-                // A clip on the phone never waits on the network, as its still is made from it where there is none.
-                let first = await MotionArtwork.shared.still(source, fetching: fetching && kept == nil, cellular: cellular)
+            // What's on the phone first, shown at once, so the last song's clip goes as this one starts, not once
+            // Spotify answers; one this song shares plays on.
+            for pass in fetching ? [false, true] : [false] {
+                var sources = await Self.motionSources(shapes, of: track, fetching: pass, cellular: cellular)
+                var unsure = false
+                if !pass, fetching, sources[Self.tallKey]?.canvas == false { unsure = await MotionArtwork.shared.isSignedInToSpotify }
+                guard let self, !Task.isCancelled else { return }
+                // A Canvas may yet be found, so an Apple cover isn't put up only to be swapped; one already up plays on.
+                if unsure, player?.motionClip?.id != sources[Self.tallKey]?.name { sources[Self.tallKey] = nil }
+                motionWanted = sources.mapValues(\.name)
+                // Now Playing's goes once replaced, or at the lapse, so one clip goes straight to the next.
+                keepMotion(clip: sources[Self.tallKey] == nil)
+                shown = await show(sources, shapes, supported: supported, fetching: pass, followed: fetching && !pass, cellular: cellular)
                 guard !Task.isCancelled else { return }
-                // Laid out for from the first frame, before an Apple clip lands, but only while one is on the phone or coming.
-                if shape == .tall {
-                    player?.motionClip = kept != nil || fetching ? first.map { MotionClip(id: source.name, file: kept, frame: $0) } : nil
-                }
-                let file = if let kept { kept } else if fetching {
-                    await MotionArtwork.shared.video(source, cellular: cellular)
-                } else { nil as URL? }
-                let frame = if let first { first } else if file != nil {
-                    await MotionArtwork.shared.still(source, fetching: false, cellular: false)
-                } else { nil as CGImage? }
-                guard !Task.isCancelled else { return }
-                // A still whose clip couldn't be had goes, rather than stand in for it all song.
-                if shape == .tall { player?.motionClip = file.flatMap { file in frame.map { MotionClip(id: source.name, file: file, frame: $0) } } }
-                guard let file, let frame else { continue }
-                shown = true
-                guard !onLockScreen else { continue }
-                metadata[key] = Self.animatedArtwork(source.name, file: file, frame: frame)
-                motionNames[key] = source.name
-                republish()
             }
             // None to be had now, as off Wi-Fi, so asking again runs; misses are remembered for the launch.
-            guard !shown, !Task.isCancelled, motionFor == wanted else { return }
+            guard let self, !shown, motionFor == wanted else { return }
             motionFor = nil
         }
         #endif
     }
 
     #if canImport(UIKit)
+    /// Puts the sources' clips on the lock screen and in Now Playing; true when any is shown. When `followed` by a
+    /// fetching pass, a still already up of one not on the phone stays for it.
+    private func show(
+        _ sources: [String: MotionSource], _ shapes: [(shape: MotionShape, key: String)], supported: [String], fetching: Bool,
+        followed: Bool, cellular: Bool
+    ) async -> Bool {
+        var shown = false
+        for (shape, key) in shapes {
+            guard let source = sources[key] else { continue }
+            let onLockScreen = !supported.contains(key) || motionNames[key] == source.name
+            let inNowPlaying = shape != .tall || player?.motionClip.map { $0.id == source.name && $0.file != nil } == true
+            if onLockScreen, inNowPlaying {
+                shown = true
+                continue
+            }
+            let kept = await MotionArtwork.shared.kept(source)
+            guard !Task.isCancelled else { return shown }
+            guard kept != nil || fetching else {
+                if shape == .tall, !followed || player?.motionClip?.id != source.name { player?.motionClip = nil }
+                continue
+            }
+            // A clip on the phone never waits on the network, as its still is made from it where there is none.
+            let first = await MotionArtwork.shared.still(source, fetching: fetching && kept == nil, cellular: cellular)
+            guard !Task.isCancelled else { return shown }
+            // Laid out for from the first frame, before an Apple clip lands.
+            if shape == .tall { player?.motionClip = first.map { MotionClip(id: source.name, file: kept, frame: $0) } }
+            let file = if let kept { kept } else if fetching {
+                await MotionArtwork.shared.video(source, cellular: cellular)
+            } else { nil as URL? }
+            let frame = if let first { first } else if file != nil {
+                await MotionArtwork.shared.still(source, fetching: false, cellular: false)
+            } else { nil as CGImage? }
+            guard !Task.isCancelled else { return shown }
+            // A still whose clip couldn't be had goes, rather than stand in for it all song.
+            if shape == .tall { player?.motionClip = file.flatMap { file in frame.map { MotionClip(id: source.name, file: file, frame: $0) } } }
+            guard let file, let frame else { continue }
+            shown = true
+            guard !onLockScreen else { continue }
+            metadata[key] = Self.animatedArtwork(source.name, file: file, frame: frame)
+            motionNames[key] = source.name
+            republish()
+        }
+        return shown
+    }
+
     /// The phone's full-screen 3:4 first.
     private static let motionKeys: [(shape: MotionShape, key: String)] = [
         (.tall, tallKey), (.square, MPNowPlayingInfoProperty1x1AnimatedArtwork),
