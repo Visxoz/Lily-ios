@@ -42,7 +42,7 @@
 <td width="33%" valign="top">
 
 ### Sounds better
-256 kbps Opus with Premium, gapless playback, a crossfade of your chosen length, volume levelling, a ten-band equaliser, and crossfeed, mono and balance for headphones.
+256 kbps Opus with Premium, gapless playback, a crossfade of your chosen length or Automix's DJ-style blends, volume levelling, a ten-band equaliser, and crossfeed, mono and balance for headphones.
 
 </td>
 <td width="33%" valign="top">
@@ -135,6 +135,7 @@ Lily starts in pure black with its own orchid. Pick another look and accent in *
 | **Normalise volume** | Plays every track at a similar loudness, from YouTube's own measurement: loud ones turned down and quiet ones up, at Normal or a Quiet level 6 dB lower, with a limiter so nothing clips. |
 | **Gapless** | The next song is lined up 15 seconds early and follows without a gap, and the screen changes the moment the sound does. |
 | **Crossfade** | Fades each song into the next over 6 seconds, or a length you choose from 1 to 12, cutting the silence at the joins. An album played in order still runs straight on, and skipping never fades. |
+| **Automix** | In place of the crossfade, blends each song into the next like a DJ: over a fade-out or a quiet intro, on the beat when the tempos match, one bass line at a time. An album played in order still runs straight on. |
 | **Equaliser** | Ten bands from 31 Hz to 16 kHz, ±12 dB each, with presets: Flat, Bass boost, Treble boost, Vocal, Rock, Electronic and Acoustic. Boosting turns the rest down to leave headroom. |
 | **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music pauses, or with **Pause when unplugged** off, carries on through the speaker; plug a pair in and it plays on through them. |
 | **Rides out a lost connection** | A connection that drops is waited on for a minute. Gone longer, the song opens again where it stopped, a few times, then waits for you to press play, rather than skipping. |
