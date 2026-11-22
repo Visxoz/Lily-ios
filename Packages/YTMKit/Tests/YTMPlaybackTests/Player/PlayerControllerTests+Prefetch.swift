@@ -45,6 +45,20 @@ extension PlayerControllerTests {
         #expect(!rig.audio.warmed.contains { $0.id.hasPrefix("b#") }, "it plays rather than warms")
     }
 
+    @Test func aQueueEditWhileTheNextSongIsQueuedResolvesNothingAgain() async throws {
+        let rig = await started()
+        rig.player.play([song("a", album: "x", number: 1), song("b", album: "y", number: 1), song("c")])
+        await rig.settle()
+        await rig.soundStarts()
+        rig.audio.currentTime = 186
+        rig.player.onTick()
+        await rig.settle()
+        #expect(rig.audio.next?.id.hasPrefix("b#") == true)
+        rig.player.removeFromQueue(atOffsets: [2])
+        await rig.settle()
+        #expect(rig.music.calls.filter { $0 == "stream b" }.count == 1, "the engine holds its stream")
+    }
+
     @Test func aPrefetchLandingOnceTheSongIsNoLongerNextIsNotWarmed() async throws {
         let rig = await started()
         rig.music.set { $0.held = ["b"] }

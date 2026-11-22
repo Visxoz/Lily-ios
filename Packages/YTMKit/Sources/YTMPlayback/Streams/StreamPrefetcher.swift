@@ -128,7 +128,9 @@ extension PlayerController {
     func resolveAhead(
         _ track: Track, warming: Bool = true, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }
     ) {
-        guard localStream(track.id) == nil, heldStream(track.id) == nil else { return }
+        // The engine holds the queued song's stream; one that failed to open resolves afresh.
+        guard localStream(track.id) == nil, heldStream(track.id) == nil,
+              gapless.queued?.trackID != track.id || gapless.queuedFailed else { return }
         if let kept = prefetcher.kept(track.id) {
             // A kept stream may have lost its part file since; the engine skips
             // a file cached or open.
