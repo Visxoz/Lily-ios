@@ -106,13 +106,13 @@ jobs:
           fi
           tag=v$VERSION
 
-          # What a user would notice, from the commit subjects, as commits go straight to main.
+          # From the commit subjects, as commits go straight to main: Markdown for the release, and
+          # plain text for the stores, which show it as written.
+          zsh scripts/release-notes.sh "$VERSION" "$PREVIOUS" > build/notes.md
+          zsh scripts/release-notes.sh --plain "$VERSION" "$PREVIOUS" > "$RUNNER_TEMP/whats-new.txt"
           if [[ -n $PREVIOUS ]]; then
-            git log --reverse --format=%s "$PREVIOUS..$GITHUB_SHA" | sed -nE 's/^(feat|fix|perf): /- /p' > build/notes.md
-            [[ -s build/notes.md ]] || echo "Lily $VERSION." > build/notes.md
             gh release download "$PREVIOUS" --repo "$REPO" --pattern source.json --output "$RUNNER_TEMP/previous.json"
           else
-            echo "The first release of Lily." > build/notes.md
             echo '{}' > "$RUNNER_TEMP/previous.json"
           fi
 
@@ -121,7 +121,7 @@ jobs:
           jq --arg version "$VERSION" --arg build "$(info CFBundleVersion)" --arg min_os "$(info MinimumOSVersion)" \
             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg sha "$sha" --argjson size "$size" \
             --arg url "https://github.com/$REPO/releases/download/$tag/Lily.ipa" \
-            --rawfile notes build/notes.md --slurpfile previous "$RUNNER_TEMP/previous.json" '
+            --rawfile notes "$RUNNER_TEMP/whats-new.txt" --slurpfile previous "$RUNNER_TEMP/previous.json" '
             .apps[0].versions = [{
               version: $version, buildVersion: $build, date: $date, downloadURL: $url, size: $size,
               sha256: $sha, minOSVersion: $min_os, localizedDescription: ($notes | sub("\\s+$"; ""))
