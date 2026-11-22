@@ -74,18 +74,21 @@ button() {
   printf '<a href="%s%s"><img src="%s/add-%s.svg" width="230" alt="Add to %s"></a>' "$redirect" "$3" "$assets" "$1" "$2"
 }
 
-printf '## Install\n\n**iPhone and iPhone Duo** (iOS %s or later): ' "$ios"
+printf '## Install\n\n**iPhone** (iOS %s or later). ' "$ios"
+# Only the source brings updates: an .ipa opened by hand is never offered one.
 if [[ -n $previous ]]; then
-  printf 'Already have Lily? Your store offers %s as an update, and your sign-in, library and downloads stay. ' "$version"
+  printf "Added Lily's source already? Your store offers %s as an update, and your sign-in, library and downloads stay. Otherwise, add" "$version"
+else
+  printf 'Add'
 fi
 cat <<EOF
-New to Lily? Add its source to your store on your iPhone, then install Lily from it.
+ Lily's source to AltStore, SideStore or Feather on your iPhone, then install Lily from it:
 
 <p align="center">$(button altstore AltStore "altstore://source?url=$source_url")&nbsp;&nbsp;$(button sidestore SideStore "sidestore://source?url=$source_url")&nbsp;&nbsp;$(button feather Feather "feather://source/$source_url")</p>
 
-If a button does nothing, paste \`$source_url\` in your store's **Sources** tab. Or download \`Lily.ipa\` below and open it with any of them.
+If a button does nothing, paste \`$source_url\` in the **Sources** tab. Or download \`Lily.ipa\` below and open it with any of the three, though updates only come through the source.
 
-Apps signed with a free Apple ID last seven days. AltStore and SideStore refresh them in the background, and **Refresh All** in the store does it by hand.
+Apps signed with a free Apple ID last seven days. AltStore and SideStore refresh them in the background, and **Refresh All** does it by hand.
 
 **Found a bug?** [Open an issue](https://github.com/$repo/issues/new).
 EOF
