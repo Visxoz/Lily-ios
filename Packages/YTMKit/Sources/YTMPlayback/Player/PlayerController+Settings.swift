@@ -77,6 +77,8 @@ extension PlayerController {
         }
         guard let old else { return }
         downloads.settingsChanged(from: old, to: new)
+        // A song not yet played only shows what is on the phone, as at restore.
+        if old.animatedArt != new.animatedArt, let current { nowPlaying?.showMotion(of: current, new.animatedArt, fetching: !isStopped) }
         if old.shuffle != new.shuffle {
             if new.shuffle != .smart {
                 queue.removeRecommended()

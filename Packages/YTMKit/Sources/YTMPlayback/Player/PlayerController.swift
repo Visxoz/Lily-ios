@@ -1,8 +1,16 @@
+import CoreGraphics
 import Foundation
 import Observation
 import os
 import YTMAudio
 import YTMCore
+
+/// The playing album's 3:4 moving cover: its first frame, shown until the clip draws, and the clip once on the phone.
+public struct MotionClip: Sendable {
+    public let album: String
+    public let file: URL?
+    public let frame: CGImage
+}
 
 /// Call `start()` once at launch. A result that arrives after the player has
 /// moved on is dropped. The position is never observed: read `currentTime`
@@ -17,6 +25,8 @@ import YTMCore
     public internal(set) var queue = Queue<Track>()
     /// The song shown, also while it loads, once stopped and when restored.
     public internal(set) var current: Track?
+    /// The album's 3:4 moving cover once its first frame is had, so Now Playing opens laid out for it.
+    public internal(set) var motionClip: MotionClip?
     /// Whether the player means to play, through loading and stalls: the
     /// play button.
     public internal(set) var isPlaying = false {

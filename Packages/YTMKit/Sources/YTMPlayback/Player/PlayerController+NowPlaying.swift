@@ -52,7 +52,7 @@ extension PlayerController {
         duration = playback.duration
         playback.heldPosition = position
         isPlaying = true
-        nowPlaying?.show(track, duration: duration)
+        nowPlaying?.show(track, duration: duration, animatedArt: settings.value.animatedArt)
         persistSoon()
         if newSong {
             loadRating(of: track.id)

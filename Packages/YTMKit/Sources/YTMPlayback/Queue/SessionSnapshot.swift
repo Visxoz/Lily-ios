@@ -89,7 +89,8 @@ extension PlayerController {
         }
         current = track
         duration = playback.duration
-        nowPlaying?.show(track, duration: duration)
+        // Only a moving cover already on the phone, rather than fetch one for a song that may never play.
+        nowPlaying?.show(track, duration: duration, animatedArt: settings.value.animatedArt, fetching: false)
         publishPlayback()
         return track
     }
