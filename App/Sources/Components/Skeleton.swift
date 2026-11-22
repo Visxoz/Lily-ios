@@ -37,7 +37,8 @@ private struct SkeletonPulse: ViewModifier {
     func body(content: Content) -> some View {
         content
             .phaseAnimator(reduceMotion ? [1] : [1, 0.5]) { bones, opacity in
-                bones.opacity(opacity)
+                // The pulse starts with the first layout, which would otherwise slide the bones in from the corner.
+                bones.transaction { $0.animation = nil }.opacity(opacity)
             } animation: { _ in
                 .easeInOut(duration: 0.8)
             }
