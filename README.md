@@ -272,7 +272,7 @@ Most YouTube clients get stream URLs that YouTube's player JavaScript has to uns
 
 Apple's AudioToolbox decodes Opus, but can't read the WebM files YouTube keeps it in, so the app reads them itself and hands AudioToolbox the packets as they download. A seek past what has arrived is fetched first, found through the file's own index, and the gap before it after.
 
-The app talks only to YouTube's hosts, plus Last.fm if you connect it, each checked against an allowlist. It follows the proxy set in iOS, or an HTTP or SOCKS5 proxy of your own entered in **Settings ▸ Account ▸ Proxy**, kept in the Keychain and used from the app's next start.
+The app talks only to YouTube's hosts, plus Apple Music's and Spotify's for animated art, and Last.fm if you connect it, each checked against an allowlist. It follows the proxy set in iOS, or an HTTP or SOCKS5 proxy of your own entered in **Settings ▸ Account ▸ Proxy**, kept in the Keychain and used from the app's next start.
 
 </details>
 

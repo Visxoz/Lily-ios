@@ -8,6 +8,7 @@ enum AppSheet: Identifiable, Hashable {
     case nowPlaying
     case settings
     case signIn
+    case spotifySignIn
     case addToPlaylist(Track)
 
     var id: Self { self }

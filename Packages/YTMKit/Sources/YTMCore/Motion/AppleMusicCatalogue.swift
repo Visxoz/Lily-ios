@@ -56,14 +56,14 @@ actor AppleMusicCatalogue {
     /// The album whose name and artist surely match, first among those with a moving cover: a wrong cover is worse
     /// than none, so nothing looser is tried.
     static func covers(in albums: [JSON], album: String, artist: String) -> [MotionShape: MotionCover] {
-        let album = normalised(album)
-        let artist = normalised(artist)
+        let album = MotionLookup.normalised(album)
+        let artist = MotionLookup.normalised(artist)
         // A name of only symbols, as "÷", would match every other such name.
         guard !album.isEmpty, !artist.isEmpty else { return [:] }
         for item in albums {
             let attributes = item["attributes"]
-            guard let name = attributes["name"].string, normalised(name) == album,
-                  let by = attributes["artistName"].string, credits(by).contains(artist)
+            guard let name = attributes["name"].string, MotionLookup.normalised(name) == album,
+                  let by = attributes["artistName"].string, MotionLookup.credits(by).contains(artist)
             else { continue }
             var covers: [MotionShape: MotionCover] = [:]
             for shape in MotionShape.allCases {
@@ -75,21 +75,6 @@ actor AppleMusicCatalogue {
             if !covers.isEmpty { return covers }
         }
         return [:]
-    }
-
-    /// The whole credit and each name it joins, never part of one, as "Low" in "Flowers".
-    static func credits(_ name: String) -> [String] {
-        [normalised(name)] + name.split { $0 == "," || $0 == "&" }.map { normalised(String($0)) }
-    }
-
-    /// Lowercase, without accents, without Apple's " - Single" or " - EP", and only letters and digits.
-    static func normalised(_ name: String) -> String {
-        var name = name[...]
-        for suffix in [" - Single", " - EP"] where name.hasSuffix(suffix) {
-            name = name.dropLast(suffix.count)
-        }
-        let folded = name.folding(options: .diacriticInsensitive, locale: nil).lowercased()
-        return String(folded.unicodeScalars.filter(CharacterSet.alphanumerics.contains))
     }
 
     private func searchRequest(_ term: String, jwt: String, cellular: Bool) throws -> URLRequest {
@@ -108,24 +93,11 @@ actor AppleMusicCatalogue {
         // Left as it is, a "+" in a name would be read as a space.
         search.percentEncodedQuery = search.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         guard let url = search.url else { throw YTMError(.parse, "The search's address couldn't be made.") }
-        var request = Self.request(url, cellular: cellular)
+        var request = MotionLookup.request(url, cellular: cellular)
         request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
         // Apple refuses the token from anywhere but its own player.
         request.setValue("https://music.apple.com", forHTTPHeaderField: "Origin")
         return request
-    }
-
-    /// Apple's requests never use Low Data Mode, and metered networks only when allowed.
-    static func request(_ url: URL, cellular: Bool) -> URLRequest {
-        var request = URLRequest(url: url)
-        request.allowsExpensiveNetworkAccess = cellular
-        request.allowsConstrainedNetworkAccess = false
-        return request
-    }
-
-    /// On `HTTP.clips`, so the 3.3 MB script ends only on silence, and playlists share their clip's connection.
-    static func fetch(_ url: URL, cellular: Bool) async throws -> Data {
-        try await HTTP.data(for: request(url, cellular: cellular), session: HTTP.clips).0
     }
 
     // MARK: - Token
@@ -170,11 +142,11 @@ actor AppleMusicCatalogue {
         guard let page = URL(string: "https://music.apple.com/\(storefront)/new") else {
             throw YTMError(.parse, "Apple Music's address couldn't be made.")
         }
-        let html = String(decoding: try await fetch(page, cellular: cellular), as: UTF8.self)
+        let html = String(decoding: try await MotionLookup.fetch(page, cellular: cellular), as: UTF8.self)
         guard let path = scriptPath(inPage: html), let script = URL(string: "https://music.apple.com" + path) else {
             throw YTMError(.parse, "Apple Music's player script wasn't found.")
         }
-        guard var token = webPlayToken(in: try await fetch(script, cellular: cellular)) else {
+        guard var token = webPlayToken(in: try await MotionLookup.fetch(script, cellular: cellular)) else {
             throw YTMError(.parse, "Apple Music's player script held no token.")
         }
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)

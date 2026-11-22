@@ -20,7 +20,7 @@ public enum Look: String, Codable, CaseIterable, Sendable {
     case dark, light, black
 }
 
-/// Apple Music's moving album covers.
+/// Moving art: a song's Spotify Canvas, or its album's Apple Music cover.
 public enum AnimatedArt: String, Codable, CaseIterable, Sendable {
     case on, wifi, off
 }
@@ -92,7 +92,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var ratingButtons = true
     public var look: Look = .black
     public var accent: Accent = .lily
-    /// Off metered networks, as downloads, since each album's clips are several MB.
+    /// Off metered networks, as downloads, since each clip is several MB.
     public var animatedArt: AnimatedArt = .wifi
     /// The account has been served Premium formats, so songs without them (music videos) never mark it as not Premium.
     public var premiumAccount = false

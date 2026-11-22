@@ -57,7 +57,9 @@ struct MotionArtworkView: View {
         ready = nil
         missed = false
         guard request.album != nil, request.setting != .off, !request.hidden else { return }
-        let next = await MotionArtwork.shared.video(.square, for: track, cellular: request.setting == .on)
+        let cellular = request.setting == .on
+        guard let source = await MotionArtwork.shared.source(.square, for: track, fetching: true, cellular: cellular) else { return }
+        let next = await MotionArtwork.shared.video(source, cellular: cellular)
         guard !Task.isCancelled else { return }
         video = next
         missed = next == nil

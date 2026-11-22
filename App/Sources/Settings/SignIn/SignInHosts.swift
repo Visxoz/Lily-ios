@@ -2,10 +2,12 @@ import Foundation
 
 /// The hosts Google's sign-in may show; everything else leaves for the browser.
 nonisolated enum SignInHosts {
-    static let musicHost = "music.youtube.com"
+    private static let musicHost = "music.youtube.com"
     /// Sign-in passes through these on its way to YouTube Music. Never handed to
     /// the system, which would open the YouTube apps and leave sign-in behind.
     private static let youtubeHosts: Set<String> = ["youtube.com", "www.youtube.com", "m.youtube.com", musicHost]
+    /// A signed-in session has one of these.
+    private static let sessionCookies: Set<String> = ["SAPISID", "__Secure-3PAPISID"]
     /// Sign-in and cookie consent hosts, allowed on any path.
     private static let signInHosts: Set<String> = [
         "accounts.youtube.com", "consent.google.com", "consent.youtube.com", "gds.google.com",
@@ -35,7 +37,12 @@ nonisolated enum SignInHosts {
     /// Whether the sign-in page may show `url`. Only HTTPS.
     static func allows(_ url: URL) -> Bool {
         guard url.scheme == "https", let host = url.host() else { return false }
-        return isYouTube(host) || signInHosts.contains(host) || isGoogleAccountsHost(host)
+        return isYouTube(host) || isGoogleSignIn(host)
+    }
+
+    /// Google's sign-in and consent hosts, which Spotify's Continue with Google also passes through.
+    static func isGoogleSignIn(_ host: String) -> Bool {
+        signInHosts.contains(host) || isGoogleAccountsHost(host)
     }
 
     /// Sign-in has finished once a YouTube page has the session's cookies.
@@ -48,6 +55,17 @@ nonisolated enum SignInHosts {
     static func opensInBrowser(_ url: URL) -> Bool {
         guard url.scheme == "https" || url.scheme == "http", let host = url.host() else { return false }
         return !host.hasPrefix(accountsPrefix) && !host.hasSuffix("youtube.com")
+    }
+
+    /// The cookies sent to YouTube Music, once a session is among them.
+    static func session(in cookies: [HTTPCookie]) -> [HTTPCookie]? {
+        let music = cookies.filter(goesToMusic)
+        return music.contains { sessionCookies.contains($0.name) } ? music : nil
+    }
+
+    private static func goesToMusic(_ cookie: HTTPCookie) -> Bool {
+        let domain = cookie.domain.trimmingPrefix(".")
+        return musicHost == domain || musicHost.hasSuffix("." + domain)
     }
 
     /// `accounts.google.<tld>` for one of Google's own domains, so that

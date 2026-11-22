@@ -21,9 +21,48 @@ struct AppearanceSettings: View {
                 }
             }
         }
-        SettingRow(label: "Animated art", detail: "Album covers that move, where Apple Music has one: the album and artist playing are looked up there.", stacked: true) {
+        SettingRow(label: "Animated art", detail: "Art that moves: a song's Spotify Canvas once signed in below, else its album's Apple Music cover.", stacked: true) {
             ChoicePills(choices: [(AnimatedArt.on, "On"), (.wifi, "Wi-Fi only"), (.off, "Off")], selection: $settings.value.animatedArt)
         }
+        SpotifyRow()
+    }
+}
+
+private struct SpotifyRow: View {
+    @Environment(AppModel.self) private var app
+    /// Nil while it is read.
+    @State private var signedIn: Bool?
+
+    var body: some View {
+        SettingRow(
+            label: "Spotify Canvas",
+            detail: signedIn == true
+                ? "Signed in: songs with a Canvas show it."
+                : "Each song's moving art from Spotify, where it has one, ahead of Apple Music's album covers. Uses your Spotify account."
+        ) {
+            switch signedIn {
+            case true?:
+                PillButton(title: "Sign out", small: true) {
+                    Task {
+                        await MotionArtwork.shared.signOutOfSpotify()
+                        app.player.refreshMotion()
+                        await refresh()
+                    }
+                }
+                .accessibilityLabel("Sign out of Spotify")
+            case false?:
+                PillButton(title: "Sign in", small: true) { app.sheet = .spotifySignIn }
+                    .accessibilityLabel("Sign in to Spotify")
+            case nil:
+                EmptyView()
+            }
+        }
+        // Settings closes for the sign-in sheet, so this reads again once it is back.
+        .task { await refresh() }
+    }
+
+    private func refresh() async {
+        signedIn = await MotionArtwork.shared.isSignedInToSpotify
     }
 }
 

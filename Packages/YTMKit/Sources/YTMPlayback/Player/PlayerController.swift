@@ -5,9 +5,10 @@ import os
 import YTMAudio
 import YTMCore
 
-/// The playing album's 3:4 moving cover: its first frame, shown until the clip draws, and the clip once on the phone.
+/// The playing song's 3:4 moving art, a Canvas or its album's cover: its first frame, shown until the clip draws, and
+/// the clip once on the phone. Named as its source, which another song may share.
 public struct MotionClip: Sendable {
-    public let album: String
+    public let id: String
     public let file: URL?
     public let frame: CGImage
 }
@@ -25,7 +26,7 @@ public struct MotionClip: Sendable {
     public internal(set) var queue = Queue<Track>()
     /// The song shown, also while it loads, once stopped and when restored.
     public internal(set) var current: Track?
-    /// The album's 3:4 moving cover once its first frame is had, so Now Playing opens laid out for it.
+    /// The song's 3:4 moving art once its first frame is had, so Now Playing opens laid out for it.
     public internal(set) var motionClip: MotionClip?
     /// Whether the player means to play, through loading and stalls: the
     /// play button.

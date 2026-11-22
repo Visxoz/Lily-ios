@@ -99,7 +99,15 @@ private struct SheetContent: View {
             case .settings:
                 SettingsScreen()
             case .signIn:
-                SignInScreen { Task { await app.accountChanged() } }
+                SignInScreen(site: .google) { cookies in
+                    try await GoogleAuth.shared.signIn(cookies: cookies)
+                    Task { await app.accountChanged() }
+                }
+            case .spotifySignIn:
+                SignInScreen(site: .spotify) { cookie in
+                    try await MotionArtwork.shared.signInToSpotify(cookie: cookie)
+                    app.player.refreshMotion()
+                }
             case .addToPlaylist(let track):
                 PlaylistPickerSheet(track: track)
             }

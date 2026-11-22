@@ -128,8 +128,8 @@ import Testing
     @Test func readsSinglesAndEPsByTheirOwnName() throws {
         #expect(try tall(albums(album("Snooze - Single", by: "SZA", video: "single")), album: "Snooze", artist: "SZA") != nil)
         #expect(try tall(albums(album("Hitchhiker - EP", by: "SZA", video: "ep")), album: "Hitchhiker", artist: "SZA") != nil)
-        #expect(AppleMusicCatalogue.normalised("Beyoncé - Single") == "beyonce")
-        #expect(AppleMusicCatalogue.normalised("good days (Remix)") == AppleMusicCatalogue.normalised("Good Days - Remix"))
+        #expect(MotionLookup.normalised("Beyoncé - Single") == "beyonce")
+        #expect(MotionLookup.normalised("good days (Remix)") == MotionLookup.normalised("Good Days - Remix"))
     }
 
     @Test func needsTheTracksArtistInApplesArtist() throws {
@@ -181,9 +181,9 @@ import Testing
 
 @Suite struct MotionArtworkTests {
     @Test func namesClipsInsideTheirFolderOnly() {
-        #expect(MotionArtwork.clipName("MPREb_4pL8gzRtw1p", .tall) == "MPREb_4pL8gzRtw1p-tall.mp4")
-        #expect(MotionArtwork.clipName("../../x/y", .square) == "xy-square.mp4")
-        #expect(MotionArtwork.clipName("/..", .tall) == nil)
+        #expect(MotionArtwork.clipName("MPREb_4pL8gzRtw1p", "tall") == "MPREb_4pL8gzRtw1p-tall")
+        #expect(MotionArtwork.clipName("../../x/y", "square") == "xy-square")
+        #expect(MotionArtwork.clipName("/..", "canvas") == nil)
     }
 
     @Test func trimsTheClipsUsedLongestAgoButNeverTheOneJustKept() throws {
@@ -215,11 +215,14 @@ import Testing
         defer { try? FileManager.default.removeItem(at: folder) }
         let motion = MotionArtwork(directory: folder, storefront: "us")
         let track = Track(id: "t", title: "t", album: AlbumRef(id: "MPREb_x", name: "x"))
-        #expect(await motion.kept(.tall, for: track) == nil)
+        let tall = try #require(await motion.source(.tall, for: track, fetching: false, cellular: false))
+        let square = try #require(await motion.source(.square, for: track, fetching: false, cellular: false))
+        #expect(tall.name == "MPREb_x-tall" && square.name == "MPREb_x-square")
+        #expect(await motion.kept(tall) == nil)
         let file = folder.appending(path: "MPREb_x-tall.mp4")
         try Data(count: 10).write(to: file)
-        #expect(await motion.kept(.tall, for: track) == file)
-        #expect(await motion.kept(.square, for: track) == nil)
-        #expect(await motion.kept(.tall, for: Track(id: "u", title: "u")) == nil)
+        #expect(await motion.kept(tall) == file)
+        #expect(await motion.kept(square) == nil)
+        #expect(await motion.source(.tall, for: Track(id: "u", title: "u"), fetching: false, cellular: false) == nil)
     }
 }

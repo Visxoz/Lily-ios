@@ -67,13 +67,13 @@ struct NowPlayingScreen: View {
             NowPlayingBackground()
             ZStack {
                 if let tallClip {
-                    // By album, so another's crossfades in place rather than through the still.
+                    // By source, so another's crossfades in place rather than through the still.
                     TallMotion(clip: tallClip, active: tallMotionShown, onPage: page == .artwork)
-                        .id(tallClip.album)
+                        .id(tallClip.id)
                         .transition(.opacity)
                 }
             }
-            .animation(MotionArtworkView.fade, value: tallClip?.album)
+            .animation(MotionArtworkView.fade, value: tallClip?.id)
         }
         // On the panel, or stood lyrics, a pull down goes back to the artwork
         // rather than closing the screen.

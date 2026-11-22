@@ -44,6 +44,12 @@ extension PlayerController {
         }
     }
 
+    /// After signing in to Spotify or out, which changes what moving art a song has.
+    public func refreshMotion() {
+        guard let current else { return }
+        nowPlaying?.showMotion(of: current, settings.value.animatedArt, fetching: !isStopped, again: true)
+    }
+
     /// Only a new song, not one shown again as on repeat or a retry, reloads its
     /// rating and lyrics.
     func present(_ track: Track, at position: Double) {

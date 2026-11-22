@@ -2,16 +2,18 @@ import Network
 import SwiftUI
 import YTMCore
 
-/// Google's own page signs in and its YouTube Music cookies sign the app in, so
-/// the password goes to Google only.
-struct SignInScreen: View {
+/// The site's own page signs in and its cookies sign the app in, so the
+/// password goes to the site only.
+struct SignInScreen<Session>: View {
     private enum Phase: Equatable {
         case browsing
         case signingIn
         case failed(String)
     }
 
-    private let onSignedIn: () -> Void
+    private let site: SignInSite<Session>
+    /// Hands the session to the app; the sheet closes once it returns.
+    private let signIn: (Session) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -21,8 +23,9 @@ struct SignInScreen: View {
     /// Read before the page loads, so it goes through the user's proxy.
     @State private var proxies: [ProxyConfiguration]?
 
-    init(onSignedIn: @escaping () -> Void) {
-        self.onSignedIn = onSignedIn
+    init(site: SignInSite<Session>, signIn: @escaping (Session) async throws -> Void) {
+        self.site = site
+        self.signIn = signIn
     }
 
     var body: some View {
@@ -30,7 +33,7 @@ struct SignInScreen: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(theme.panel)
-                .navigationTitle("Sign in")
+                .navigationTitle(site.title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -47,7 +50,7 @@ struct SignInScreen: View {
             ZStack {
                 spinner
                 if let proxies {
-                    SignInWebView(onSession: signIn, onFailure: { phase = .failed($0) }, proxies: proxies)
+                    SignInWebView(site: site, onSession: handOver, onFailure: { phase = .failed($0) }, proxies: proxies)
                         .ignoresSafeArea(edges: .bottom)
                 }
             }
@@ -78,14 +81,13 @@ struct SignInScreen: View {
         Proxy.configurations
     }
 
-    private func signIn(with cookies: [HTTPCookie]) {
+    private func handOver(_ session: Session) {
         // Later pages of the same session hand over again.
         guard phase == .browsing else { return }
         phase = .signingIn
         Task {
             do {
-                try await GoogleAuth.shared.signIn(cookies: cookies)
-                onSignedIn()
+                try await signIn(session)
                 dismiss()
             } catch {
                 phase = .failed(sentence(for: error))

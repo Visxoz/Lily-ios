@@ -129,3 +129,13 @@ extension ClientProfile {
     /// tends to change one at a time, so a song plays on the next meanwhile.
     static let plainStreamClients: [ClientProfile] = [.visionOS, .androidVR, .iOS]
 }
+
+/// The browser the sign-in page and Spotify's requests pass as.
+public enum Browser {
+    /// Mac Safari: Google's desktop sign-in goes straight to YouTube Music, and both sites refuse bare clients.
+    public static let userAgent: String = {
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            + "Version/\(os.majorVersion).\(os.minorVersion) Safari/605.1.15"
+    }()
+}

@@ -14,11 +14,13 @@ enum HTTP {
         // Built-in artwork, such as Liked music's.
         "gstatic.com",
     ]
-    /// On these hosts only: Last.fm's API and sign-in page, and Apple Music's web player, catalogue, clips and stills.
+    /// On these hosts only: Last.fm's API and sign-in page, and Apple Music's and Spotify's players, APIs and clips.
     private static let hosts: Set<String> = [
         "ws.audioscrobbler.com", "www.last.fm",
         "music.apple.com", "amp-api.music.apple.com", "mvod.itunes.apple.com",
         "is1-ssl.mzstatic.com", "is2-ssl.mzstatic.com", "is3-ssl.mzstatic.com", "is4-ssl.mzstatic.com", "is5-ssl.mzstatic.com",
+        "open.spotify.com", "open.spotifycdn.com", "api-partner.spotify.com", "spclient.wg.spotify.com", "canvaz.scdn.co",
+        "i.scdn.co",
     ]
 
     /// HTTPS on an allowed host.
@@ -45,7 +47,7 @@ enum HTTP {
         return session(config)
     }()
 
-    /// Apple Music's files, some of several MB, so only silence ends a request, never a slow link.
+    /// Moving art's clips and its players' scripts, some of several MB, so only silence ends a request, never a slow link.
     static let clips: URLSession = {
         let config = uncached()
         config.timeoutIntervalForRequest = 20
