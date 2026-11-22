@@ -74,7 +74,7 @@ extension PlaybackEngine {
 
     func isReady(_ track: Track) -> Bool {
         guard let rate = track.sampleRate else { return false }
-        return nextFade <= 0 || track.trimLeadingSilence(limit: Int64(AudioPlayer.silenceTrimSeconds * rate))
+        return nextTransition == .gapless || track.trimLeadingSilence(limit: Int64(AudioPlayer.silenceTrimSeconds * rate))
     }
 
     /// Keeps what it downloaded. Reports nothing: the controller asked for it.

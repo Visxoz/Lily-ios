@@ -17,6 +17,16 @@ enum Fixtures {
         }
     }
 
+    /// Seeded white noise, steady and without a beat; at a quarter of full scale, as Opus overshoots on noise and
+    /// louder would reach the limiter.
+    static func noise(frames: Int, seed: UInt32) -> [Float] {
+        var state = seed
+        return (0..<frames).map { _ in
+            state = state &* 1_664_525 &+ 1_013_904_223
+            return (Float(state >> 8) / Float(1 << 24) - 0.5) / 2
+        }
+    }
+
     /// Runs a stage of the sound unit over two channels, in place.
     static func stereo(
         _ left: inout [Float], _ right: inout [Float],

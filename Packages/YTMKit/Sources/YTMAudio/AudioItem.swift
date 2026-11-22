@@ -39,7 +39,7 @@ public struct AudioItem: Sendable {
 public enum AudioEvent: Sendable, Equatable {
     /// The first sound of an item started by `play`.
     case started(id: String)
-    /// The next item became the one heard, with no gap or as a crossfade began.
+    /// The next item became the one heard, with no gap or as a blend began.
     case advanced(id: String)
     /// The last item ended with nothing queued after it.
     case finished

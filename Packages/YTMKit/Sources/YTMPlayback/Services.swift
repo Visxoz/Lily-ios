@@ -45,10 +45,9 @@ extension YTMusic: MusicService {
     var balance: Float { get set }
     var pauseOnUnplug: Bool { get set }
     var isMuted: Bool { get set }
-    var crossfadeSeconds: Double { get set }
     var speed: Double { get set }
     func play(_ item: AudioItem, from seconds: Double, paused: Bool)
-    func setNext(_ item: AudioItem?, crossfade: Bool)
+    func setNext(_ item: AudioItem?, _ transition: Transition)
     func warm(_ item: AudioItem)
     func pause()
     func resume()

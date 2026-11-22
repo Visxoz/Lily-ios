@@ -74,6 +74,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var crossfade = false
     /// Long enough to blend two songs, short enough to keep most of an ending.
     public var crossfadeSeconds = 6.0
+    /// Blends tracks by their sound, in place of the crossfade.
+    public var automix = false
     /// Pauses as the device playing is unplugged, rather than carrying on through the next.
     public var pauseOnUnplug = true
     public var speed = 1.0
@@ -129,6 +131,7 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&crossfadeSeconds, .crossfadeSeconds)
         // Outside the lengths offered, the nearer end of them.
         crossfadeSeconds = min(max(crossfadeSeconds, Self.crossfadeLengths[0]), Self.crossfadeLengths[Self.crossfadeLengths.count - 1])
+        file.read(&automix, .automix)
         file.read(&pauseOnUnplug, .pauseOnUnplug)
         file.read(&speed, .speed) { Self.speeds.contains($0) }
         file.read(&autoplay, .autoplay)

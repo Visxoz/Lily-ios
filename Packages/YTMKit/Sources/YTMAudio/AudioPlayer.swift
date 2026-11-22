@@ -3,9 +3,9 @@ import Network
 
 /// Every call returns at once; the work happens on the engine's own queue, in the order called.
 @MainActor public final class AudioPlayer {
-    /// The most silence cut from either side of a crossfade, so a quiet passage or a hidden track is not
-    /// mistaken for the end. A crossfade's next item must be queued this much earlier than the fade.
-    nonisolated public static let silenceTrimSeconds = 4.0
+    /// The most silence cut from either side of a blend, so a quiet passage or a hidden track is not
+    /// mistaken for the end.
+    nonisolated static let silenceTrimSeconds = 4.0
 
     /// For one consumer. Events of an item replaced by `play` or `stop` never arrive after the call.
     public let events: AsyncStream<AudioEvent>
@@ -40,8 +40,6 @@ import Network
             engine.send { $0.setLevel(level) }
         }
     }
-
-    public var crossfadeSeconds = 6.0
 
     /// Record-style, the pitch moving with it. Positions, lengths and fades stay in the song's own time.
     public var speed = 1.0 {
@@ -110,11 +108,9 @@ import Network
     }
 
     /// Replaces any item queued before; nil clears it. Its download starts now.
-    /// Pass `crossfade` false for tracks of one album in order.
-    public func setNext(_ item: AudioItem?, crossfade: Bool) {
-        let fade = crossfade ? crossfadeSeconds : 0
+    public func setNext(_ item: AudioItem?, _ transition: Transition) {
         let session = session
-        engine.send { $0.setNext(item, fade: fade, session: session) }
+        engine.send { $0.setNext(item, transition, session: session) }
     }
 
     /// Fetches the start of an item likely to play next, so a skip to it starts sooner.

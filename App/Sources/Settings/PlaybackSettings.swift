@@ -16,19 +16,27 @@ struct PlaybackSettings: View {
         SettingRow(label: "Speed", detail: "Faster or slower, the pitch moving with it as on a record.", stacked: true) {
             ChoicePills(choices: Settings.speeds.map { ($0, "\($0.formatted())×") }, selection: $settings.value.speed)
         }
-        SettingRow(label: "Crossfade", detail: "Fades each track into the next. Tracks of an album played in order still run straight on.") {
-            HStack(spacing: 12) {
-                if settings.value.crossfade {
-                    Menu {
-                        ForEach(Settings.crossfadeLengths, id: \.self) { seconds in
-                            Button(Self.length(seconds)) { settings.value.crossfadeSeconds = seconds }
+        ToggleRow(
+            label: "Automix",
+            detail: "Blends each track into the next as a DJ would: over a fade-out or a quiet intro, on the beat when tempos agree, one bass at a time. Tracks of an album played in order still run straight on.",
+            isOn: $settings.value.automix
+        )
+        // Automix blends in its place.
+        if !settings.value.automix {
+            SettingRow(label: "Crossfade", detail: "Fades each track into the next. Tracks of an album played in order still run straight on.") {
+                HStack(spacing: 12) {
+                    if settings.value.crossfade {
+                        Menu {
+                            ForEach(Settings.crossfadeLengths, id: \.self) { seconds in
+                                Button(Self.length(seconds)) { settings.value.crossfadeSeconds = seconds }
+                            }
+                        } label: {
+                            PillLabel(title: Self.length(settings.value.crossfadeSeconds), small: true)
                         }
-                    } label: {
-                        PillLabel(title: Self.length(settings.value.crossfadeSeconds), small: true)
                     }
+                    Toggle("Crossfade", isOn: $settings.value.crossfade)
+                        .labelsHidden()
                 }
-                Toggle("Crossfade", isOn: $settings.value.crossfade)
-                    .labelsHidden()
             }
         }
         ToggleRow(

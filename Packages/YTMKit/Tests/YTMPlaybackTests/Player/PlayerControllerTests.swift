@@ -32,7 +32,7 @@ struct PlayerControllerTests {
         await rig.settle()
         let next = try #require(rig.audio.next)
         #expect(next.id.hasPrefix("b#"))
-        #expect(!rig.audio.nextCrossfades, "an album in order runs straight on")
+        #expect(rig.audio.nextTransition == .gapless, "an album in order runs straight on")
         #expect(rig.music.calls.filter { $0 == "stream b" }.count == 1, "queued from the prefetched stream")
 
         rig.player.handle(.advanced(id: next.id))
@@ -54,7 +54,7 @@ struct PlayerControllerTests {
         rig.player.onTick()
         await rig.settle()
         #expect(rig.audio.next?.id.hasPrefix("b#") == true, "queued earlier by the fade and the silence it may cut")
-        #expect(rig.audio.nextCrossfades)
+        #expect(rig.audio.nextTransition == .crossfade(6))
     }
 
     @Test func previousRestartsAfterThreeSecondsAsANewPlay() async {

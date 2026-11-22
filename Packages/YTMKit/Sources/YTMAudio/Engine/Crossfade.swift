@@ -6,11 +6,14 @@ struct FadePlan {
     let from: Track
     let start: Int64
     let length: Int64
+    let trade: Automix.Trade?
 }
 
 struct Fade {
     let from: Track
     let length: Int64
+    /// Automix's bass trade; nil for a plain crossfade.
+    let trade: Automix.Trade?
     var mixed: Int64 = 0
 
     var remaining: Int64 { length - mixed }
@@ -67,24 +70,30 @@ enum Crossfade {
         count: Int,
         at position: Int64,
         of length: Int64,
+        trade: Automix.Trade?,
         into out: UnsafePointer<UnsafeMutablePointer<Float>>,
         offset: Int
     ) {
         for frame in 0..<count {
-            let angle = Double(position + Int64(frame)) / Double(max(length, 1)) * .pi / 2
+            let at = position + Int64(frame)
+            let angle = Double(at) / Double(max(length, 1)) * .pi / 2
             let fadeIn = Float(sin(angle))
             let fadeOut = Float(cos(angle))
             var left: Float = 0
             var right: Float = 0
             if let incoming {
+                var sample = (incoming.channels.left[frame], incoming.channels.right[frame])
+                if let trade { sample = trade.incoming(sample, at: at) }
                 let gain = incoming.gain.at(offset + frame) * fadeIn
-                left += incoming.channels.left[frame] * gain
-                right += incoming.channels.right[frame] * gain
+                left += sample.0 * gain
+                right += sample.1 * gain
             }
             if let outgoing {
+                var sample = (outgoing.channels.left[frame], outgoing.channels.right[frame])
+                if let trade { sample = trade.outgoing(sample, at: at) }
                 let gain = outgoing.gain.at(offset + frame) * fadeOut
-                left += outgoing.channels.left[frame] * gain
-                right += outgoing.channels.right[frame] * gain
+                left += sample.0 * gain
+                right += sample.1 * gain
             }
             out[0][offset + frame] = left
             out[1][offset + frame] = right

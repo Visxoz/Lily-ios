@@ -31,7 +31,7 @@ struct PlaybackEngineTests {
         let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
         let two = try AudioItem.fixture("two", length: files["two", default: Data()].count)
         playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
-        playback.engine.send { $0.setNext(two, fade: 0, session: 1) }
+        playback.engine.send { $0.setNext(two, .gapless, session: 1) }
         let output = await playback.render(seconds: 2.5)
         let decoded = try DecodableFile(files["one", default: Data()]).decode() + DecodableFile(files["two", default: Data()]).decode()
         expectSame(output[480..<96_000], decoded[480...], "the second item's first frame follows the first's last")
@@ -73,7 +73,7 @@ struct PlaybackEngineTests {
         let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
         let two = try AudioItem.fixture("two", length: files["two", default: Data()].count, loudnessDB: -6)
         playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
-        playback.engine.send { $0.setNext(two, fade: 0.5, session: 1) }
+        playback.engine.send { $0.setNext(two, .crossfade(0.5), session: 1) }
         let output = await playback.render(seconds: 6)
         let outgoing = try DecodableFile(files["one", default: Data()]).decode()
         let incoming = try DecodableFile(files["two", default: Data()]).decode()
@@ -98,13 +98,64 @@ struct PlaybackEngineTests {
         #expect(playback.events == [.buffering(true), .started(id: "one"), .buffering(false), .advanced(id: "two"), .finished])
     }
 
+    @Test func automixesHardEndsOverTheShortestBlend() async throws {
+        // Steady noise neither fades out nor builds, and has no beat.
+        let files = [
+            "one": try Fixtures.opusWebM(Fixtures.noise(frames: 480_000, seed: 1)),
+            "two": try Fixtures.opusWebM(Fixtures.noise(frames: 384_000, seed: 2)),
+        ]
+        let playback = OfflinePlayback(files: files)
+        let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
+        let two = try AudioItem.fixture("two", length: files["two", default: Data()].count, loudnessDB: -6)
+        playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
+        playback.engine.send { $0.setNext(two, .automix, session: 1) }
+        let output = await playback.render(seconds: 16)
+        let outgoing = try DecodableFile(files["one", default: Data()]).decode()
+        let incoming = try DecodableFile(files["two", default: Data()]).decode()
+        let end = (outgoing.lastIndex { abs($0) >= Crossfade.silence } ?? 0) + 1
+        let lead = incoming.firstIndex { abs($0) >= Crossfade.silence } ?? 0
+        let length = Int(Automix.minSeconds * Fixtures.rate)
+        expectSame(output[480..<end - length], outgoing[480...], "the first item up to the blend")
+        let after = incoming[(lead + length)...].map { $0 * pow(10, Float(-6) / 20) }
+        expectSame(output[end..<end + 48_000], after[...], "then the second, its bass back whole")
+        #expect(playback.events == [.buffering(true), .started(id: "one"), .buffering(false), .advanced(id: "two"), .finished])
+    }
+
+    @Test func automixesOverAFadeOutEndingWhereItsSoundDoes() async throws {
+        // 40 dB down over the last 10 s of 20, then a second of silence, which is cut.
+        let fading = Fixtures.noise(frames: 960_000, seed: 3).enumerated().map { frame, sample in
+            sample * pow(10, -2 * Float(max(frame - 480_000, 0)) / 480_000)
+        }
+        let files = [
+            "one": try Fixtures.opusWebM(fading + Array(repeating: 0, count: 48_000)),
+            "two": try Fixtures.opusWebM(Fixtures.noise(frames: 672_000, seed: 4)),
+        ]
+        let playback = OfflinePlayback(files: files)
+        let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
+        let two = try AudioItem.fixture("two", length: files["two", default: Data()].count)
+        playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
+        playback.engine.send { $0.setNext(two, .automix, session: 1) }
+        let output = await playback.render(seconds: 26)
+        let outgoing = try DecodableFile(files["one", default: Data()]).decode()
+        let incoming = try DecodableFile(files["two", default: Data()]).decode()
+        let end = (outgoing.lastIndex { abs($0) >= Crossfade.silence } ?? 0) + 1
+        let lead = incoming.firstIndex { abs($0) >= Crossfade.silence } ?? 0
+        // The blend's length is where the second item carries on after the first's sound ends.
+        let after = output[end..<end + 480]
+        let length = try #require((432_000...480_000).first { length in
+            zip(after, incoming[(lead + length)...]).allSatisfy { abs($0 - $1) < 1e-6 }
+        }, "over the fade, 9 to 10 s, ending where the first item's sound does")
+        expectSame(output[480..<end - length], outgoing[480...], "the first item up to the blend")
+        #expect(playback.events == [.buffering(true), .started(id: "one"), .buffering(false), .advanced(id: "two"), .finished])
+    }
+
     @Test func dropsTheNextWhenASeekFollowsTheSwitch() async throws {
         let files = ["one": try Fixtures.opusWebM(first), "two": try Fixtures.opusWebM(second)]
         let playback = OfflinePlayback(files: files)
         let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
         let two = try AudioItem.fixture("two", length: files["two", default: Data()].count)
         playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
-        playback.engine.send { $0.setNext(two, fade: 0, session: 1) }
+        playback.engine.send { $0.setNext(two, .gapless, session: 1) }
         while await playback.state({ $0.producing === $0.heard }) {
             _ = await playback.render(seconds: 0.05)
         }
@@ -221,7 +272,7 @@ struct PlaybackEngineTests {
         let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
         let next = try AudioItem.fixture("two", length: two.count)
         playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
-        playback.engine.send { $0.setNext(next, fade: 0, session: 1) }
+        playback.engine.send { $0.setNext(next, .gapless, session: 1) }
         for _ in 0..<1_000 where await playback.state({ $0.next?.loader.available ?? 0 }) < Int64(half) {
             try await Task.sleep(for: .milliseconds(1))
         }

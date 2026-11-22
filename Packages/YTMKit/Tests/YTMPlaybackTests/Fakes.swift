@@ -223,12 +223,11 @@ final class FakeMusic: MusicService {
     var balance: Float = 0
     var pauseOnUnplug = true
     var isMuted = false
-    var crossfadeSeconds = 6.0
     var speed = 1.0
     private(set) var played: [(item: AudioItem, from: Double, paused: Bool)] = []
     private(set) var next: AudioItem?
     private(set) var warmed: [AudioItem] = []
-    private(set) var nextCrossfades = false
+    private(set) var nextTransition = Transition.gapless
     private(set) var seeks: [Double] = []
     private(set) var log: [String] = []
 
@@ -243,9 +242,9 @@ final class FakeMusic: MusicService {
         log.append("play \(item.id)")
     }
 
-    func setNext(_ item: AudioItem?, crossfade: Bool) {
+    func setNext(_ item: AudioItem?, _ transition: Transition) {
         next = item
-        nextCrossfades = crossfade
+        nextTransition = transition
         log.append("next \(item?.id ?? "nil")")
     }
 

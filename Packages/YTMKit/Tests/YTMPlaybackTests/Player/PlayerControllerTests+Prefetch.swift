@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import YTMAudio
 @testable import YTMCore
 @testable import YTMPlayback
 
@@ -74,6 +75,6 @@ extension PlayerControllerTests {
         rig.player.onTick()
         await rig.settle()
         #expect(rig.audio.next?.id.hasPrefix("b#") == true)
-        #expect(rig.audio.nextCrossfades)
+        #expect(rig.audio.nextTransition == .crossfade(6))
     }
 }

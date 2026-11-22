@@ -45,8 +45,8 @@ actor PlaybackEngine {
     /// The level items are normalised to, as a gain on YouTube's reference loudness (0.5 is 6 dB under), or nil for none.
     var normalise: Float? = 1
     var pauseOnUnplug = true
-    /// The crossfade into `next`, in seconds, or 0 to follow without a gap.
-    var nextFade = 0.0
+    /// How `next` follows the item heard.
+    var nextTransition = Transition.gapless
     var plan: FadePlan?
     var fade: Fade?
     /// The item heard has ended, and the next is still opening.
@@ -117,11 +117,11 @@ actor PlaybackEngine {
         updateBuffering()
     }
 
-    func setNext(_ item: AudioItem?, fade seconds: Double, session: UInt64) {
+    func setNext(_ item: AudioItem?, _ transition: Transition, session: UInt64) {
         guard session == self.session, heard != nil else { return }
         dropNext()
         next = item.flatMap { open($0, at: 0, announcingStart: false) }
-        nextFade = seconds
+        nextTransition = transition
         // The item heard ended waiting for the next, which is gone.
         if next == nil, awaitingNext {
             awaitingNext = false

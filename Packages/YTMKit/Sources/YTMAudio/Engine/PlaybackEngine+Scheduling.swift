@@ -80,6 +80,7 @@ extension PlaybackEngine {
                 count: taken,
                 at: fade.mixed + Int64(filled),
                 of: fade.length,
+                trade: fade.trade,
                 into: out,
                 offset: filled
             )
@@ -130,27 +131,41 @@ extension PlaybackEngine {
         return (buffer, UnsafePointer(out))
     }
 
-    /// Cuts at most `silenceTrimSeconds` of trailing silence so the fade ends where
+    /// Cuts at most `silenceTrimSeconds` of trailing silence so the blend ends where
     /// the music does. A next item of another rate follows with a gap instead.
     private func planFade() {
-        guard plan == nil, nextFade > 0, let next, next.leadTrimmed, let track = producing,
-              let rate = track.sampleRate, next.sampleRate == rate,
-              let end = track.soundEnd(limit: Int64(AudioPlayer.silenceTrimSeconds * rate)) else { return }
+        guard plan == nil, let next, next.leadTrimmed, let track = producing,
+              let rate = track.sampleRate, next.sampleRate == rate, track.length != nil else { return }
+        let limit = Int64(AudioPlayer.silenceTrimSeconds * rate)
+        let (end, length, trade): (Int64, Int64, Automix.Trade?)
+        switch nextTransition {
+        case .gapless:
+            return
+        case .crossfade(let seconds):
+            guard let found = track.soundEnd(limit: limit) else { return }
+            (end, length, trade) = (found, Int64(seconds * rate), nil)
+        case .automix:
+            guard let intro = next.intro(frames: Int64(Automix.introSeconds * rate)),
+                  let (found, tail) = track.tail(limit: limit, frames: Int64(Automix.tailSeconds * rate)) else { return }
+            // Within what is yet to be scheduled, so the beats still land together.
+            let mix = Automix.plan(tail: tail, intro: intro, rate: rate, room: Int(max(found - track.position, 0)))
+            (end, length, trade) = (found, Int64(mix.frames), Automix.Trade(mix, rate: rate))
+        }
         // What is scheduled already plays as it is, so a late plan shortens the fade.
-        let start = max(end - Int64(nextFade * rate), track.position)
-        plan = FadePlan(from: track, start: start, length: max(end - start, 0))
+        let start = max(end - length, track.position)
+        plan = FadePlan(from: track, start: start, length: max(end - start, 0), trade: trade)
     }
 
     private func beginFade(_ plan: FadePlan) {
         self.plan = nil
         producing = next
         next = nil
-        fade = plan.length > 0 ? Fade(from: plan.from, length: plan.length) : nil
+        fade = plan.length > 0 ? Fade(from: plan.from, length: plan.length, trade: plan.trade) : nil
     }
 
     private func followOn() -> Bool {
         guard let next, let track = producing, track.failure == nil, next.sampleRate == track.sampleRate,
-              nextFade <= 0 || next.leadTrimmed else { return false }
+              nextTransition == .gapless || next.leadTrimmed else { return false }
         producing = next
         self.next = nil
         plan = nil

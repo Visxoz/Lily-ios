@@ -68,7 +68,7 @@ enum AudioChecks {
         let items = entries.map(\.item)
         playback.engine.send { engine in
             engine.play(items[0], from: start, paused: false, session: 1)
-            if items.count > 1 { engine.setNext(items[1], fade: 0, session: 1) }
+            if items.count > 1 { engine.setNext(items[1], .gapless, session: 1) }
         }
         var buffers = Set<OfflineEngine.Buffer>()
         var lengths: [String: (frames: Int64, rate: Double)] = [:]

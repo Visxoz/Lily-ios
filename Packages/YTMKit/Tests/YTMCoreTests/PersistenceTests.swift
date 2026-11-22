@@ -27,6 +27,7 @@ import Testing
         let settings = try decode(#"{"look": "dark", "accent": "artwork", "shuffle": "smart"}"#)
         #expect(settings.look == .dark && settings.accent == .artwork && settings.shuffle == .smart)
         #expect(settings.normalise == .normal && !settings.crossfade && settings.quality == .high)
+        #expect(!settings.automix, "off until chosen")
         #expect(!settings.foldToScrub, "off until asked for")
         #expect(settings.pauseOnUnplug, "on until turned off")
         #expect(settings.animatedArt == .wifi)

@@ -3,7 +3,7 @@ import Observation
 import YTMCore
 
 /// Settings changes take effect as made: normalisation within the few seconds the
-/// engine has scheduled, quality and crossfade from the next song queued, speed at once.
+/// engine has scheduled, quality, crossfade and Automix from the next song queued, speed at once.
 extension PlayerController {
     public func toggleMute() {
         settings.value.muted.toggle()
@@ -66,7 +66,6 @@ extension PlayerController {
         if audio.mono != new.mono { audio.mono = new.mono }
         if audio.balance != new.balance { audio.balance = new.balance }
         if audio.pauseOnUnplug != new.pauseOnUnplug { audio.pauseOnUnplug = new.pauseOnUnplug }
-        if audio.crossfadeSeconds != new.crossfadeSeconds { audio.crossfadeSeconds = new.crossfadeSeconds }
         if audio.speed != new.speed {
             audio.speed = new.speed
             nowPlaying?.speed = new.speed
@@ -95,9 +94,9 @@ extension PlayerController {
             queueing?.cancel()
             prefetcher.clear()
             gapless.forget()
-            audio.setNext(nil, crossfade: false)
+            audio.setNext(nil, .gapless)
             preparePremium()
-        } else if old.crossfade != new.crossfade || old.crossfadeSeconds != new.crossfadeSeconds {
+        } else if old.transition != new.transition {
             // A song queued, or being queued, with the old setting is queued again.
             dropQueuedNext()
         }

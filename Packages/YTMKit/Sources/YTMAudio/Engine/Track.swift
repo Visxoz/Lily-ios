@@ -20,6 +20,9 @@ final class Track {
     /// A buffer of its sound has been scheduled.
     var hasSounded = false
     private(set) var leadTrimmed = false
+    /// Automix's analyses, kept as each decodes seconds of the file.
+    private var analysedTail: (end: Int64, analysis: Automix.Analysis)?
+    private var analysedIntro: Automix.Analysis?
     private var startAt: Double
     /// The file's first bytes, until there are enough to tell its container.
     private var head = Data()
@@ -134,7 +137,7 @@ final class Track {
         decoder.map { ($0.samples(0), $0.samples(1)) }
     }
 
-    /// Cut so a crossfade brings in music rather than silence. False while waiting on the file.
+    /// Cut so a blend brings in music rather than silence. False while waiting on the file.
     func trimLeadingSilence(limit: Int64) -> Bool {
         guard !leadTrimmed else { return true }
         guard let decoder else { return false }
@@ -159,21 +162,70 @@ final class Track {
     }
 
     /// Cuts at most `limit` frames, so a long quiet passage or hidden track is not mistaken
-    /// for the end. Nil until the file is complete.
-    func soundEnd(limit: Int64) -> Int64? {
-        guard let length, let format = source?.format else { return nil }
-        let from = max(length - limit, 0)
-        guard let scanner = try? PacketDecoder(source: format, file: loader.reader) else { return length }
-        scanner.seek(to: from)
-        var end = from
-        while case .frames(let count) = (try? scanner.supply(state)) ?? .ended {
-            let found = Crossfade.soundEnd((scanner.samples(0), scanner.samples(1)), count: count)
+    /// for the end, handing `measure` the `measured` frames before them too. Nil until the file is complete.
+    func soundEnd(limit: Int64, measuring measured: Int64 = 0, _ measure: (Crossfade.Channels, Int) -> Void = { _, _ in }) -> Int64? {
+        guard let length else { return nil }
+        let cut = max(length - limit, 0)
+        var end = cut
+        let scanned = scan(from: max(cut - measured, 0)) { channels, count, start in
+            measure(channels, count)
+            let found = Crossfade.soundEnd(channels, count: count)
             if found > 0 {
-                end = scanner.position + Int64(found)
+                end = max(end, start + Int64(found))
             }
-            scanner.consume(count)
+            return true
         }
-        return end
+        return scanned ? end : length
+    }
+
+    /// As `soundEnd`, with Automix's analysis from `frames` before the cut to the sound end. An unreadable end
+    /// analyses as nothing, so it switches without a blend.
+    func tail(limit: Int64, frames: Int64) -> (end: Int64, analysis: Automix.Analysis)? {
+        if let analysedTail { return analysedTail }
+        guard let length, let rate = sampleRate else { return nil }
+        var meter = Automix.Meter(rate: rate, frames: Int(limit + frames))
+        guard let end = soundEnd(limit: limit, measuring: frames, { meter.add($0, count: $1) }) else { return nil }
+        analysedTail = (end, meter.analysis(frames: Int(end - max(length - limit - frames, 0))))
+        return analysedTail
+    }
+
+    /// Automix's analysis of its next `frames` from the lead trimmed; nil until their bytes have arrived.
+    func intro(frames: Int64) -> Automix.Analysis? {
+        if let analysedIntro { return analysedIntro }
+        guard leadTrimmed, let rate = sampleRate, let source, let format = source.format else { return nil }
+        // Each try decodes all that has arrived, so it waits until the decoder can reach the last packet: its bytes
+        // on disk, and another listed after it, as the last listed waits for its padding.
+        if !state.complete {
+            let packets = source.packets
+            guard let (last, _) = packets.packet(holding: position + frames + format.leadingFrames), last + 1 < packets.count,
+                  Int64(packets[last].offset) + Int64(packets[last].size) <= loader.available else { return nil }
+        }
+        let wanted = Int(frames)
+        var meter = Automix.Meter(rate: rate, frames: wanted)
+        guard scan(from: position, { channels, count, _ in
+            meter.add(channels, count: min(count, wanted - meter.frames))
+            return meter.frames < wanted
+        }) else { return nil }
+        analysedIntro = meter.analysis(frames: meter.frames)
+        return analysedIntro
+    }
+
+    /// Decodes from `frame` on a decoder of its own, so playback's stays put, handing `body` each run of frames and
+    /// the frame it starts on until it returns false. False if that decoder can't open or waits on bytes not yet downloaded.
+    private func scan(from frame: Int64, _ body: (Crossfade.Channels, Int, Int64) -> Bool) -> Bool {
+        guard let format = source?.format, let scanner = try? PacketDecoder(source: format, file: loader.reader) else { return false }
+        scanner.seek(to: frame)
+        while true {
+            switch (try? scanner.supply(state)) ?? .ended {
+            case .frames(let count):
+                guard body((scanner.samples(0), scanner.samples(1)), count, scanner.position) else { return true }
+                scanner.consume(count)
+            case .waiting:
+                return false
+            case .ended:
+                return true
+            }
+        }
     }
 
     /// Starts a seek run when the decoder seeks past the packets listed from the start and the file's index

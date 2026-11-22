@@ -4,10 +4,10 @@ import YTMAudio
 import YTMCore
 
 /// Queues the next song in the engine shortly before the current one ends,
-/// so it follows without a gap or fades in.
+/// so it follows without a gap, fades in or is mixed in.
 struct GaplessScheduler {
-    /// Wall time for the next stream to start downloading and its decoder to open. A crossfade
-    /// adds its length and the silence it may cut, which the engine holds back, both in song time.
+    /// Wall time for the next stream to start downloading and its decoder to open. A blend adds
+    /// its reach, in song time.
     static let leadSeconds = 15.0
 
     struct Queued {
@@ -24,7 +24,7 @@ struct GaplessScheduler {
     /// The song last tried for queueing, so a failure is not retried every tick.
     private(set) var tried: String?
 
-    /// Album tracks in order are often written to run straight on, so are never faded into.
+    /// Album tracks in order are often written to run straight on, so are never blended into.
     static func inAlbumOrder(_ current: Track?, _ next: Track) -> Bool {
         guard let current, let album = current.album?.id, album == next.album?.id else { return false }
         guard let a = current.trackNumber, let b = next.trackNumber else { return true }
@@ -32,20 +32,19 @@ struct GaplessScheduler {
     }
 
     /// In song time, which passes `speed` times as fast as wall time.
-    static func lead(crossfade: Double, speed: Double) -> Double {
-        let open = leadSeconds * speed
-        return crossfade > 0 ? open + crossfade + AudioPlayer.silenceTrimSeconds : open
+    static func lead(_ transition: Transition, speed: Double) -> Double {
+        leadSeconds * speed + transition.reach
     }
 
-    /// `stale`: the queued song is no longer next; `due`: the song to queue now, with its fade.
+    /// `stale`: the queued song is no longer next; `due`: the song to queue now, and how it follows.
     func plan(
-        position: Double, duration: Double, started: Bool, current: Track?, next: Track?, crossfadeSeconds: Double?, speed: Double
-    ) -> (stale: Bool, due: (id: String, crossfade: Double)?) {
-        let fade = if let crossfadeSeconds, let next, !Self.inAlbumOrder(current, next) { crossfadeSeconds } else { 0.0 }
+        position: Double, duration: Double, started: Bool, current: Track?, next: Track?, transition: Transition, speed: Double
+    ) -> (stale: Bool, due: (id: String, transition: Transition)?) {
+        let transition = if let next, !Self.inAlbumOrder(current, next) { transition } else { Transition.gapless }
         let stale = queued.map { $0.trackID != next?.id } ?? false
-        let nearEnd = started && duration > 0 && duration - position <= Self.lead(crossfade: fade, speed: speed) && (queued == nil || stale)
+        let nearEnd = started && duration > 0 && duration - position <= Self.lead(transition, speed: speed) && (queued == nil || stale)
         guard nearEnd, let next, tried != next.id else { return (stale, nil) }
-        return (stale, (next.id, fade))
+        return (stale, (next.id, transition))
     }
 
     mutating func markTried(_ id: String) {
@@ -80,11 +79,10 @@ extension PlayerController {
         let next = queue.peekNext(repeat: repeatMode)
         let plan = gapless.plan(
             position: position, duration: playback.duration, started: playback.started,
-            current: queue.current, next: next, crossfadeSeconds: settings.value.crossfade ? audio.crossfadeSeconds : nil,
-            speed: audio.speed
+            current: queue.current, next: next, transition: settings.value.transition, speed: audio.speed
         )
         if plan.stale { dropQueuedNext() }
-        guard let (nextID, fade) = plan.due, let next else { return }
+        guard let (nextID, transition) = plan.due, let next else { return }
         gapless.markTried(nextID)
         // A resolve ahead is only waited on, so a skip that cancels this still
         // starts the song from it; one handed back keeps its resolve time.
@@ -97,7 +95,7 @@ extension PlayerController {
             do {
                 let prefetched = try result.get()
                 let item = try audioItem(for: next, stream: prefetched.stream)
-                audio.setNext(item, crossfade: fade > 0)
+                audio.setNext(item, transition)
                 gapless.setQueued(.init(trackID: nextID, itemID: item.id, prefetched: prefetched))
             } catch {
                 Logger.playback.debug("could not queue the next track: \(sentence(for: error), privacy: .public)")
@@ -111,7 +109,7 @@ extension PlayerController {
         queueing?.cancel()
         guard gapless.queued != nil else { return gapless.forget() }
         gapless.unqueue(into: &prefetcher)
-        audio.setNext(nil, crossfade: false)
+        audio.setNext(nil, .gapless)
     }
 
     /// The queued song became audible: moves the queue on without loading anything.
@@ -138,5 +136,12 @@ extension PlayerController {
         publishPlayback()
         extendWithRadioIfEnding()
         prefetchNext()
+    }
+}
+
+extension Settings {
+    /// As set, Automix over a crossfade left on beneath it; `plan` still runs album tracks in order straight on.
+    var transition: Transition {
+        automix ? .automix : crossfade ? .crossfade(crossfadeSeconds) : .gapless
     }
 }

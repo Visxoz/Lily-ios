@@ -1,15 +1,28 @@
 import Foundation
 import Testing
+import YTMAudio
 @testable import YTMCore
 @testable import YTMPlayback
 
 @MainActor
 struct PlayerSettingsTests {
-    @Test func theCrossfadesLengthReachesTheEngineFromLaunch() async {
-        let rig = Rig()
-        rig.settings.value.crossfadeSeconds = 10
-        await rig.player.start()
-        #expect(rig.audio.crossfadeSeconds == 10)
+    @Test func automixQueuesTheNextSongByItsReachInPlaceOfTheCrossfade() async throws {
+        let rig = await started()
+        rig.settings.value.crossfade = true
+        rig.settings.value.automix = true
+        rig.player.apply(rig.settings.value)
+        rig.player.play([song("a", album: "x", number: 1), song("b", album: "y", number: 1)])
+        await rig.settle()
+        await rig.soundStarts()
+        rig.audio.currentTime = 168
+        rig.player.onTick()
+        await rig.settle()
+        #expect(rig.audio.next == nil, "not yet")
+        rig.audio.currentTime = 170
+        rig.player.onTick()
+        await rig.settle()
+        #expect(rig.audio.next?.id.hasPrefix("b#") == true, "queued by the longest blend and the silence it may cut")
+        #expect(rig.audio.nextTransition == .automix)
     }
 
     @Test func aNewCrossfadeLengthQueuesTheNextSongAgain() async throws {
@@ -26,13 +39,12 @@ struct PlayerSettingsTests {
 
         rig.settings.value.crossfadeSeconds = 3
         rig.player.apply(rig.settings.value)
-        #expect(rig.audio.crossfadeSeconds == 3)
         #expect(rig.audio.next == nil, "queued with the old length, so dropped")
         rig.audio.currentTime = 186
         rig.player.onTick()
         await rig.settle()
         #expect(rig.audio.next?.id.hasPrefix("b#") == true)
-        #expect(rig.audio.nextCrossfades)
+        #expect(rig.audio.nextTransition == .crossfade(3))
     }
 
     @Test func unpluggingTheDevicePlayingPauses() async throws {

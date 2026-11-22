@@ -32,16 +32,19 @@ private final class Stereo {
 }
 
 struct CrossfadeTests {
-    private func mix(_ incoming: [Float]?, _ outgoing: [Float]?, gains: (Float, Float) = (1, 1), from start: Int64 = 0, length: Int64) -> [Float] {
+    private func mix(_ incoming: [Float]?, _ outgoing: [Float]?, gains: (Float, Float) = (1, 1), from start: Int64 = 0, length: Int64, trade: Automix.Trade? = nil) -> [Float] {
         let count = incoming?.count ?? outgoing?.count ?? 0
         let out = Stereo(Array(repeating: 0, count: count))
         let new = incoming.map(Stereo.init)
         let old = outgoing.map(Stereo.init)
         let ramps = (Crossfade.Ramp(from: gains.0, to: gains.0, length: count), Crossfade.Ramp(from: gains.1, to: gains.1, length: count))
-        Crossfade.mix(
-            incoming: new.map { ($0.channels, ramps.0) }, outgoing: old.map { ($0.channels, ramps.1) },
-            count: count, at: start, of: length, into: out.output, offset: 0
-        )
+        // Kept alive while their pointers are read, which an optimised build would not otherwise promise.
+        withExtendedLifetime((new, old)) {
+            Crossfade.mix(
+                incoming: new.map { ($0.channels, ramps.0) }, outgoing: old.map { ($0.channels, ramps.1) },
+                count: count, at: start, of: length, trade: trade, into: out.output, offset: 0
+            )
+        }
         #expect(out.samples.left == out.samples.right, "channels fade together")
         return out.samples.left
     }
@@ -64,6 +67,27 @@ struct CrossfadeTests {
             return mix(Array(incoming[start..<end]), Array(outgoing[start..<end]), gains: (1, 0.5), from: Int64(start), length: 960)
         }
         #expect(pieces == whole)
+    }
+
+    @Test func tradesBassAcrossPiecesAsInOne() {
+        let incoming = (0..<4_800).map { cos(Float($0) * 0.03) }
+        let outgoing = (0..<4_800).map { sin(Float($0) * 0.01) }
+        let analyses = [outgoing, incoming].map { samples -> Automix.Analysis in
+            let stereo = Stereo(samples)
+            var meter = Automix.Meter(rate: 48_000, frames: samples.count)
+            withExtendedLifetime(stereo) { meter.add(stereo.channels, count: samples.count) }
+            return meter.analysis(frames: meter.frames)
+        }
+        let plan = Automix.plan(tail: analyses[0], intro: analyses[1], rate: 48_000, room: .max)
+        let whole = mix(incoming, outgoing, gains: (1, 0.5), length: 4_800, trade: Automix.Trade(plan, rate: 48_000))
+        // One trade across the pieces, as its filters carry on from one buffer to the next.
+        let trade = Automix.Trade(plan, rate: 48_000)
+        let pieces = stride(from: 0, to: 4_800, by: 122).flatMap { start -> [Float] in
+            let end = min(start + 122, 4_800)
+            return mix(Array(incoming[start..<end]), Array(outgoing[start..<end]), gains: (1, 0.5), from: Int64(start), length: 4_800, trade: trade)
+        }
+        #expect(pieces == whole)
+        #expect(whole != mix(incoming, outgoing, gains: (1, 0.5), length: 4_800), "the bass traded, not only faded")
     }
 
     @Test func fadesOutOverSilenceOnceTheIncomingItemEnds() {
