@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="270" viewBox="0 0 1280 270">
+  <title>256 kbps Opus with YouTube Premium. A ten-band equaliser, ±12 dB each. Nine accents in black, dark or light. No third-party packages, just Swift and Apple's own frameworks.</title>
+  <defs>
+    <linearGradient id="art" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f472d0"/>
+      <stop offset="1" stop-color="#9b5cff"/>
+    </linearGradient>
+    <!-- The lily from the app's icon, drawn in a 1046-unit square. -->
+    <g id="lily">
+      <path fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" d="M 478 845 C 494 786 500 726 498 677 C 520 674 543 669 564 661 C 644 635 716 585 753 518 C 774 479 813 474 844 503 C 826 431 778 380 729 392 C 688 401 629 548 564 661 M 476 655 C 374 627 290 553 265 458 C 255 415 218 401 180 420 C 215 357 273 317 319 341 C 363 364 405 578 476 655 M 474 536 C 449 459 429 340 425 225 M 503 528 C 514 439 536 320 565 213 M 532 540 C 579 469 631 374 690 283"/>
+      <path fill="#ffffff" fill-opacity="0.92" d="M 390 225 A 35 35 0 1 0 460 225 A 35 35 0 1 0 390 225 Z M 530 213 A 35 35 0 1 0 600 213 A 35 35 0 1 0 530 213 Z M 655 283 A 35 35 0 1 0 725 283 A 35 35 0 1 0 655 283 Z"/>
+    </g>
+    <!-- The app icon's own background, glow and ink, from AppIcon.icon. -->
+    <linearGradient id="iconbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17111d"/>
+      <stop offset="1" stop-color="#0b0a0f"/>
+    </linearGradient>
+    <radialGradient id="iconglow" gradientUnits="userSpaceOnUse" cx="512" cy="460" r="460">
+      <stop offset="0" stop-color="#c45ad8" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#c45ad8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="iconink" gradientUnits="userSpaceOnUse" x1="240" y1="180" x2="784" y2="864">
+      <stop offset="0" stop-color="#f472d0"/>
+      <stop offset="1" stop-color="#9b5cff"/>
+    </linearGradient>
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="32" y1="0" x2="250" y2="0">
+      <stop offset="0" stop-color="#f472d0"/>
+      <stop offset="1" stop-color="#9b5cff"/>
+    </linearGradient>
+    <!-- Stands in for any cover's colour. -->
+    <linearGradient id="artwork" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffb35c"/>
+      <stop offset="0.35" stop-color="#ff5c8a"/>
+      <stop offset="0.7" stop-color="#5c6bff"/>
+      <stop offset="1" stop-color="#7be3b0"/>
+    </linearGradient>
+    <style>
+      text { font-family: 'SF Pro Display', -apple-system, 'Segoe UI Variable Display', 'Segoe UI', system-ui, Inter, 'Helvetica Neue', Arial, sans-serif; }
+      .pill { fill: #ffffff; fill-opacity: 0.07; stroke: #ffffff; stroke-opacity: 0.14; }
+      .body { fill: #1b1b20; stroke: #ffffff; stroke-opacity: 0.16; stroke-width: 1.5; }
+      .big { font-size: 58px; font-weight: 700; fill: #ffffff; letter-spacing: -1px; }
+      .unit { font-size: 24px; font-weight: 600; fill: #98989d; }
+      .cap { font-size: 17px; fill: #98989d; }
+    </style>
+  </defs>
+
+  <g transform="translate(0.0 0)">
+    <rect x="0.5" y="0.5" width="305.5" height="269" rx="24" fill="#1c1c1e"/>
+    <g fill="url(#ink)"><rect x="32" y="52.0" width="5" height="24" rx="2.5"/><rect x="41" y="40.5" width="5" height="47" rx="2.5"/><rect x="50" y="40.5" width="5" height="47" rx="2.5"/><rect x="59" y="49.0" width="5" height="30" rx="2.5"/><rect x="68" y="51.5" width="5" height="25" rx="2.5"/><rect x="77" y="48.0" width="5" height="32" rx="2.5"/><rect x="86" y="44.5" width="5" height="39" rx="2.5"/><rect x="95" y="52.0" width="5" height="24" rx="2.5"/><rect x="104" y="39.5" width="5" height="49" rx="2.5"/><rect x="113" y="37.0" width="5" height="54" rx="2.5"/><rect x="122" y="46.5" width="5" height="35" rx="2.5"/><rect x="131" y="47.5" width="5" height="33" rx="2.5"/><rect x="140" y="48.0" width="5" height="32" rx="2.5"/><rect x="149" y="51.0" width="5" height="26" rx="2.5"/><rect x="158" y="52.0" width="5" height="24" rx="2.5"/><rect x="167" y="42.5" width="5" height="43" rx="2.5"/><rect x="176" y="37.5" width="5" height="53" rx="2.5"/><rect x="185" y="45.5" width="5" height="37" rx="2.5"/><rect x="194" y="45.0" width="5" height="38" rx="2.5"/><rect x="203" y="40.5" width="5" height="47" rx="2.5"/><rect x="212" y="47.0" width="5" height="34" rx="2.5"/><rect x="221" y="52.0" width="5" height="24" rx="2.5"/><rect x="230" y="48.5" width="5" height="31" rx="2.5"/><rect x="239" y="42.5" width="5" height="43" rx="2.5"/></g>
+    <text x="32" y="170"><tspan class="big">256</tspan><tspan class="unit" dx="8">kbps</tspan></text>
+    <text class="cap" x="32" y="206">Opus, with YouTube Premium</text>
+  </g>
+  <g transform="translate(324.5 0)">
+    <rect x="0.5" y="0.5" width="305.5" height="269" rx="24" fill="#1c1c1e"/>
+    <rect x="34" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="34" y="51.0" width="4" height="13.0" rx="2" fill="url(#ink)"/><circle cx="36" cy="51.0" r="6" fill="#ffffff"/><rect x="56" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="56" y="45.8" width="4" height="18.2" rx="2" fill="url(#ink)"/><circle cx="58" cy="45.8" r="6" fill="#ffffff"/><rect x="78" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="78" y="53.6" width="4" height="10.4" rx="2" fill="url(#ink)"/><circle cx="80" cy="53.6" r="6" fill="#ffffff"/><rect x="100" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="100" y="61.4" width="4" height="2.6" rx="2" fill="url(#ink)"/><circle cx="102" cy="61.4" r="6" fill="#ffffff"/><rect x="122" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="122" y="64.0" width="4" height="5.2" rx="2" fill="url(#ink)"/><circle cx="124" cy="69.2" r="6" fill="#ffffff"/><rect x="144" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="144" y="64.0" width="4" height="7.8" rx="2" fill="url(#ink)"/><circle cx="146" cy="71.8" r="6" fill="#ffffff"/><rect x="166" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="166" y="64.0" width="4" height="2.6" rx="2" fill="url(#ink)"/><circle cx="168" cy="66.6" r="6" fill="#ffffff"/><rect x="188" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="188" y="56.2" width="4" height="7.8" rx="2" fill="url(#ink)"/><circle cx="190" cy="56.2" r="6" fill="#ffffff"/><rect x="210" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="210" y="48.4" width="4" height="15.6" rx="2" fill="url(#ink)"/><circle cx="212" cy="48.4" r="6" fill="#ffffff"/><rect x="232" y="36" width="4" height="56" rx="2" fill="#ffffff" fill-opacity="0.16"/><rect x="232" y="43.2" width="4" height="20.8" rx="2" fill="url(#ink)"/><circle cx="234" cy="43.2" r="6" fill="#ffffff"/>
+    <text x="32" y="170"><tspan class="big">10</tspan><tspan class="unit" dx="8">bands</tspan></text>
+    <text class="cap" x="32" y="206">of equaliser, ±12 dB each</text>
+  </g>
+  <g transform="translate(649.0 0)">
+    <rect x="0.5" y="0.5" width="305.5" height="269" rx="24" fill="#1c1c1e"/>
+    <circle cx="48" cy="64" r="16" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.8"/><circle cx="48" cy="64" r="11" fill="#d65db1"/><circle cx="80" cy="64" r="11" fill="#ff0033"/><circle cx="106" cy="64" r="11" fill="#ff6a13"/><circle cx="132" cy="64" r="11" fill="#1db954"/><circle cx="158" cy="64" r="11" fill="#00a89d"/><circle cx="184" cy="64" r="11" fill="#3d7bff"/><circle cx="210" cy="64" r="11" fill="#9b5cff"/><circle cx="236" cy="64" r="11" fill="#f0458f"/><circle cx="262" cy="64" r="11" fill="url(#artwork)"/>
+    <text x="32" y="170"><tspan class="big">9</tspan><tspan class="unit" dx="8">accents</tspan></text>
+    <text class="cap" x="32" y="206">in black, dark or light</text>
+  </g>
+  <g transform="translate(973.5 0)">
+    <rect x="0.5" y="0.5" width="305.5" height="269" rx="24" fill="#1c1c1e"/>
+    <g transform="translate(32 32) scale(0.0625)"><rect width="1024" height="1024" rx="230" fill="url(#iconbg)"/><rect width="1024" height="1024" rx="230" fill="url(#iconglow)"/><rect x="8" y="8" width="1008" height="1008" rx="222" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="16"/><path fill="none" stroke="url(#iconink)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round" d="M 478 845 C 494 786 500 726 498 677 C 520 674 543 669 564 661 C 644 635 716 585 753 518 C 774 479 813 474 844 503 C 826 431 778 380 729 392 C 688 401 629 548 564 661 M 476 655 C 374 627 290 553 265 458 C 255 415 218 401 180 420 C 215 357 273 317 319 341 C 363 364 405 578 476 655 M 474 536 C 449 459 429 340 425 225 M 503 528 C 514 439 536 320 565 213 M 532 540 C 579 469 631 374 690 283"/><path fill="url(#iconink)" d="M 390 225 A 35 35 0 1 0 460 225 A 35 35 0 1 0 390 225 Z M 530 213 A 35 35 0 1 0 600 213 A 35 35 0 1 0 530 213 Z M 655 283 A 35 35 0 1 0 725 283 A 35 35 0 1 0 655 283 Z"/></g>
+    <text x="32" y="170"><tspan class="big">0</tspan><tspan class="unit" dx="8">packages</tspan></text>
+    <text class="cap" x="32" y="206">just Swift and Apple's</text><text class="cap" x="32" y="230">own frameworks</text>
+  </g>
+</svg>

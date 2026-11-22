@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="688" viewBox="0 0 1280 688">
+  <title>Make it yours: three looks, Black, Dark and Light, and nine accents, Lily's orchid, Red, Orange, Green, Teal, Blue, Purple, Pink, or one taken from the artwork</title>
+  <defs>
+    <linearGradient id="art" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f472d0"/>
+      <stop offset="1" stop-color="#9b5cff"/>
+    </linearGradient>
+    <linearGradient id="art2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffb35c"/>
+      <stop offset="1" stop-color="#ff5c8a"/>
+    </linearGradient>
+    <linearGradient id="art3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5cc8ff"/>
+      <stop offset="1" stop-color="#5c6bff"/>
+    </linearGradient>
+    <filter id="shadow" x="-40%" y="-20%" width="180%" height="150%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <!-- The lily from the app's icon, drawn in a 1046-unit square. -->
+    <g id="lily">
+      <path fill="none" stroke="#ffffff" stroke-opacity="0.92" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" d="M 478 845 C 494 786 500 726 498 677 C 520 674 543 669 564 661 C 644 635 716 585 753 518 C 774 479 813 474 844 503 C 826 431 778 380 729 392 C 688 401 629 548 564 661 M 476 655 C 374 627 290 553 265 458 C 255 415 218 401 180 420 C 215 357 273 317 319 341 C 363 364 405 578 476 655 M 474 536 C 449 459 429 340 425 225 M 503 528 C 514 439 536 320 565 213 M 532 540 C 579 469 631 374 690 283"/>
+      <path fill="#ffffff" fill-opacity="0.92" d="M 390 225 A 35 35 0 1 0 460 225 A 35 35 0 1 0 390 225 Z M 530 213 A 35 35 0 1 0 600 213 A 35 35 0 1 0 530 213 Z M 655 283 A 35 35 0 1 0 725 283 A 35 35 0 1 0 655 283 Z"/>
+    </g>
+    <!-- Stands in for any cover's colour. -->
+    <linearGradient id="artwork" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffb35c"/>
+      <stop offset="0.35" stop-color="#ff5c8a"/>
+      <stop offset="0.7" stop-color="#5c6bff"/>
+      <stop offset="1" stop-color="#7be3b0"/>
+    </linearGradient>
+    <style>
+      text { font-family: 'SF Pro Display', -apple-system, 'Segoe UI Variable Display', 'Segoe UI', system-ui, Inter, 'Helvetica Neue', Arial, sans-serif; }
+      .pill { fill: #ffffff; fill-opacity: 0.07; stroke: #ffffff; stroke-opacity: 0.14; }
+      .body { fill: #1b1b20; stroke: #ffffff; stroke-opacity: 0.16; stroke-width: 1.5; }
+      .look { font-size: 24px; font-weight: 700; fill: #ffffff; }
+      .lookNote { font-size: 17px; fill: #98989d; }
+      .accent { font-size: 18px; font-weight: 600; fill: #ffffff; }
+      .accentNote { font-size: 16px; fill: #98989d; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="688" rx="28" fill="#1c1c1e"/>
+
+  <text x="90" y="200" font-size="19" font-weight="500" fill="#98989d">Settings › Appearance</text>
+  <text x="86" y="272" font-size="68" font-weight="700" letter-spacing="-1.5" fill="#ffffff">Make it yours</text>
+  <text x="90" y="318" font-size="26" font-weight="600" fill="#ffffff">Three looks and nine accents.</text>
+  <text x="90" y="354" font-size="19" fill="#98989d">Any look with any accent.</text>
+
+  <!-- Black: its own panel and text colours, with Lily's orchid as that look shows it. -->
+  <g transform="translate(560 44)">
+    <rect x="12" y="28" width="146" height="324" rx="30" fill="#000000" opacity="0.6" filter="url(#shadow)"/>
+    <rect class="body" width="170" height="352" rx="31"/>
+    <rect x="6" y="6" width="158" height="340" rx="26" fill="#000000"/>
+    <rect x="57" y="15" width="56" height="16" rx="8" fill="#000000" stroke="#ffffff" stroke-opacity="0.14"/>
+    <rect x="20" y="48" width="70" height="12" rx="6" fill="#ffffff"/>
+    <rect x="20" y="72" width="38" height="18" rx="9" fill="#d65db1"/>
+    <rect x="64" y="72" width="44" height="18" rx="9" fill="#1f1f1f"/>
+    <rect x="114" y="72" width="36" height="18" rx="9" fill="#1f1f1f"/>
+    <rect x="20" y="102" width="130" height="104" rx="12" fill="url(#art)"/>
+    <use href="#lily" transform="translate(45 102.6) scale(0.0994)"/>
+    <rect x="20" y="220" width="28" height="28" rx="6" fill="url(#art2)"/>
+    <rect x="56" y="224" width="70" height="8" rx="4" fill="#ffffff"/>
+    <rect x="56" y="238" width="44" height="6" rx="3" fill="#b3b3b3"/>
+    <rect x="20" y="258" width="28" height="28" rx="6" fill="url(#art3)"/>
+    <rect x="56" y="262" width="58" height="8" rx="4" fill="#ffffff"/>
+    <rect x="56" y="276" width="36" height="6" rx="3" fill="#b3b3b3"/>
+    <rect x="16" y="302" width="138" height="32" rx="16" fill="#1f1f1f"/>
+    <circle cx="36" cy="318" r="4.5" fill="#d65db1"/>
+    <circle cx="68" cy="318" r="4.5" fill="#b3b3b3"/>
+    <circle cx="100" cy="318" r="4.5" fill="#b3b3b3"/>
+    <circle cx="132" cy="318" r="4.5" fill="#b3b3b3"/>
+  </g>
+  <text class="look" x="645" y="442" text-anchor="middle">Black</text>
+  <text class="lookNote" x="645" y="470" text-anchor="middle">pure black, for OLED,</text>
+  <text class="lookNote" x="645" y="492" text-anchor="middle">where Lily starts</text>
+  <!-- Dark: its own panel and text colours, with Lily's orchid as that look shows it. -->
+  <g transform="translate(785 44)">
+    <rect x="12" y="28" width="146" height="324" rx="30" fill="#000000" opacity="0.6" filter="url(#shadow)"/>
+    <rect class="body" width="170" height="352" rx="31"/>
+    <rect x="6" y="6" width="158" height="340" rx="26" fill="#121212"/>
+    <rect x="57" y="15" width="56" height="16" rx="8" fill="#000000" stroke="#ffffff" stroke-opacity="0.14"/>
+    <rect x="20" y="48" width="70" height="12" rx="6" fill="#ffffff"/>
+    <rect x="20" y="72" width="38" height="18" rx="9" fill="#d65db1"/>
+    <rect x="64" y="72" width="44" height="18" rx="9" fill="#2a2a2a"/>
+    <rect x="114" y="72" width="36" height="18" rx="9" fill="#2a2a2a"/>
+    <rect x="20" y="102" width="130" height="104" rx="12" fill="url(#art)"/>
+    <use href="#lily" transform="translate(45 102.6) scale(0.0994)"/>
+    <rect x="20" y="220" width="28" height="28" rx="6" fill="url(#art2)"/>
+    <rect x="56" y="224" width="70" height="8" rx="4" fill="#ffffff"/>
+    <rect x="56" y="238" width="44" height="6" rx="3" fill="#b3b3b3"/>
+    <rect x="20" y="258" width="28" height="28" rx="6" fill="url(#art3)"/>
+    <rect x="56" y="262" width="58" height="8" rx="4" fill="#ffffff"/>
+    <rect x="56" y="276" width="36" height="6" rx="3" fill="#b3b3b3"/>
+    <rect x="16" y="302" width="138" height="32" rx="16" fill="#2a2a2a"/>
+    <circle cx="36" cy="318" r="4.5" fill="#d65db1"/>
+    <circle cx="68" cy="318" r="4.5" fill="#b3b3b3"/>
+    <circle cx="100" cy="318" r="4.5" fill="#b3b3b3"/>
+    <circle cx="132" cy="318" r="4.5" fill="#b3b3b3"/>
+  </g>
+  <text class="look" x="870" y="442" text-anchor="middle">Dark</text>
+  <text class="lookNote" x="870" y="470" text-anchor="middle">soft greys, easy at night</text>
+  <!-- Light: its own panel and text colours, with Lily's orchid as that look shows it. -->
+  <g transform="translate(1010 44)">
+    <rect x="12" y="28" width="146" height="324" rx="30" fill="#000000" opacity="0.6" filter="url(#shadow)"/>
+    <rect class="body" width="170" height="352" rx="31"/>
+    <rect x="6" y="6" width="158" height="340" rx="26" fill="#ffffff"/>
+    <rect x="57" y="15" width="56" height="16" rx="8" fill="#000000" stroke="#ffffff" stroke-opacity="0.14"/>
+    <rect x="20" y="48" width="70" height="12" rx="6" fill="#0f0f0f"/>
+    <rect x="20" y="72" width="38" height="18" rx="9" fill="#c8319b"/>
+    <rect x="64" y="72" width="44" height="18" rx="9" fill="#ececec"/>
+    <rect x="114" y="72" width="36" height="18" rx="9" fill="#ececec"/>
+    <rect x="20" y="102" width="130" height="104" rx="12" fill="url(#art)"/>
+    <use href="#lily" transform="translate(45 102.6) scale(0.0994)"/>
+    <rect x="20" y="220" width="28" height="28" rx="6" fill="url(#art2)"/>
+    <rect x="56" y="224" width="70" height="8" rx="4" fill="#0f0f0f"/>
+    <rect x="56" y="238" width="44" height="6" rx="3" fill="#5c5c5c"/>
+    <rect x="20" y="258" width="28" height="28" rx="6" fill="url(#art3)"/>
+    <rect x="56" y="262" width="58" height="8" rx="4" fill="#0f0f0f"/>
+    <rect x="56" y="276" width="36" height="6" rx="3" fill="#5c5c5c"/>
+    <rect x="16" y="302" width="138" height="32" rx="16" fill="#ececec"/>
+    <circle cx="36" cy="318" r="4.5" fill="#c8319b"/>
+    <circle cx="68" cy="318" r="4.5" fill="#5c5c5c"/>
+    <circle cx="100" cy="318" r="4.5" fill="#5c5c5c"/>
+    <circle cx="132" cy="318" r="4.5" fill="#5c5c5c"/>
+  </g>
+  <text class="look" x="1095" y="442" text-anchor="middle">Light</text>
+  <text class="lookNote" x="1095" y="470" text-anchor="middle">bright, for daytime</text>
+
+  <!-- The accents, in the order Settings offers them. -->
+  <rect x="24" y="516" width="1232" height="148" rx="20" fill="#2c2c2e"/>
+  <g text-anchor="middle">
+    <circle cx="121" cy="568" r="31" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.85"/>
+    <circle cx="121" cy="568" r="24" fill="#d65db1"/>
+    <text class="accent" x="121" y="628">Lily</text>
+    <text class="accentNote" x="121" y="650">the default</text>
+    <circle cx="250" cy="568" r="24" fill="#ff0033"/>
+    <text class="accent" x="250" y="628">Red</text>
+    <circle cx="379" cy="568" r="24" fill="#ff6a13"/>
+    <text class="accent" x="379" y="628">Orange</text>
+    <circle cx="508" cy="568" r="24" fill="#1db954"/>
+    <text class="accent" x="508" y="628">Green</text>
+    <circle cx="637" cy="568" r="24" fill="#00a89d"/>
+    <text class="accent" x="637" y="628">Teal</text>
+    <circle cx="766" cy="568" r="24" fill="#3d7bff"/>
+    <text class="accent" x="766" y="628">Blue</text>
+    <circle cx="895" cy="568" r="24" fill="#9b5cff"/>
+    <text class="accent" x="895" y="628">Purple</text>
+    <circle cx="1024" cy="568" r="24" fill="#f0458f"/>
+    <text class="accent" x="1024" y="628">Pink</text>
+    <circle cx="1153" cy="568" r="24" fill="url(#artwork)"/>
+    <text class="accent" x="1153" y="628">Artwork</text>
+    <text class="accentNote" x="1153" y="650">follows the song</text>
+  </g>
+</svg>

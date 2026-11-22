@@ -1,19 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440">
   <title>Made for iPhone Duo: the player beside the queue, albums in two panes, and a stand mode, each in its own layout</title>
   <defs>
-    <radialGradient id="glow" cx="78%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#d65db1" stop-opacity="0.38"/>
-      <stop offset="0.5" stop-color="#d65db1" stop-opacity="0.08"/>
-      <stop offset="1" stop-color="#d65db1" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="glow2" cx="4%" cy="100%" r="48%">
-      <stop offset="0" stop-color="#9b5cff" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#9b5cff" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#f6c4ea"/>
-    </linearGradient>
     <linearGradient id="art" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f472d0"/>
       <stop offset="1" stop-color="#9b5cff"/>
@@ -61,15 +48,12 @@
     </style>
   </defs>
 
-  <rect width="1280" height="440" rx="28" fill="#0c0a10"/>
-  <rect width="1280" height="440" rx="28" fill="url(#glow)"/>
-  <rect width="1280" height="440" rx="28" fill="url(#glow2)"/>
-  <rect x="0.5" y="0.5" width="1279" height="439" rx="27.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <rect width="1280" height="440" rx="28" fill="#1c1c1e"/>
 
-  <text x="90" y="92" font-size="15" font-weight="700" letter-spacing="3" fill="#f472d0">MADE FOR THE FOLD</text>
-  <text x="86" y="164" font-size="72" font-weight="700" letter-spacing="-1.5" fill="url(#title)">iPhone Duo</text>
-  <text x="90" y="210" font-size="26" font-weight="600" fill="#f0f0f3">Open it, fold it or stand it up.</text>
-  <text x="90" y="246" font-size="19" fill="#9a9aa3">Every pose gets a layout of its own, built for its two halves.</text>
+  <text x="90" y="92" font-size="19" font-weight="500" fill="#98989d">Two displays, one app</text>
+  <text x="86" y="164" font-size="72" font-weight="700" letter-spacing="-1.5" fill="#ffffff">iPhone Duo</text>
+  <text x="90" y="210" font-size="26" font-weight="600" fill="#ffffff">Open it, fold it or stand it up.</text>
+  <text x="90" y="246" font-size="19" fill="#98989d">Every pose gets a layout of its own, built for its two halves.</text>
 
   <g>
     <rect class="pill" x="90" y="276" width="236" height="40" rx="20"/>
@@ -80,7 +64,7 @@
     <text class="pt" x="558" y="302" text-anchor="middle">Fold to scrub</text>
   </g>
 
-  <text x="90" y="375" font-size="17" fill="#9a9aa3">Folded, it's the Lily you know. The open layouts need iOS 27.1.</text>
+  <text x="90" y="375" font-size="17" fill="#98989d">Folded, it's the Lily you know. The open layouts need iOS 27.1.</text>
 
   <!-- Behind: open flat, the player on one half and the queue on the other. -->
   <g transform="translate(700 52) rotate(-6 170 120)">

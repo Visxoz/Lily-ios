@@ -8,29 +8,34 @@
 [![Downloads](https://img.shields.io/github/downloads/Visxoz/Lily-ios/total?style=flat&labelColor=18181b&color=d65db1&label=downloads)](https://github.com/Visxoz/Lily-ios/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/Visxoz/Lily-ios/ci.yml?branch=main&style=flat&labelColor=18181b&label=CI)](https://github.com/Visxoz/Lily-ios/actions/workflows/ci.yml)
 [![iOS 26](https://img.shields.io/badge/iOS-26-0a84ff?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#install)
-[![iPhone Duo](https://img.shields.io/badge/iPhone%20Duo-made%20for%20the%20fold-d65db1?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#made-for-iphone-duo)
+[![iPhone Duo](https://img.shields.io/badge/iPhone%20Duo-supported-d65db1?style=flat&labelColor=18181b&logo=apple&logoColor=white)](#made-for-iphone-duo)
 [![Swift 6.4](https://img.shields.io/badge/Swift-6.4-f05138?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0a84ff?style=flat&labelColor=18181b&logo=swift&logoColor=white)](#under-the-hood)
 [![Licence](https://img.shields.io/github/license/Visxoz/Lily-ios?style=flat&labelColor=18181b&color=3f3f46&label=licence)](LICENSE)
 
 <br>
 
-<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-altstore.svg" height="44" alt="Add to AltStore"></a>
-<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-sidestore.svg" height="44" alt="Add to SideStore"></a>
-<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-feather.svg" height="44" alt="Add to Feather"></a>
-<a href="https://github.com/Visxoz/Lily-ios/releases/latest"><img src="docs/get-github.svg" height="44" alt="Download from GitHub"></a>
-
-<sub>Free, for iOS 26 and later · open this page on your iPhone and tap a store to add Lily, with updates as they come</sub>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-altstore.svg" width="300" alt="Add to AltStore"></a>&nbsp;&nbsp;<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-sidestore.svg" width="300" alt="Add to SideStore"></a>
+<br>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-feather.svg" width="300" alt="Add to Feather"></a>&nbsp;&nbsp;<a href="https://github.com/Visxoz/Lily-ios/releases/latest"><img src="docs/get-github.svg" width="300" alt="Download the IPA from GitHub"></a>
 
 <br>
 
 <img src="docs/hero.jpg" width="100%" alt="Lily: an artist page with its banner, synced lyrics in the artwork's colours, and the queue">
 
-<sub>Artist pages with their banner · lyrics that follow the song, in its artwork's colours · a queue you drag into order</sub>
+<img src="docs/hero-captions.svg" width="100%" alt="Artist pages with their banner and the whole discography; synced lyrics in the artwork's colours; and a queue you drag into order and save as a playlist">
+
+<br>
+
+<img src="docs/glance.svg" width="100%" alt="256 kbps Opus with YouTube Premium. A ten-band equaliser. Nine accents in black, dark or light. No third-party packages, just Swift and Apple's own frameworks.">
+
+<br>
+
+**[Tour](#a-look-around)** · **[Looks](#make-it-yours)** · **[Sound](#sounds-as-good-as-youtube-gets)** · **[Offline](#take-it-offline)** · **[iPhone Duo](#made-for-iphone-duo)** · **[Install](#install)** · **[Your account](#your-account)** · **[Under the hood](#under-the-hood)**
 
 </div>
 
-<br>
+## Why Lily
 
 <table>
 <tr>
@@ -42,8 +47,8 @@
 </td>
 <td width="33%" valign="top">
 
-### Truly native
-Swift and SwiftUI from top to bottom, on Apple's own audio engine. No web views, no wrappers, nothing but the app.
+### All of YouTube Music
+Radio, autoplay, Smart Shuffle, repeat, history and search with recent searches. Speed dial on Home, and artist pages with the whole discography. Songs, albums and playlists download to play offline.
 
 </td>
 <td width="33%" valign="top">
@@ -56,12 +61,6 @@ Pure black and orchid out of the box, or dark or light, in eight other accents i
 <tr>
 <td width="33%" valign="top">
 
-### All of YouTube Music
-Radio, autoplay, Smart Shuffle, repeat, history and search with recent searches. Speed dial on Home, and artist pages with the whole discography. Songs, albums and playlists download to play offline.
-
-</td>
-<td width="33%" valign="top">
-
 ### Lyrics and queue
 Swipe up from the artwork for synced lyrics you can tap to jump to, and a queue you drag into order, edit several songs at a time, and save as a playlist.
 
@@ -72,35 +71,48 @@ Swipe up from the artwork for synced lyrics you can tap to jump to, and a queue 
 The lock screen, Control Center, the volume buttons and your AirPods, Last.fm, a Liquid Glass tab bar and icon, and [layouts of its own](#made-for-iphone-duo) on iPhone Duo. Reopens on the song you left, at the second you left it.
 
 </td>
+<td width="33%" valign="top">
+
+### Truly native
+Swift and SwiftUI from top to bottom, on Apple's own audio engine. No web views, no wrappers, nothing but the app.
+
+</td>
+</tr>
+</table>
+
+## A look around
+
+<table>
+<tr>
+<td width="25%"><img src="docs/home.jpg" alt="Home in the dark theme, tinted with the accent"></td>
+<td width="25%"><img src="docs/explore.jpg" alt="Explore's moods and moments"></td>
+<td width="25%"><img src="docs/search.jpg" alt="Search results with the top result"></td>
+<td width="25%"><img src="docs/library.jpg" alt="Library, asking to sign in, with the Downloads button"></td>
+</tr>
+<tr>
+<td align="center"><b>Home</b> · in Dark, tinted with your accent</td>
+<td align="center"><b>Explore</b> · moods, moments and more</td>
+<td align="center"><b>Search</b> · with a top result</td>
+<td align="center"><b>Library</b> · yours when signed in, with downloads</td>
 </tr>
 </table>
 
 ## Make it yours
 
+<img src="docs/looks.svg" width="100%" alt="Three looks, Black, Dark and Light, and nine accents: Lily's orchid, Red, Orange, Green, Teal, Blue, Purple, Pink, or one from the artwork">
+
 <table>
 <tr>
-<td width="25%"><img src="docs/home.jpg" alt="Home in the dark theme, tinted with the accent"></td>
-<td width="25%"><img src="docs/home-light.jpg" alt="Home in the light theme"></td>
 <td width="25%"><img src="docs/album-black.jpg" alt="Discovery's album page in the pure black theme"></td>
+<td width="25%"><img src="docs/home-light.jpg" alt="Home in the light theme"></td>
 <td width="25%"><img src="docs/album.jpg" alt="An album page tinted from its cover"></td>
-</tr>
-<tr>
-<td align="center"><b>Dark</b> · Home, tinted with your accent</td>
-<td align="center"><b>Light</b> · for daytime</td>
-<td align="center"><b>Black</b> · for OLED screens</td>
-<td align="center"><b>Albums</b> · tinted from the cover</td>
-</tr>
-<tr>
-<td width="25%"><img src="docs/explore.jpg" alt="Explore's moods and moments"></td>
-<td width="25%"><img src="docs/search.jpg" alt="Search results with the top result"></td>
 <td width="25%"><img src="docs/nowplaying.jpg" alt="Now Playing, coloured from the artwork"></td>
-<td width="25%"><img src="docs/library.jpg" alt="Library, asking to sign in, with the Downloads button"></td>
 </tr>
 <tr>
-<td align="center"><b>Explore</b> · moods, moments and more</td>
-<td align="center"><b>Search</b> · with a top result</td>
+<td align="center"><b>Black</b> · for OLED screens</td>
+<td align="center"><b>Light</b> · for daytime</td>
+<td align="center"><b>Albums</b> · tinted from the cover</td>
 <td align="center"><b>Now Playing</b> · in the artwork's colours</td>
-<td align="center"><b>Library</b> · yours when signed in, with downloads</td>
 </tr>
 </table>
 
@@ -115,13 +127,15 @@ Lily starts in pure black with its own orchid. Pick another look and accent in *
 </tr>
 </table>
 
+<img src="docs/sound.svg" width="100%" alt="The sound path: the stream, volume levelling, crossfade, speed, the equaliser, crossfeed, mono and balance, then a limiter">
+
 | Feature | What it does |
 | --- | --- |
 | **Premium streams** | Signed in with Premium on High, songs play in YouTube's 256 kbps formats, and Now Playing says so. Music videos swap to their song versions to get them. |
+| **Normalise volume** | Plays every track at a similar loudness, from YouTube's own measurement: loud ones turned down and quiet ones up, at Normal or a Quiet level 6 dB lower, with a limiter so nothing clips. |
 | **Gapless** | The next song is lined up 15 seconds early and follows without a gap, and the screen changes the moment the sound does. |
 | **Crossfade** | Fades each song into the next over 6 seconds, or a length you choose from 1 to 12, cutting the silence at the joins. An album played in order still runs straight on, and skipping never fades. |
 | **Equaliser** | Ten bands from 31 Hz to 16 kHz, ±12 dB each, with presets: Flat, Bass boost, Treble boost, Vocal, Rock, Electronic and Acoustic. Boosting turns the rest down to leave headroom. |
-| **Normalise volume** | Plays every track at a similar loudness, from YouTube's own measurement: loud ones turned down and quiet ones up, at Normal or a Quiet level 6 dB lower, with a limiter so nothing clips. |
 | **No clicks, no drop-outs** | Pausing ramps the sound down, and seeks and skips fade in. Unplug your headphones and the music pauses, or with **Pause when unplugged** off, carries on through the speaker; plug a pair in and it plays on through them. |
 | **Rides out a lost connection** | A connection that drops is waited on for a minute. Gone longer, the song opens again where it stopped, a few times, then waits for you to press play, rather than skipping. |
 
@@ -177,7 +191,9 @@ The open layouts need iOS 27.1 or later.
 
 ## Install
 
-On your iPhone, tap **Add to AltStore**, **Add to SideStore** or **Add to Feather** at the top of this page. Your store opens and adds Lily's source; install Lily from it, and new versions show up there as updates.
+1. On your iPhone, tap **Add to AltStore**, **Add to SideStore** or **Add to Feather** at the top of this page.
+2. Your store opens and adds Lily's source. Install Lily from it.
+3. That's it: Lily works signed out straight away, and new versions show up in your store as updates.
 
 If a button does nothing, add the source by hand: copy this link, and paste it in your store's **Sources** tab.
 
@@ -185,36 +201,25 @@ If a button does nothing, add the source by hand: copy this link, and paste it i
 https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json
 ```
 
-Or grab `Lily.ipa` from the [latest release](https://github.com/Visxoz/Lily-ios/releases/latest) and open it with any of them. Lily works signed out straight away.
-
-Every release is built by [GitHub Actions](.github/workflows/release.yml) from main, never on anyone's computer. To check a download came from there, run `gh attestation verify Lily.ipa --repo Visxoz/Lily-ios --signer-workflow Visxoz/Lily-ios/.github/workflows/release.yml`.
+Or grab `Lily.ipa` from the [latest release](https://github.com/Visxoz/Lily-ios/releases/latest) and open it with any of them.
 
 > [!NOTE]
 > Apps signed with a free Apple ID last seven days. AltStore and SideStore refresh them in the background; if they haven't, open the store and tap **Refresh All**.
 
-## Getting around
-
-| Do | To |
-| --- | --- |
-| Tap the mini player | Open Now Playing |
-| Swipe up on Now Playing, or tap **Up next** or **Lyrics** | Show the queue or the lyrics under the player |
-| Swipe down | Go back to the artwork, then close Now Playing |
-| Tap the song or artist in Now Playing | Go to its album or artist |
-| Tap a lyric line | Jump to it |
-| Drag a song in the queue | Move it |
-| Swipe a song in the queue | Remove it |
-| **Select** in the queue | Pick several songs, then play them next or remove them |
-| Press and hold a song | Play it next, add it to the queue, start a radio, download it, like it, save it to a playlist or remove it from your own playlist, go to its artist or album, or copy its link |
-| Press and hold a card | Play it, start a radio, download an album or playlist, or copy its link. In Library, pin a playlist to the top of its playlists |
-| Tap **More** beside an album's, playlist's or artist's buttons | Copy its link, or rename your own playlist, change who can see it, or delete it |
-| Tap the shuffle button | Cycle Off, Shuffle and **Smart Shuffle**, which mixes in recommendations. Shuffling keeps an artist's or an album's songs apart |
-| On iPhone Duo, half open with **Fold to scrub** on, fold or open it | Skip back or ahead 10 seconds a step |
+> [!WARNING]
+> Lily is an unofficial client. It uses YouTube's undocumented API, which is against YouTube's terms of service. Google could ask you to confirm you're not a bot or sign the session out, and could in principle restrict the account. A separate account is the safest choice.
 
 ## Your account
 
-Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in. Your playlists, albums and artists appear in Library, where a playlist's menu can pin it to the top, Home becomes your own feed, and what you play here counts towards your YouTube Music history and recommendations, with the time you listened, as on the web, unless you turn off **YouTube history** in **Settings ▸ Account**.
+Tap the account button, then **Settings ▸ Account ▸ Sign in**, and sign in on Google's own page. The page closes by itself once you're in.
 
-Your own playlists can be edited from their page: press and hold a song, then drag it into a new order, remove songs from their menu, or rename it, change who can see it, or delete it from **More** in its header (making one public or unlisted needs a YouTube channel on the account). Any other album or playlist can be saved to your library from its header, and artists subscribed to. **Copy link** is in the menus of songs, the queue, cards and page headers.
+| Signed in | What you get |
+| --- | --- |
+| **Library** | Your playlists, albums and artists, where a playlist's menu can pin it to the top. |
+| **Home** | Your own feed. |
+| **History** | What you play here counts towards your YouTube Music history and recommendations, with the time you listened, as on the web, unless you turn off **YouTube history** in **Settings ▸ Account**. |
+| **Your playlists** | Edited from their page: press and hold a song, then drag it into a new order, remove songs from their menu, or rename it, change who can see it, or delete it from **More** in its header. Making one public or unlisted needs a YouTube channel on the account. |
+| **Saving** | Any other album or playlist can be saved to your library from its header, and artists subscribed to. |
 
 The sign-in is kept in the iPhone's Keychain, for this device only. Google's page is shown in a private web view that's thrown away as soon as you're signed in. Lily renews the sign-in every hour, and should YouTube sign you out, it says so.
 
@@ -227,9 +232,6 @@ Tap **Settings ▸ Account ▸ Last.fm ▸ Connect**, then allow access on Last.
 Building it yourself? Last.fm needs an [API account](https://www.last.fm/api/account/create). Put its key and secret in `Config/Secrets.xcconfig` as `LASTFM_API_KEY = …` and `LASTFM_API_SECRET = …`; without them, Settings says Last.fm is unavailable.
 
 </details>
-
-> [!WARNING]
-> Lily is an unofficial client. It uses YouTube's undocumented API, which is against YouTube's terms of service. Google could ask you to confirm you're not a bot or sign the session out, and could in principle restrict the account. A separate account is the safest choice.
 
 ## Under the hood
 
@@ -290,6 +292,8 @@ scripts/lint.sh          # the lint CI runs
 ```
 
 Or open `Lily.xcodeproj` and run it on the iPhone simulator.
+
+Every release is built by [GitHub Actions](.github/workflows/release.yml) from main, never on anyone's computer. To check a download came from there, run `gh attestation verify Lily.ipa --repo Visxoz/Lily-ios --signer-workflow Visxoz/Lily-ios/.github/workflows/release.yml`.
 
 | Path | What it holds |
 | --- | --- |
