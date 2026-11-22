@@ -29,6 +29,8 @@ import Testing
         #expect(settings.normalise == .normal && !settings.crossfade && settings.quality == .high)
         #expect(!settings.foldToScrub, "off until asked for")
         #expect(settings.pauseOnUnplug, "on until turned off")
+        #expect(settings.animatedArt == .wifi)
+        #expect(try decode(#"{"animatedArt": "on"}"#).animatedArt == .on)
         #expect(!settings.crossfeed && !settings.mono && settings.balance == 0)
         #expect(Settings.crossfadeLengths.contains(settings.crossfadeSeconds), "a length Settings offers")
         let saved = try JSONEncoder().encode(settings)

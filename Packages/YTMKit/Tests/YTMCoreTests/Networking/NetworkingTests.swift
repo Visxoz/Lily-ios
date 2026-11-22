@@ -17,6 +17,10 @@ import Testing
         #expect(allowed("https://www.gstatic.com/youtube/media/ytm/images/pbg/liked-music-@576.png"))
         #expect(allowed("https://ws.audioscrobbler.com/2.0/"))
         #expect(allowed("https://www.last.fm/api/auth/?api_key=k&token=t"))
+        #expect(allowed("https://music.apple.com/gb/new"))
+        #expect(allowed("https://amp-api.music.apple.com/v1/catalog/gb/search"))
+        #expect(allowed("https://mvod.itunes.apple.com/itunes-assets/a.m3u8"))
+        #expect(allowed("https://is1-ssl.mzstatic.com/image/thumb/Video122/a.png/720x960bb.jpg"))
     }
 
     @Test func blocksEverythingElse() {
@@ -26,6 +30,9 @@ import Testing
         #expect(!allowed("https://example.com/image.jpg"))
         #expect(!allowed("https://accounts.google.com/"))
         #expect(!allowed("https://last.fm/"), "only Last.fm's own two hosts")
+        #expect(!allowed("https://apple.com/"), "only Apple Music's own hosts")
+        #expect(!allowed("https://mzstatic.com/"))
+        #expect(!allowed("https://x.music.apple.com/"))
         #expect(!allowed("file:///etc/passwd"))
     }
 

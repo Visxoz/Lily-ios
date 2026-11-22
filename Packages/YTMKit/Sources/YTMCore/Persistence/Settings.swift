@@ -20,6 +20,11 @@ public enum Look: String, Codable, CaseIterable, Sendable {
     case dark, light, black
 }
 
+/// Apple Music's moving album covers.
+public enum AnimatedArt: String, Codable, CaseIterable, Sendable {
+    case on, wifi, off
+}
+
 /// The colour of active controls, in the order Settings offers them.
 public enum Accent: String, Codable, CaseIterable, Sendable {
     case lily, red, orange, green, teal, blue, purple, pink, artwork
@@ -87,6 +92,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var ratingButtons = true
     public var look: Look = .black
     public var accent: Accent = .lily
+    /// Off metered networks, as downloads, since each album's clips are several MB.
+    public var animatedArt: AnimatedArt = .wifi
     /// The account has been served Premium formats, so songs without them (music videos) never mark it as not Premium.
     public var premiumAccount = false
     /// The account was taken as without Premium: songs start on the free stream while a background check confirms it.
@@ -139,6 +146,7 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&ratingButtons, .ratingButtons)
         file.read(&look, .look)
         file.read(&accent, .accent)
+        file.read(&animatedArt, .animatedArt)
         file.read(&premiumAccount, .premiumAccount)
         file.read(&noPremium, .noPremium)
         file.read(&downloadQuality, .downloadQuality)

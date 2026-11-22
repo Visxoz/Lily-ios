@@ -12,6 +12,7 @@ let groups: [(name: String, run: @MainActor (Report) async -> Void)] = [
     ("audio", AudioChecks.run),
     ("lyrics", LyricsChecks.run),
     ("radio", RadioChecks.run),
+    ("motion", MotionChecks.run),
 ]
 
 let usage = """

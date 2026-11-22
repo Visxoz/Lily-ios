@@ -14,8 +14,12 @@ enum HTTP {
         // Built-in artwork, such as Liked music's.
         "gstatic.com",
     ]
-    /// Last.fm's API and its sign-in page, on these hosts only.
-    private static let hosts: Set<String> = ["ws.audioscrobbler.com", "www.last.fm"]
+    /// On these hosts only: Last.fm's API and sign-in page, and Apple Music's web player, catalogue, clips and stills.
+    private static let hosts: Set<String> = [
+        "ws.audioscrobbler.com", "www.last.fm",
+        "music.apple.com", "amp-api.music.apple.com", "mvod.itunes.apple.com",
+        "is1-ssl.mzstatic.com", "is2-ssl.mzstatic.com", "is3-ssl.mzstatic.com", "is4-ssl.mzstatic.com", "is5-ssl.mzstatic.com",
+    ]
 
     /// HTTPS on an allowed host.
     static func isAllowed(_ url: URL) -> Bool {
@@ -34,18 +38,35 @@ enum HTTP {
     /// Nothing is cached and no cookie is kept: the signed-in Cookie header is
     /// set per request from the Keychain.
     static let api: URLSession = {
-        let config = URLSessionConfiguration.ephemeral
-        config.urlCache = nil
-        config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        config.httpCookieStorage = nil
-        config.httpShouldSetCookies = false
-        config.httpCookieAcceptPolicy = .never
+        let config = uncached()
         // A request that has not answered in 15 s is not going to.
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 60
+        return session(config)
+    }()
+
+    /// Apple Music's files, some of several MB, so only silence ends a request, never a slow link.
+    static let clips: URLSession = {
+        let config = uncached()
+        config.timeoutIntervalForRequest = 20
+        return session(config)
+    }()
+
+    private static func uncached() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.ephemeral
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return config
+    }
+
+    /// Every session keeps no cookies, goes through the user's proxy and checks its redirects.
+    private static func session(_ config: URLSessionConfiguration) -> URLSession {
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
         config.proxyConfigurations = Proxy.configurations
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
-    }()
+    }
 
     /// Artwork, cached on disk across launches, within Lily for Windows's budget. Pages prefetch their cards'
     /// art and song rows load theirs as they show. Kept here, as a session's `configuration` is a copy.
@@ -62,13 +83,9 @@ enum HTTP {
         // a long while; revalidating after the short max-age only delays the
         // image. `ImagePipeline` fetches one older than 30 days again.
         config.requestCachePolicy = .returnCacheDataElseLoad
-        config.httpCookieStorage = nil
-        config.httpShouldSetCookies = false
-        config.httpCookieAcceptPolicy = .never
         config.httpMaximumConnectionsPerHost = 8
         config.timeoutIntervalForRequest = 20
-        config.proxyConfigurations = Proxy.configurations
-        return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
+        return session(config)
     }()
 
     /// Checks the host and fails outside 2xx; errors omit the URL, which may carry stream signatures.
@@ -104,6 +121,23 @@ enum HTTP {
             }
             try await Task.sleep(for: retryDelay(after: attempt))
             attempt += 1
+        }
+    }
+
+    /// To a temporary file the caller moves, so a large body never sits in memory; checked as `data` is, without retries.
+    static func download(_ request: URLRequest) async throws -> URL {
+        guard let url = request.url, isAllowed(url) else { throw YTMError.blocked }
+        do {
+            let (file, response) = try await clips.download(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status) else {
+                try? FileManager.default.removeItem(at: file)
+                throw YTMError(status: status)
+            }
+            return file
+        } catch let error as URLError {
+            if error.code == .cancelled { throw CancellationError() }
+            throw YTMError(error)
         }
     }
 
