@@ -112,8 +112,8 @@ extension PlayerController {
         }
     }
 
-    /// Fetches the next song's lyrics ahead, only while lyrics are on screen; a streamed music video's known
-    /// song version's, as the song will play in its place, while a downloaded video stays.
+    /// Fetches the next song's lyrics ahead, only while lyrics are on screen: for a streamed video, its known
+    /// song version's, which plays in its place.
     func prefetchLyrics(of track: Track) {
         guard showsLyrics else { return }
         let song = localStream(track.id) == nil ? songVersions.knownSong(for: track.id) ?? track : track

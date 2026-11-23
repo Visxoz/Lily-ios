@@ -8,7 +8,7 @@ struct Stereo {
     static let cutHz: Float = 700
     /// G / (1 - G) = 10^(-4.5 / 20), the feed's share of a side's lows.
     static let feed: Float = 0.373_3
-    /// The share of the highs' difference widening moves each way: their side raised by half, 3.5 dB.
+    /// The share of the highs' difference pushed onto each side, raising their side signal by half, 3.5 dB.
     static let widen: Float = 0.25
     /// How long a change takes, so turning one on or off never clicks.
     static let rampSeconds: Float = 0.05

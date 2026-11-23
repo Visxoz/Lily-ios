@@ -86,7 +86,6 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Each band's gain in dB, kept while the equaliser is off.
     public var equaliserGains: [Float] = Array(repeating: 0, count: Settings.equaliserFrequencies.count)
     public var crossfeed = false
-    /// Spreads the sides' highs further out.
     public var widen = false
     public var mono = false
     /// From -1, the left side alone, to 1, the right.
