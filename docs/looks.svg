@@ -39,7 +39,11 @@
     </style>
   </defs>
 
-  <rect width="1280" height="688" rx="28" fill="#1c1c1e"/>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#2e1f3a"/>
+    <stop offset="1" stop-color="#120e16"/>
+  </linearGradient>
+  <rect width="1280" height="688" rx="28" fill="url(#bg)"/>
 
   <text x="90" y="200" font-size="19" font-weight="500" fill="#98989d">Settings › Appearance</text>
   <text x="86" y="272" font-size="68" font-weight="700" letter-spacing="-1.5" fill="#ffffff">Make it yours</text>
@@ -127,7 +131,7 @@
   <text class="lookNote" x="1095" y="470" text-anchor="middle">bright, for daytime</text>
 
   <!-- The accents, in the order Settings offers them. -->
-  <rect x="24" y="516" width="1232" height="148" rx="20" fill="#2c2c2e"/>
+  <rect x="24" y="516" width="1232" height="148" rx="20" fill="#ffffff" fill-opacity="0.07"/>
   <g text-anchor="middle">
     <circle cx="121" cy="568" r="31" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.85"/>
     <circle cx="121" cy="568" r="24" fill="#d65db1"/>
