@@ -51,10 +51,15 @@ private struct LyricsLines: View {
 
     var body: some View {
         let synced = lyrics.isSynced
+        let wordSynced = lyrics.isWordSynced
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(lyrics.lines.indices, id: \.self) { index in
-                    LyricLine(text: lyrics.lines[index], lit: !synced || index == current)
+                    LyricLine(
+                        text: lyrics.lines[index],
+                        words: wordSynced && index == current ? lyrics.words[index] : [],
+                        lit: !synced || index == current
+                    )
                         .onTapGesture { if synced { seek(to: index) } }
                         .accessibilityAddTraits(synced ? .isButton : [])
                 }
@@ -139,18 +144,79 @@ private struct LyricClock: View {
 
 private struct LyricLine: View {
     let text: String
+    /// Filled in as sung on the line being sung word by word; empty on the others.
+    let words: [Lyrics.Word]
     let lit: Bool
 
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 22, weight: .bold))
-            .foregroundStyle(theme.text)
-            .opacity(lit ? 1 : 0.5)
-            .animation(Theme.normal, value: lit)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+        Group {
+            if words.isEmpty {
+                Text(text)
+            } else {
+                let sung = words.reduce(Text(verbatim: "")) { line, word in
+                    let tagged = Text(verbatim: word.text).customAttribute(SungWord(start: word.start, end: word.end))
+                    return Text("\(line)\(tagged)")
+                }
+                let end = words.reduce(0.0) { max($0, $1.start, $1.end) }
+                // 30 fps sweeps a word smoothly at half the redraws; capped at `end`, a sung line stops changing through a gap.
+                Playhead(interval: 1.0 / 30) { time in sung.textRenderer(SungFill(time: min(time, end))) }
+                    .accessibilityLabel(text)
+            }
+        }
+        // Swapped at once as a line starts or ends, so its two forms never stand together mid-fade.
+        .transition(.identity)
+        .font(.system(size: 22, weight: .bold))
+        .foregroundStyle(theme.text)
+        .opacity(lit ? 1 : SungFill.dim)
+        // A line filling in word by word dims its own unsung words, so it lights at once.
+        .animation(words.isEmpty ? Theme.normal : nil, value: lit)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+}
+
+private nonisolated struct SungWord: TextAttribute {
+    let start: Double
+    let end: Double
+
+    /// How much of the word has been sung by `time`; one without length lights once it starts.
+    func fraction(at time: Double) -> Double {
+        end > start ? min(max((time - start) / (end - start), 0), 1) : time >= start ? 1 : 0
+    }
+}
+
+/// Draws each word dim, then lit from its start as far as it has been sung.
+private nonisolated struct SungFill: TextRenderer {
+    static let dim = 0.5
+
+    let time: Double
+
+    func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+        for line in layout {
+            for run in line {
+                let fraction = run[SungWord.self]?.fraction(at: time) ?? 1
+                guard fraction < 1 else {
+                    context.draw(run)
+                    continue
+                }
+                var unsung = context
+                unsung.opacity = Self.dim
+                unsung.draw(run)
+                if fraction > 0 {
+                    let bounds = run.typographicBounds.rect
+                    let width = bounds.width * fraction
+                    // From the right in right-to-left scripts; thrice the run's height, so accents are not cut.
+                    let lit = CGRect(
+                        x: run.layoutDirection == .rightToLeft ? bounds.maxX - width : bounds.minX, y: bounds.minY - bounds.height,
+                        width: width, height: bounds.height * 3)
+                    var sung = context
+                    sung.clip(to: Path(lit))
+                    sung.draw(run)
+                }
+            }
+        }
     }
 }

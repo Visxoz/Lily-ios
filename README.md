@@ -62,7 +62,7 @@ Pure black and orchid out of the box, or dark or light, in eight other accents i
 <td width="33%" valign="top">
 
 ### Lyrics and queue
-Swipe up from the artwork for synced lyrics you can tap to jump to, and a queue you drag into order, edit several songs at a time, and save as a playlist.
+Swipe up from the artwork for lyrics that light up word by word as they're sung, which you can tap to jump to, and a queue you drag into order, edit several songs at a time, and save as a playlist.
 
 </td>
 <td width="33%" valign="top">
