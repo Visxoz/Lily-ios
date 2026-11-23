@@ -310,6 +310,8 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 
 Lily for iPhone is a port of [Lily for Windows](https://github.com/Visxoz/lily) and, like it, free software under the [GNU General Public License, version 3](LICENSE).
 
+Lyrics come partly from [Better Lyrics](https://github.com/better-lyrics/better-lyrics)' lyrics hub. Thanks to Better Lyrics for it.
+
 <br>
 
 <div align="center">
