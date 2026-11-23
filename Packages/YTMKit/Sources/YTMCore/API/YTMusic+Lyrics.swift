@@ -7,14 +7,32 @@ extension YTMusic {
     public func lyrics(for track: Track) async throws -> Lyrics? {
         // A music video's timing is its own, which other sites' songs needn't share.
         guard !track.isVideo else { return try await youtubeLyrics(videoId: track.id) }
-        async let apple = try? LrcRed.lyrics(for: track)
+        async let sites = Self.otherSites(for: track)
         let own = try await youtubeLyrics(videoId: track.id)
-        // Only wanted when YouTube's are untimed; lrc.red's answer is still coming meanwhile.
-        let community: Lyrics? = if own?.isSynced == true { nil } else { try? await LRCLIB.lyrics(for: track) }
-        let chosen = Lyrics.chosen(youtube: own, apple: await apple, community: community)
+        let found = await sites
+        let apple = found.apple.compactMap { Lyrics.checked($0, against: own) }
+        var others = found.others.compactMap { Lyrics.checked($0, against: own) }
+        let agreed = apple + others
+        // KuGou is slow and often has another version, so it's asked only for word timing the rest lack, where
+        // YouTube's lyrics can vouch for it. The hub's KuGou lyrics are timed by the line alone.
+        let wantsWords = own != nil && !agreed.contains(where: \.isWordSynced)
+        // LRCLIB only for timing YouTube's lyrics lack, unless the hub asked it already.
+        let wantsLines = own?.isSynced != true && !found.answered.contains("lrclib") && !agreed.contains(where: \.isSynced)
+        // Held to a few seconds, as the lyrics wait on them; LRCLIB's may take a search after a miss.
+        async let kugou = wantsWords ? LyricsSite.within(.seconds(4)) { try await KuGou.lyrics(for: track) } : nil
+        async let lrclib = wantsLines ? LyricsSite.within(.seconds(7)) { try await LRCLIB.lyrics(for: track) } : nil
+        others += await [kugou, lrclib].compactMap { Lyrics.checked($0, against: own) }
         // The other sites fold a cancellation into nil, which mustn't pass for their having none.
         try Task.checkCancellation()
-        return chosen
+        return Lyrics.chosen(youtube: own, apple: apple, others: others)
+    }
+
+    /// The hub's lyrics, and lrc.red's when the hub has no word timing of Apple Music's kind. Neither waits on
+    /// YouTube's, so both run alongside them.
+    private static func otherSites(for track: Track) async -> LyricsHub.Found {
+        var found = await LyricsHub.lyrics(for: track) ?? LyricsHub.Found()
+        if !found.apple.contains(where: \.isWordSynced), let lrcRed = try? await LrcRed.lyrics(for: track) { found.apple.append(lrcRed) }
+        return found
     }
 
     /// Timed lines as the Android app is given them, else the web client's
@@ -38,13 +56,19 @@ extension YTMusic {
 }
 
 extension Lyrics {
-    /// lrc.red's timed lyrics, then YouTube's timed lines, then LRCLIB's, then YouTube's text. YouTube's are
-    /// always the recording playing, so another site's must agree with them.
-    static func chosen(youtube own: Lyrics?, apple: Lyrics?, community: Lyrics?) -> Lyrics? {
-        if let apple, apple.isSynced, own.map({ LyricsMatch.agrees($0, apple) }) ?? true { return apple }
-        if let own, own.isSynced { return own }
-        if let community, own.map({ community.isSynced && LyricsMatch.agrees($0, community) }) ?? true { return community }
-        return own
+    /// Word timing, Apple Music's kind first; then timed lines, Apple Music's kind, YouTube's, then the others';
+    /// then YouTube's text, or any. The other sites' have passed `checked`, and come best first.
+    static func chosen(youtube own: Lyrics?, apple: [Lyrics], others: [Lyrics]) -> Lyrics? {
+        let timed = (apple + others).first(where: \.isWordSynced)
+            ?? (apple + [own].compactMap(\.self) + others).first(where: \.isSynced)
+        return timed ?? own ?? others.first ?? apple.first
+    }
+
+    /// Another site's lyrics where they agree with YouTube's, which are always the recording playing, or where
+    /// YouTube has none to hold them to.
+    static func checked(_ other: Lyrics?, against own: Lyrics?) -> Lyrics? {
+        guard let other, let own else { return other }
+        return LyricsMatch.agrees(own, other) ? other : nil
     }
 
     /// The Lyrics tab's browse ID, which a song without lyrics leaves out.

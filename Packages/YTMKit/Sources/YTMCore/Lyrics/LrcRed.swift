@@ -2,15 +2,28 @@ import Foundation
 
 /// Apple Music's lyrics, often word by word, as lrc.red keeps them by ISRC.
 enum LrcRed {
+    static let source = "Source: lrc.red"
+
     static func lyrics(for track: Track) async throws -> Lyrics? {
-        guard let artist = LyricsMatch.artist(track), let duration = track.duration,
-            let results = try await LyricsSite.get(
-            "lrc.red", "/api/v1",
-            // No album: lrc.red takes it as a filter, and YouTube's often names another edition.
-            ["track": LyricsMatch.title(track.title), "artist": artist, "duration": String(duration)]
-        ), let isrc = Self.isrc(in: results, for: track), let ttml = try await LyricsSite.get("lrc.red", "/s/\(isrc).ttml")
+        guard let artist = LyricsMatch.artist(track) else { return nil }
+        let title = LyricsMatch.title(track.title)
+        var isrc = try await search(title, artist, for: track)
+        // Chinese songs are filed in Simplified characters, under which a search in Traditional ones misses. Kana
+        // mark Japanese, whose kanji aren't Chinese to simplify.
+        if isrc == nil, !(title + artist).unicodeScalars.contains(where: { (0x3040..<0x3100).contains($0.value) }) {
+            let simplified = (LyricsMatch.simplified(title), LyricsMatch.simplified(artist))
+            if simplified != (title, artist) { isrc = try await search(simplified.0, simplified.1, for: track) }
+        }
+        guard let isrc, let ttml = try await LyricsSite.get("lrc.red", "/s/\(isrc).ttml") else { return nil }
+        return TTML.lyrics(ttml, source: source)
+    }
+
+    private static func search(_ title: String, _ artist: String, for track: Track) async throws -> String? {
+        guard let duration = track.duration,
+              // No album: lrc.red takes it as a filter, and YouTube's often names another edition.
+              let results = try await LyricsSite.get("lrc.red", "/api/v1", ["track": title, "artist": artist, "duration": String(duration)])
         else { return nil }
-        return TTML.lyrics(ttml, source: "Source: lrc.red")
+        return isrc(in: results, for: track)
     }
 
     /// The ISRC of the first timed result that is the track's own recording, since the search returns whatever

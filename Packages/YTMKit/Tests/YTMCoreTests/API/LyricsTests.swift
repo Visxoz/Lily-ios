@@ -18,15 +18,27 @@ import Testing
         let late = Lyrics(lines: ["Alpha", "Beta"], starts: [5, 7], words: words, source: "Source: lrc.red")
         let other = Lyrics(lines: ["Gamma", "Delta"], starts: [1, 3], source: "Source: LRCLIB")
         let community = Lyrics(lines: ["Alpha", "Beta"], starts: [1.2, 3.2], source: "Source: LRCLIB")
-        #expect(Lyrics.chosen(youtube: youtube, apple: apple, community: nil) == apple)
-        #expect(Lyrics.chosen(youtube: youtube, apple: late, community: nil) == youtube, "out of time with the recording")
-        #expect(Lyrics.chosen(youtube: youtube, apple: plain, community: nil) == youtube, "untimed never beats timed")
-        #expect(Lyrics.chosen(youtube: nil, apple: apple, community: community) == apple)
-        #expect(Lyrics.chosen(youtube: plain, apple: nil, community: community) == community)
-        #expect(Lyrics.chosen(youtube: plain, apple: nil, community: other) == plain, "another song's")
-        #expect(Lyrics.chosen(youtube: plain, apple: nil, community: plain) == plain, "untimed adds nothing to YouTube's")
-        #expect(Lyrics.chosen(youtube: nil, apple: nil, community: plain) == plain, "better than none")
-        #expect(Lyrics.chosen(youtube: nil, apple: nil, community: nil) == nil)
+        let lines = Lyrics(lines: ["Alpha", "Beta"], starts: [1.1, 3.1], source: "Source: lrc.red")
+        let kugou = Lyrics(lines: ["Alpha", "Beta"], starts: [1.3, 3.3], words: words, source: "Source: KuGou")
+        func chosen(_ own: Lyrics?, apple: Lyrics? = nil, kugou: Lyrics? = nil, community: Lyrics? = nil) -> Lyrics? {
+            Lyrics.chosen(
+                youtube: own, apple: [apple].compactMap { .checked($0, against: own) },
+                others: [kugou, community].compactMap { .checked($0, against: own) }
+            )
+        }
+        #expect(chosen(youtube, apple: apple, kugou: kugou) == apple)
+        #expect(chosen(youtube, apple: late) == youtube, "out of time with the recording")
+        #expect(chosen(youtube, apple: plain) == youtube, "untimed never beats timed")
+        #expect(chosen(youtube, apple: lines, kugou: kugou) == kugou, "words beat lines")
+        #expect(chosen(youtube, apple: lines) == lines)
+        #expect(chosen(plain, kugou: kugou) == kugou, "timing YouTube's words lack")
+        #expect(chosen(plain, kugou: other) == plain, "another song's")
+        #expect(chosen(nil, apple: apple, community: community) == apple)
+        #expect(chosen(plain, community: community) == community)
+        #expect(chosen(plain, community: other) == plain, "another song's")
+        #expect(chosen(plain, community: plain) == plain, "untimed adds nothing to YouTube's")
+        #expect(chosen(nil, community: plain) == plain, "better than none")
+        #expect(chosen(nil) == nil)
     }
 
     @Test func readsSyncedLinesWithTheirStarts() throws {

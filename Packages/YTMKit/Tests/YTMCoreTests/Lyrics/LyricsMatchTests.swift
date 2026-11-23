@@ -43,6 +43,7 @@ import Testing
         #expect(LyricsMatch.sameSong(track("Song - 2011 Remaster", "Band"), title: "Song", artist: "Band", duration: 200))
         #expect(LyricsMatch.sameSong(track("Song (Remix)", "Band"), title: "Song [Remix]", artist: "band", duration: 200))
         #expect(LyricsMatch.sameSong(track("Rosé", "ROSÉ"), title: "ROSE", artist: "Rose", duration: 200))
+        #expect(LyricsMatch.sameSong(track("晴天", "周杰倫"), title: "晴天", artist: "周杰伦", duration: 200), "Traditional and Simplified")
     }
 
     @Test func anotherVersionIsAnotherSong() {
@@ -50,12 +51,18 @@ import Testing
         #expect(!LyricsMatch.sameSong(track("Dynamite", "BTS"), title: "Dynamite (Live)", artist: "BTS", duration: 200))
         #expect(!LyricsMatch.sameSong(track("Song (Remix)", "Band"), title: "Song", artist: "Band", duration: 200))
         #expect(!LyricsMatch.sameSong(track("アイドル", "YOASOBI", duration: 213), title: "Idol", artist: "YOASOBI", duration: 213))
+        #expect(!LyricsMatch.sameSong(track("✨", "Band"), title: "🪐", artist: "Band", duration: 200), "symbols alone are still the name")
+        #expect(LyricsMatch.sameSong(track("✨ ", "Band"), title: "✨", artist: "Band", duration: 200))
+        #expect(!LyricsMatch.sameSong(track("✨ (Live)", "Band"), title: "🪐 (Live)", artist: "Band", duration: 200))
+        #expect(LyricsMatch.sameSong(track("✨ (feat. IU)", "Band"), title: "✨", artist: "Band", duration: 200))
     }
 
     @Test func artistsMustShareOne() {
         #expect(LyricsMatch.sameSong(lucky, title: "Get Lucky", artist: "Pharrell Williams & Daft Punk", duration: 369))
         #expect(LyricsMatch.sameSong(lucky, title: "Get Lucky", artist: "Someone x Daft Punk feat. Another", duration: 369))
         #expect(LyricsMatch.sameSong(track("Song", "Band - Topic"), title: "Song", artist: "Band", duration: 200))
+        #expect(LyricsMatch.sameSong(track("Song", "Band"), title: "Song", artist: "Someone、Band", duration: 200))
+        #expect(LyricsMatch.sameSong(track("Dynamite", "BTS"), title: "Dynamite", artist: "BTS (防弹少年团)", duration: 200))
         #expect(!LyricsMatch.sameSong(lucky, title: "Get Lucky", artist: "Someone Else", duration: 369))
     }
 
@@ -98,6 +105,8 @@ import Testing
         let reference = Lyrics(lines: ["あいうえお かきくけこ", "さしすせそ"], starts: [5, 9])
         #expect(LyricsMatch.agrees(reference, Lyrics(lines: ["あいう", "えおかきくけこさしすせそ"], starts: [5.1, 7])))
         #expect(!LyricsMatch.agrees(reference, Lyrics(lines: ["たちつてと なにぬねの", "はひふへほ"], starts: [5, 9])))
+        // Only 我 and 你 are written alike in both scripts, so these agree only through the fold.
+        #expect(LyricsMatch.agrees(Lyrics(lines: ["我們說愛你", "聽見風聲"]), Lyrics(lines: ["我们说爱你", "听见风声"])))
     }
 
     // MARK: - lrc.red

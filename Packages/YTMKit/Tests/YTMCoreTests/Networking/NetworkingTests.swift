@@ -23,6 +23,8 @@ import Testing
         #expect(allowed("https://is1-ssl.mzstatic.com/image/thumb/Video122/a.png/720x960bb.jpg"))
         #expect(allowed("https://lrc.red/s/USUG11904206.ttml"))
         #expect(allowed("https://lrclib.net/api/get?track_name=a"))
+        #expect(allowed("https://krcs.kugou.com/download?id=1"))
+        #expect(allowed("https://lyrics.api.dacubeking.com/v2/lyrics"))
     }
 
     @Test func blocksEverythingElse() {
@@ -36,6 +38,8 @@ import Testing
         #expect(!allowed("https://mzstatic.com/"))
         #expect(!allowed("https://x.music.apple.com/"))
         #expect(!allowed("https://evil.lrc.red/"), "only the lyrics sites' own hosts")
+        #expect(!allowed("https://mobilecdn.kugou.com/"))
+        #expect(!allowed("https://api.dacubeking.com/"))
         #expect(!allowed("file:///etc/passwd"))
     }
 

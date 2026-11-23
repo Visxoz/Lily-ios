@@ -123,15 +123,19 @@ enum LyricsMatch {
     /// The name outside brackets and before any " - " suffix, and the version words in the rest.
     private static func parts(_ title: String) -> (name: String, versions: Set<Substring>) {
         var outside = "", rest = ""
-        scan(Self.title(title)[...]) { part, bracketed in
+        let kept = Self.title(title)
+        scan(kept[...]) { part, bracketed in
             if bracketed { outside += " "; rest += part } else { outside += part }
         }
         if let dash = outside.range(of: " - ") {
             rest += outside[dash.upperBound...]
             outside.removeSubrange(dash.lowerBound...)
         }
-        let name = key(outside)
-        return (name.isEmpty ? key(title) : name, Set(words(rest).filter(versionWords.contains)))
+        var name = key(outside)
+        // A title of symbols keeps them, lest "✨" and "🪐" both have no name and pass as one.
+        if name.isEmpty { name = folded(outside).filter { !$0.isWhitespace } }
+        if name.isEmpty { name = key(kept) }
+        return (name, Set(words(rest).filter(versionWords.contains)))
     }
 
     // MARK: - Artists
@@ -141,13 +145,13 @@ enum LyricsMatch {
         return name.hasSuffix(" - Topic") ? String(name.dropLast(8)) : name
     }
 
-    /// Each name a credit joins, as "A feat. B & C" is A, B and C.
+    /// Each name a credit joins, as "A feat. B & C" is A, B and C, and "BTS (防弹少年团)、Halsey" is all three.
     private static func credits(_ credit: String) -> [String] {
         var credit = folded(withoutTopic(credit))
         for separator in [" and ", " x ", " with ", " feat. ", " feat ", " ft. ", " ft ", " featuring "] {
             credit = credit.replacingOccurrences(of: separator, with: ",")
         }
-        return credit.split { ",&;/".contains($0) }.map { key($0) }.filter { !$0.isEmpty }
+        return credit.split { ",&;/、()".contains($0) }.map { key($0) }.filter { !$0.isEmpty }
     }
 
     // MARK: - Words
@@ -184,9 +188,16 @@ enum LyricsMatch {
             || (0xF900..<0xFB00).contains(scalar) || scalar >= 0x20000
     }
 
-    /// Lower case, without accents and with full-width forms made plain, as "ROSÉ" is "rose".
+    /// Lower case, without accents, with full-width forms made plain and Chinese in Simplified characters, as
+    /// "ROSÉ" is "rose" and 周杰倫 is 周杰伦.
     private static func folded(_ text: some StringProtocol) -> String {
-        text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+        simplified(text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil))
+    }
+
+    /// Traditional Chinese characters in their Simplified forms, which the Chinese sites file names under.
+    static func simplified(_ text: String) -> String {
+        guard text.unicodeScalars.contains(where: { (0x3400..<0xA000).contains($0.value) || $0.value >= 0x20000 }) else { return text }
+        return text.applyingTransform(StringTransform("Hant-Hans"), reverse: false) ?? text
     }
 
     /// The folded runs of letters and digits.

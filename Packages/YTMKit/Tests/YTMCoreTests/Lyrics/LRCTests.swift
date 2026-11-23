@@ -67,4 +67,14 @@ import Testing
         #expect(LRCLIB.lyrics(answer(#""instrumental":false,"plainLyrics":"Alpha","syncedLyrics":"[00:01.00]Alpha""#), for: other) == nil)
         #expect(LRCLIB.lyrics(Data("<html></html>".utf8), for: track) == nil, "not JSON")
     }
+
+    @Test func searchesForTheFirstTimedRecordOfTheSong() {
+        let records = Data(#"""
+            [{"trackName":"Dummy Song","artistName":"Dummy Artist","duration":198.4,"instrumental":false,"plainLyrics":"Plain","syncedLyrics":null},
+             {"trackName":"Dummy Song","artistName":"Dummy Artist","duration":230,"instrumental":false,"plainLyrics":"Far","syncedLyrics":"[00:01.00]Far"},
+             {"trackName":"Dummy Song","artistName":"Dummy Artist","duration":201.6,"instrumental":false,"plainLyrics":"Timed","syncedLyrics":"[00:01.00]Timed"}]
+            """#.utf8)
+        #expect(LRCLIB.lyrics(searched: records, for: track) == Lyrics(lines: ["Timed"], starts: [1], source: "Source: LRCLIB"))
+        #expect(LRCLIB.lyrics(searched: Data("[]".utf8), for: track) == nil)
+    }
 }

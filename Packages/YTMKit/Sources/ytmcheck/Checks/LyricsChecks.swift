@@ -1,7 +1,7 @@
 import Foundation
 @testable import YTMCore
 
-/// Word-timed lyrics from lrc.red where they agree with YouTube's, else YouTube's timed lines or text.
+/// Word-timed lyrics from lrc.red or KuGou where they agree with YouTube's, else timed lines or text.
 enum LyricsChecks {
     static func run(_ report: Report) async {
         await report.check("lyrics") { findings in
@@ -35,7 +35,23 @@ enum LyricsChecks {
             let community = try await LRCLIB.lyrics(for: Live.songs[1].track)
             findings.expect(community?.isSynced == true, "LRCLIB: no timed lines for \(Live.songs[1].title)")
             try await versions(&findings)
+            try await chinese(&findings)
         }
+    }
+
+    /// YouTube writes 周杰倫's 晴天 in Traditional characters and the other sites file it in Simplified ones, so
+    /// lrc.red finds it only on a second search, and KuGou's must agree with YouTube's words across the scripts.
+    private static func chinese(_ findings: inout Findings) async throws {
+        var song = Track(id: "SJKoWAd5ySo", title: "晴天", artists: [ArtistRef(id: nil, name: "周杰倫")], duration: 270)
+        let lyrics = try await Live.api.lyrics(for: song)
+        findings.expect(lyrics?.isWordSynced == true, "晴天: not word-synced, from \(lyrics?.source ?? "nowhere")")
+        findings.note("晴天: \(lyrics?.lines.count ?? 0) lines, \(lyrics?.source ?? "none")")
+        let kugou = await LyricsSite.within(.seconds(4)) { [song] in try await KuGou.lyrics(for: song) }
+        guard let kugou, kugou.isWordSynced else { return findings.fail("KuGou: no word timing for 晴天") }
+        // A music video is given YouTube's lyrics alone.
+        song.isVideo = true
+        guard let own = try await Live.api.lyrics(for: song) else { return findings.fail("晴天: no YouTube lyrics") }
+        findings.expect(LyricsMatch.agrees(own, kugou), "KuGou's 晴天 taken as another version")
     }
 
     /// YOASOBI's アイドル and its English version share a name, artist and length, so only YouTube's own

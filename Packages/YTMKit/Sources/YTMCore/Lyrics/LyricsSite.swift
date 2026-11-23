@@ -1,7 +1,6 @@
 import Foundation
 
-/// Lyrics sites other than YouTube: asked without cookies, as an unnamed client, and given little time,
-/// as YouTube's own lyrics wait on them.
+/// Lyrics sites other than YouTube, given little time as YouTube's own lyrics wait on them.
 enum LyricsSite {
     /// Nil on a 404, which these sites answer a miss with. Items without a value are left out.
     static func get(_ host: String, _ path: String, _ items: KeyValuePairs<String, String?> = [:]) async throws -> Data? {
@@ -9,13 +8,34 @@ enum LyricsSite {
         address.scheme = "https"
         address.host = host
         address.path = path
-        if !items.isEmpty {
-            address.queryItems = items.compactMap { name, value in value.map { URLQueryItem(name: name, value: $0) } }
-            // Left as it is, a "+" in a name would be read as a space.
-            address.percentEncodedQuery = address.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
-        }
+        if !items.isEmpty { address.percentEncodedQuery = query(items) }
         guard let url = address.url else { return nil }
-        var request = URLRequest(url: url, timeoutInterval: 4)
+        return try await send(URLRequest(url: url))
+    }
+
+    /// `items` as a form or query, a "+" kept from being read as a space.
+    static func query(_ items: KeyValuePairs<String, String?>) -> String? {
+        var form = URLComponents()
+        form.queryItems = items.compactMap { name, value in value.map { URLQueryItem(name: name, value: $0) } }
+        return form.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+    }
+
+    /// `fetch`'s answer, or nil on failure or once `deadline` passes.
+    static func within<T: Sendable>(_ deadline: Duration, _ fetch: @escaping @Sendable () async throws -> T?) async -> T? {
+        await withTaskGroup(of: T?.self) { group in
+            group.addTask { try? await fetch() }
+            group.addTask {
+                try? await Task.sleep(for: deadline)
+                return nil
+            }
+            defer { group.cancelAll() }
+            return await group.next() ?? nil
+        }
+    }
+
+    static func send(_ request: URLRequest) async throws -> Data? {
+        var request = request
+        request.timeoutInterval = 4
         request.setValue("Lily", forHTTPHeaderField: "User-Agent")
         do {
             return try await HTTP.data(for: request).0

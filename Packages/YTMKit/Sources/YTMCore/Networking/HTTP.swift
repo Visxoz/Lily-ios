@@ -21,7 +21,7 @@ enum HTTP {
         "music.apple.com", "amp-api.music.apple.com", "mvod.itunes.apple.com",
         "is1-ssl.mzstatic.com", "is2-ssl.mzstatic.com", "is3-ssl.mzstatic.com", "is4-ssl.mzstatic.com", "is5-ssl.mzstatic.com",
         "open.spotify.com", "open.spotifycdn.com", "api-partner.spotify.com", "spclient.wg.spotify.com", "canvaz.scdn.co",
-        "lrc.red", "lrclib.net",
+        "lrc.red", "lrclib.net", "mobileservice.kugou.com", "krcs.kugou.com", "lyrics.api.dacubeking.com",
     ]
 
     /// HTTPS on an allowed host.
