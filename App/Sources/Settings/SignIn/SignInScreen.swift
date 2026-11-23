@@ -54,7 +54,7 @@ struct SignInScreen<Session>: View {
                         .ignoresSafeArea(edges: .bottom)
                 }
             }
-            .task { proxies = await Self.proxiesInUse() }
+            .task { proxies = await Proxy.loadConfigurations() }
         case .signingIn:
             spinner
         case .failed(let message):
@@ -73,12 +73,6 @@ struct SignInScreen<Session>: View {
         ProgressView()
             .controlSize(.large)
             .tint(theme.accent)
-    }
-
-    /// Off the main actor, as the first read touches the Keychain.
-    @concurrent
-    private static func proxiesInUse() async -> [ProxyConfiguration] {
-        Proxy.configurations
     }
 
     private func handOver(_ session: Session) {

@@ -123,6 +123,7 @@ final class AppModel {
     /// Signed in, Home's feed is asked for at once and the launch's other requests wait for it
     /// (two seconds at most), so they don't slow it.
     func start() async {
+        await LyricsHub.useCheck { await LyricsPassCheck.run() }
         isSignedIn = await api.auth.isSignedIn
         // Before the load, which belongs to the generation it starts in.
         accountGeneration += 1

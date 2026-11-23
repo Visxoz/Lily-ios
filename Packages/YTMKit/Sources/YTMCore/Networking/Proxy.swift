@@ -42,6 +42,12 @@ public enum Proxy {
         inUse.map { [configuration(for: $0)] } ?? []
     }
 
+    /// `configurations` for the main actor's web views.
+    @concurrent
+    public static func loadConfigurations() async -> [ProxyConfiguration] {
+        configurations
+    }
+
     /// The proxy saved, without any password, and whether it waits for the next start.
     @concurrent
     public static func saved() async -> (address: String?, pending: Bool) {
