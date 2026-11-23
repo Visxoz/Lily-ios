@@ -15,14 +15,14 @@ struct PageContent: View {
     @State private var frame = Frame()
     @State private var position = ScrollPosition(edge: .top)
     @State private var titleShown = false
-    @State private var artworkTint: RGB?
+    @State private var backdrop: PageBackdrop?
     @State private var isWide = false
     @State private var dialog: PlaylistDialog?
     @State private var newName = ""
 
     /// So a page opened again starts in its colour. Keyed by URL alone: the
     /// size isn't known until the header is measured, and doesn't change it.
-    private static var tints: [String: RGB] = [:]
+    private static var backdrops: [String: PageBackdrop] = [:]
 
     /// The scroll view's width, the bar's height over it, and the column
     /// iPhone Duo keeps its tabs in down one side.
@@ -75,15 +75,15 @@ struct PageContent: View {
         .task(id: tintSource) {
             guard let tintSource else { return }
             // Held in the view too, as another page may empty the cache while this one stays in a stack.
-            if let cached = Self.tints[tintSource.url] {
-                artworkTint = cached
+            if let cached = Self.backdrops[tintSource.url] {
+                backdrop = cached
                 return
             }
-            if let background = await ArtworkColours.background(url: tintSource.url, pixelEdge: tintSource.pixels) {
-                artworkTint = background
+            if let found = await ArtworkColours.backdrop(url: tintSource.url, pixelEdge: tintSource.pixels) {
+                backdrop = found
                 // Emptied once full rather than evicted one by one: past 64 pages, a revisit only fades in again.
-                if Self.tints.count >= 64 { Self.tints.removeAll() }
-                Self.tints[tintSource.url] = background
+                if Self.backdrops.count >= 64 { Self.backdrops.removeAll() }
+                Self.backdrops[tintSource.url] = found
             }
         }
         // The cards' art is fetched as the page is built, rather than as each
@@ -105,7 +105,14 @@ struct PageContent: View {
     }
 
     private var tint: PageTint {
-        PageTint(colour: artworkTint ?? tintSource.flatMap { Self.tints[$0.url] } ?? Theme.routeTint(route), top: frame.top)
+        let shown = shownBackdrop
+        // Tinted, not frosted, under a banner on a wide screen, where more glass would read as a band of blur.
+        let frosted = isWide && page.header?.banner == true ? nil : shown?.frosted
+        return PageTint(colour: shown?.tint ?? Theme.routeTint(route), frosted: frosted, top: frame.top)
+    }
+
+    private var shownBackdrop: PageBackdrop? {
+        backdrop ?? tintSource.flatMap { Self.backdrops[$0.url] }
     }
 
     private func headerView(_ header: PageHeader) -> PageHeaderView {
@@ -114,8 +121,10 @@ struct PageContent: View {
             canPlay: canPlay,
             canShuffle: canPlay || header.shufflePlaylistId != nil,
             canRadio: header.radioId != nil,
+            backdrop: shownBackdrop,
             topInset: frame.top,
             extendsBanner: frame.side > 0,
+            isWide: isWide,
             download: canPlay && Downloads.isDownloadable(route) ? DownloadButton(route: route, page: page) : nil,
             link: route.link,
             model: model,

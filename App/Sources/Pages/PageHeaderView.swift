@@ -6,11 +6,15 @@ struct PageHeaderView: View {
     let canPlay: Bool
     let canShuffle: Bool
     let canRadio: Bool
+    /// The artwork blurred, which a banner fades into towards its foot.
+    let backdrop: PageBackdrop?
     /// The navigation bar's height, which a banner reaches up under.
     let topInset: CGFloat
     /// Under iPhone Duo's column of tabs; nowhere else, where it would
     /// mirror the banner up into the space a pull to refresh opens.
     let extendsBanner: Bool
+    /// Wider than tall, as iPhone Duo open.
+    let isWide: Bool
     let download: DownloadButton?
     /// The page's address, which a menu at the end of the buttons copies.
     let link: String?
@@ -33,20 +37,35 @@ struct PageHeaderView: View {
             if header.banner {
                 let height = Self.artEdge(header, topInset: topInset)
                 ZStack(alignment: .bottomLeading) {
-                    ZStack {
-                        ArtworkImage(url: header.thumbnail, edge: height, placeholder: false)
-                            .frame(height: height)
-                            .clipped()
-                        LinearGradient(
-                            stops: [.init(color: .clear, location: 0.35), .init(color: theme.bannerShade, location: 1)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                    .backgroundExtensionEffect(isEnabled: extendsBanner)
-                    // A banner is darkened behind its text, which stays white in every look. An artist's Subscribe
-                    // sits beside its count of subscribers, leaving the row below room for words.
-                    HeaderText(header: header, foreground: theme.onColour, secondary: theme.onColour.opacity(0.7)) {
+                    ArtworkImage(url: header.thumbnail, edge: height, placeholder: false)
+                        .frame(height: height)
+                        // Sharp down to just above the text, then as if behind frosted glass, which the text sits
+                        // on. Laid out as the photograph, so the two line up.
+                        .overlay {
+                            if let frosted = backdrop?.frosted {
+                                FrostedGlass(frosted: frosted)
+                                    // The banner's size, so the fades are measured on it rather than on an image
+                                    // overhanging it.
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .mask(PageTint.fade(from: 0.2, to: 0.45, edge: .bottom))
+                                    .mask(besideText)
+                                    .transition(.opacity)
+                            }
+                        }
+                        .animation(.easeOut(duration: 0.5), value: backdrop?.frosted == nil)
+                        // The page's colour behind the text, as the frost is set by the whole photograph, so a
+                        // bright or dark patch of it there would still show through.
+                        .overlay {
+                            LinearGradient(colors: [theme.panel.opacity(0), theme.panel.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                                .mask(PageTint.fade(from: 0.15, to: 0.45, edge: .bottom))
+                                .mask(besideText)
+                        }
+                        .clipped()
+                        // Into the page's backdrop at the foot, so the songs below meet no edge.
+                        .mask(PageTint.fade(from: isWide ? 0.8 : 0.7))
+                        .backgroundExtensionEffect(isEnabled: extendsBanner)
+                    // An artist's Subscribe beside its count of subscribers, leaving the row below room for words.
+                    HeaderText(header: header, foreground: theme.text, secondary: theme.textSecondary) {
                         subscribe(small: true)
                     }
                     .padding(.horizontal, Metrics.pagePadding)
@@ -84,6 +103,11 @@ struct PageHeaderView: View {
                 .frame(height: Metrics.actionsHeight)
             }
         }
+    }
+
+    /// On a wide screen, the banner's frost and wash only behind the text: right across, they read as a wall of blur.
+    private var besideText: LinearGradient {
+        isWide ? PageTint.fade(from: 0.3, to: 0.6, edge: .leading) : LinearGradient(colors: [.black], startPoint: .top, endPoint: .bottom)
     }
 
     private var canSave: Bool {

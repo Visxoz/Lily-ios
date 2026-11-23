@@ -37,7 +37,7 @@ nonisolated enum Metrics {
     static let topResultArt: CGFloat = 96
     static let topResultHeight: CGFloat = 200
 
-    static let tintHeight: CGFloat = 420
+    static let tintHeight: CGFloat = 520
     /// How far the header scrolls away before its title shows in the bar.
     static let stickyTitleAfter: CGFloat = 300
 

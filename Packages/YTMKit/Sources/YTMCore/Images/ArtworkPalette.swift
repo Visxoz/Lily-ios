@@ -138,7 +138,7 @@ public enum ArtworkPalette {
     }
 
     /// WCAG's relative luminance.
-    static func luminance(_ colour: RGB) -> Double {
+    public static func luminance(_ colour: RGB) -> Double {
         func linear(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
         return 0.2126 * linear(colour.r) + 0.7152 * linear(colour.g) + 0.0722 * linear(colour.b)
     }

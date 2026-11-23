@@ -45,8 +45,6 @@ nonisolated struct Theme: Equatable, Sendable {
     let shadowSoft = Color(rgb: .black).opacity(0.376)
     let shadow = Color(rgb: .black).opacity(0.5)
     let shadowDeep = Color(rgb: .black).opacity(0.565)
-    /// Darkens the foot of an artist's banner behind its white text.
-    let bannerShade = Color(rgb: .black).opacity(0.69)
 
     /// Behind Home, a dark take on the accent; Lily's orchid gives #4d2140.
     private let homeTint: RGB
