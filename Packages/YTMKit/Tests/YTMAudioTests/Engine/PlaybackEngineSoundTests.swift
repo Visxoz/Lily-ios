@@ -28,7 +28,7 @@ struct PlaybackEngineSoundTests {
         let file = try Fixtures.opusWebM(Fixtures.signal(frames: 48_000))
         let playback = OfflinePlayback(files: ["one": file])
         let item = try AudioItem.fixture("one", length: file.count)
-        playback.engine.send { $0.setStereo(crossfeed: false, mono: false, balance: 1) }
+        playback.engine.send { $0.setStereo(crossfeed: false, widen: false, mono: false, balance: 1) }
         playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
         try expectRightOnly(await playback.renderBoth(seconds: 0.5), file)
     }
@@ -37,7 +37,7 @@ struct PlaybackEngineSoundTests {
         let file = try Fixtures.opusWebM(Fixtures.signal(frames: 48_000))
         let playback = OfflinePlayback(files: ["one": file])
         let item = try AudioItem.fixture("one", length: file.count)
-        playback.engine.send { $0.setStereo(crossfeed: false, mono: false, balance: 1) }
+        playback.engine.send { $0.setStereo(crossfeed: false, widen: false, mono: false, balance: 1) }
         playback.engine.send { $0.rebuildGraph() }
         playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
         try expectRightOnly(await playback.renderBoth(seconds: 0.5), file)
@@ -47,7 +47,7 @@ struct PlaybackEngineSoundTests {
         let file = try Fixtures.opusWebM(Fixtures.signal(frames: 48_000))
         let playback = OfflinePlayback(files: ["one": file], rate: 44_100)
         let item = try AudioItem.fixture("one", length: file.count)
-        playback.engine.send { $0.setStereo(crossfeed: false, mono: false, balance: 1) }
+        playback.engine.send { $0.setStereo(crossfeed: false, widen: false, mono: false, balance: 1) }
         playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
         let output = await playback.renderBoth(seconds: 0.5)
         #expect(output.left[..<2_200].contains { abs($0) > 0.01 })

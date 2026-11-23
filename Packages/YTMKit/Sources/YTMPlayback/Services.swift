@@ -41,6 +41,7 @@ extension YTMusic: MusicService {
     var equaliser: (enabled: Bool, gains: [Float]) { get set }
     var normalise: Float? { get set }
     var crossfeed: Bool { get set }
+    var widen: Bool { get set }
     var mono: Bool { get set }
     var balance: Float { get set }
     var pauseOnUnplug: Bool { get set }

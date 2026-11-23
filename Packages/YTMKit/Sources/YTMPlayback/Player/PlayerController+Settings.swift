@@ -63,6 +63,7 @@ extension PlayerController {
         let level = Self.level(new.normalise)
         if audio.normalise != level { audio.normalise = level }
         if audio.crossfeed != new.crossfeed { audio.crossfeed = new.crossfeed }
+        if audio.widen != new.widen { audio.widen = new.widen }
         if audio.mono != new.mono { audio.mono = new.mono }
         if audio.balance != new.balance { audio.balance = new.balance }
         if audio.pauseOnUnplug != new.pauseOnUnplug { audio.pauseOnUnplug = new.pauseOnUnplug }

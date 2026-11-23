@@ -32,7 +32,7 @@ import Testing
         #expect(settings.pauseOnUnplug, "on until turned off")
         #expect(settings.animatedArt == .wifi)
         #expect(try decode(#"{"animatedArt": "on"}"#).animatedArt == .on)
-        #expect(!settings.crossfeed && !settings.mono && settings.balance == 0)
+        #expect(!settings.crossfeed && !settings.widen && !settings.mono && settings.balance == 0)
         #expect(Settings.crossfadeLengths.contains(settings.crossfadeSeconds), "a length Settings offers")
         let saved = try JSONEncoder().encode(settings)
         #expect(try JSONDecoder().decode(Settings.self, from: saved) == settings)
@@ -50,6 +50,7 @@ import Testing
 
     @Test func keepsTheBalanceWithinTheSides() throws {
         #expect(try decode(#"{"balance": -0.25, "crossfeed": true, "mono": true}"#).balance == -0.25)
+        #expect(try decode(#"{"widen": true}"#).widen)
         #expect(try decode(#"{"balance": 3}"#).balance == 1)
         #expect(try decode(#"{"balance": -3}"#).balance == -1)
     }

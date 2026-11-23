@@ -23,6 +23,10 @@ struct SoundSettings: View {
             detail: "For headphones: blends a little of each side into the other, as speakers do.",
             isOn: $settings.value.crossfeed
         )
+        ToggleRow(
+            label: "Wide stereo", detail: "Spreads the sound further out to each side, keeping the bass centred.",
+            isOn: $settings.value.widen
+        )
         ToggleRow(label: "Mono", detail: "Both sides in each ear, for listening with one earbud.", isOn: $settings.value.mono)
         let balance = Self.balanceDetail(settings.value.balance)
         SettingRow(label: "Balance", detail: balance) {

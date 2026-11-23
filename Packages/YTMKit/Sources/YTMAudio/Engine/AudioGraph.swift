@@ -98,9 +98,9 @@ final class AudioGraph {
     }
 
     /// Balance from -1, the left side alone, to 1, the right. Each change ramps in over 50 ms.
-    func setStereo(crossfeed: Bool, mono: Bool, balance: Float) {
+    func setStereo(crossfeed: Bool, widen: Bool, mono: Bool, balance: Float) {
         let balance = min(max(balance, -1), 1)
-        unit?.change { ($0.crossfeed, $0.mono, $0.balance) = (crossfeed, mono, balance) }
+        unit?.change { ($0.crossfeed, $0.widen, $0.mono, $0.balance) = (crossfeed, widen, mono, balance) }
     }
 
     /// True if the varispeed joined or left the path, which stops the engine to reconnect it.

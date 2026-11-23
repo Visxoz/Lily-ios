@@ -196,8 +196,8 @@ actor PlaybackEngine {
         graph.setEqualiser(enabled: enabled, gains: gains)
     }
 
-    func setStereo(crossfeed: Bool, mono: Bool, balance: Float) {
-        graph.setStereo(crossfeed: crossfeed, mono: mono, balance: balance)
+    func setStereo(crossfeed: Bool, widen: Bool, mono: Bool, balance: Float) {
+        graph.setStereo(crossfeed: crossfeed, widen: widen, mono: mono, balance: balance)
     }
 
     /// Between two speeds other than 1x the change is live; to or from 1x the output is reconnected,

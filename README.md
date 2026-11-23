@@ -42,7 +42,7 @@
 <td width="33%" valign="top">
 
 ### Sounds better
-256 kbps Opus with Premium, gapless playback, a crossfade of your chosen length or Automix's DJ-style blends, volume levelling, a ten-band equaliser, and crossfeed, mono and balance for headphones.
+256 kbps Opus with Premium, gapless playback, a crossfade of your chosen length or Automix's DJ-style blends, volume levelling, a ten-band equaliser, stereo widening, and crossfeed, mono and balance for headphones.
 
 </td>
 <td width="33%" valign="top">
@@ -127,7 +127,7 @@ Lily starts in pure black with its own orchid. Pick another look and accent in *
 </tr>
 </table>
 
-<img src="docs/sound.svg" width="100%" alt="The sound path: the stream, volume levelling, crossfade, speed, the equaliser, crossfeed, mono and balance, then a limiter">
+<img src="docs/sound.svg" width="100%" alt="The sound path: the stream, volume levelling, crossfade, speed, the equaliser, widening, crossfeed, mono and balance, then a limiter">
 
 | Feature | What it does |
 | --- | --- |
@@ -261,7 +261,7 @@ flowchart LR
 | Premium URLs | A Swift tokenizer that cuts the player down, and JavaScriptCore |
 | Demuxing | Its own WebM and MP4 readers (`YTMAudio`) |
 | Opus and AAC | AudioToolbox |
-| Audio output | AVAudioEngine, with its own in-process audio unit for the equaliser, crossfeed, balance and limiter |
+| Audio output | AVAudioEngine, with its own in-process audio unit for the equaliser, widening, crossfeed, balance and limiter |
 | Interface | SwiftUI, with Lily's own icons drawn as shapes, and Now Playing's mesh gradient taken from the artwork |
 | Networking | URLSession over HTTP/2 |
 | Artwork | ImageIO, decoded at the size it's shown |

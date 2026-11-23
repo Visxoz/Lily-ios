@@ -23,6 +23,11 @@ import Network
         didSet { sendStereo() }
     }
 
+    /// Each side's highs pushed further out, for a wider sound.
+    public var widen = false {
+        didSet { sendStereo() }
+    }
+
     /// Both sides in each ear.
     public var mono = false {
         didSet { sendStereo() }
@@ -169,8 +174,8 @@ import Network
     }
 
     private func sendStereo() {
-        let (crossfeed, mono, balance) = (crossfeed, mono, balance)
-        engine.send { $0.setStereo(crossfeed: crossfeed, mono: mono, balance: balance) }
+        let (crossfeed, widen, mono, balance) = (crossfeed, widen, mono, balance)
+        engine.send { $0.setStereo(crossfeed: crossfeed, widen: widen, mono: mono, balance: balance) }
     }
 
     private func deliver(_ stamped: PlaybackEngine.Stamped) {

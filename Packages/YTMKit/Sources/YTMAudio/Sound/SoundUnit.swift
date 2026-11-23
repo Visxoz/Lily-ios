@@ -30,6 +30,7 @@ final class SoundUnit: AUAudioUnit {
         /// Clamped, and flat while off.
         var equaliser = EqualiserBands.Gains(repeating: 0)
         var crossfeed = false
+        var widen = false
         var mono = false
         /// From -1, the left side alone, to 1, the right.
         var balance: Float = 0
@@ -51,7 +52,7 @@ final class SoundUnit: AUAudioUnit {
 
         mutating func take(_ wanted: Pending) {
             equaliser.target = wanted.equaliser
-            (stereo.crossfeed, stereo.mono, stereo.balance) = (wanted.crossfeed, wanted.mono, wanted.balance)
+            (stereo.crossfeed, stereo.widen, stereo.mono, stereo.balance) = (wanted.crossfeed, wanted.widen, wanted.mono, wanted.balance)
             if wanted.resets != resets {
                 resets = wanted.resets
                 // What follows a seek or load starts from no limiting, and with no lows of what came before.

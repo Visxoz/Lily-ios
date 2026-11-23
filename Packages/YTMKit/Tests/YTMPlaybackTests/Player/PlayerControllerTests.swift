@@ -261,10 +261,11 @@ struct PlayerControllerTests {
     @Test func headphoneSettingsReachTheAudio() async {
         let rig = await started()
         rig.settings.value.crossfeed = true
+        rig.settings.value.widen = true
         rig.settings.value.mono = true
         rig.settings.value.balance = -0.25
         rig.player.apply(rig.settings.value)
-        #expect(rig.audio.crossfeed && rig.audio.mono && rig.audio.balance == -0.25)
+        #expect(rig.audio.crossfeed && rig.audio.widen && rig.audio.mono && rig.audio.balance == -0.25)
     }
 
     @Test func turnsQuietSongsUp() throws {

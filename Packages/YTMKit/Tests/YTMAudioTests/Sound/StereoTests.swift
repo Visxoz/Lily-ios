@@ -51,6 +51,24 @@ struct StereoTests {
         #expect(highs > 0.45 && leaked < 0.05, "\(highs) \(leaked)")
     }
 
+    @Test func wideningKeepsTheCentreAndTheLowsAndSpreadsTheHighs() {
+        var stereo = Stereo()
+        stereo.widen = true
+        let centre = run(&stereo, (0.5, 0.5))
+        #expect(abs(centre[0] - 0.5) < 1e-6 && abs(centre[1] - 0.5) < 1e-6, "\(centre)")
+        let lows = run(&stereo, (0.5, 0))
+        #expect(abs(lows[0] - 0.5) < 1e-4 && abs(lows[1]) < 1e-4, "\(lows)")
+
+        // A high on the left alone is pushed out, the right taking its opposite, their sum kept.
+        var left = (0..<9_600).map { Float($0 % 2 == 0 ? 0.5 : -0.5) }
+        var right = [Float](repeating: 0, count: 9_600)
+        let sums = left
+        Fixtures.stereo(&left, &right) { stereo.process($0, $1, rate: 48_000) }
+        let (wide, opposite) = (left[4_800...].map(abs).max() ?? 0, right[4_800...].map(abs).max() ?? 0)
+        #expect(wide > 0.6 && opposite > 0.1, "\(wide) \(opposite)")
+        #expect(zip(sums, zip(left, right)).allSatisfy { abs($0 - $1.0 - $1.1) < 1e-6 })
+    }
+
     @Test func turningOnRampsAndOffPassesThroughAgain() {
         var stereo = Stereo()
         stereo.mono = true
