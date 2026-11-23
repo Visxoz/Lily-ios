@@ -4,12 +4,20 @@ extension YTMusic {
     /// The full discography is asked alongside the page, and stands in for the page's own
     /// releases when it has more.
     func artistPage(_ id: String) async throws -> Page {
-        async let page = artist(id)
+        async let page = fetchArtist(id)
         async let discography = try? releases(of: id)
         var artist = try await page
-        // An alias redirects to the artist's own ID, which the discography
-        // must be asked by.
-        let all = artist.id == id ? await discography : try? await releases(of: artist.id)
+        let all: [ArtistRelease]?
+        if artist.id == id {
+            all = await discography
+        } else {
+            // An alias redirects to the artist's own ID, which the page and discography are asked again by, together.
+            let realID = artist.id
+            async let real = fetchArtist(realID)
+            async let realDiscography = try? releases(of: realID)
+            artist = try await real
+            all = await realDiscography
+        }
         try Task.checkCancellation()
         if let all, all.count > artist.releases.count {
             artist.releases = all
@@ -17,14 +25,16 @@ extension YTMusic {
         return artist.page
     }
 
-    /// Asked again by the artist's own ID when `id` is an alias; as the account sees it, for whether it is subscribed.
+    /// Asked again by the artist's own ID when `id` is an alias.
     func artist(_ id: String) async throws -> ArtistDetails {
-        func fetch(_ id: String) async throws -> ArtistDetails {
-            let (response, signedIn) = try await asAccount(true) { try await self.innerTube.browse(id, authenticated: $0) }
-            return try Renderers.artist(response, id: id, signedIn: signedIn)
-        }
-        let artist = try await fetch(id)
-        return artist.id == id ? artist : try await fetch(artist.id)
+        let artist = try await fetchArtist(id)
+        return artist.id == id ? artist : try await fetchArtist(artist.id)
+    }
+
+    /// As the account sees it, for whether it is subscribed.
+    private func fetchArtist(_ id: String) async throws -> ArtistDetails {
+        let (response, signedIn) = try await asAccount(true) { try await self.innerTube.browse(id, authenticated: $0) }
+        return try Renderers.artist(response, id: id, signedIn: signedIn)
     }
 
     private func releases(of artistId: String) async throws -> [ArtistRelease] {
