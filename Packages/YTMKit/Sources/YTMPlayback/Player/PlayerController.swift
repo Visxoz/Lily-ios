@@ -185,15 +185,19 @@ public struct MotionClip: Sendable {
     public func start(after launchLoad: @escaping @Sendable () async -> Void = {}) async {
         guard !hasStarted else { return }
         hasStarted = true
+        let (history, store) = (history, store)
+        async let session = SessionSnapshot.load(from: store)
+        async let historyRead: Void = history.load()
         await settings.load()
-        await history.load()
+        // After the settings, which say what network downloads may use.
         await downloads.load()
+        await historyRead
         signedIn = await music.isSignedIn
         chooser.seed(known: settings.value.premiumAccount, none: settings.value.noPremium)
         premiumStatus = chooser.status
         apply(settings.value)
         followSettings()
-        let restored = await restoreSession()
+        let restored = restoreSession(await session)
         let rating = ratingGeneration
         Task { [weak self] in
             await launchLoad()

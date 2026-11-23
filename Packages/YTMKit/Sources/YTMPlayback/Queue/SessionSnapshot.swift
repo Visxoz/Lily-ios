@@ -73,8 +73,8 @@ extension PlayerController {
     }
 
     /// Shows the last launch's song, paused, and returns it.
-    func restoreSession() async -> Track? {
-        guard let session = await SessionSnapshot.load(from: store), current == nil else { return nil }
+    func restoreSession(_ session: SessionSnapshot?) -> Track? {
+        guard let session, current == nil else { return nil }
         let track = session.queue[session.index]
         replaceQueue(with: session.queue, start: session.index, shuffle: false)
         queue.markRecommended(session.recommended)
