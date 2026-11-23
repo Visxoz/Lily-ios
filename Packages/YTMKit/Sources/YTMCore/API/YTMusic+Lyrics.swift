@@ -1,10 +1,25 @@
 import Foundation
 
 extension YTMusic {
+    /// YouTube's lyrics, or another site's better ones that agree with them. Nil when there are none.
+    /// Only YouTube's failure throws, so the song is asked again rather than shown unchecked.
+    @concurrent
+    public func lyrics(for track: Track) async throws -> Lyrics? {
+        // A music video's timing is its own, which other sites' songs needn't share.
+        guard !track.isVideo else { return try await youtubeLyrics(videoId: track.id) }
+        async let apple = try? LrcRed.lyrics(for: track)
+        let own = try await youtubeLyrics(videoId: track.id)
+        // Only wanted when YouTube's are untimed; lrc.red's answer is still coming meanwhile.
+        let community: Lyrics? = if own?.isSynced == true { nil } else { try? await LRCLIB.lyrics(for: track) }
+        let chosen = Lyrics.chosen(youtube: own, apple: await apple, community: community)
+        // The other sites fold a cancellation into nil, which mustn't pass for their having none.
+        try Task.checkCancellation()
+        return chosen
+    }
+
     /// Timed lines as the Android app is given them, else the web client's
     /// block of text. Nil when the song has none.
-    @concurrent
-    public func lyrics(videoId: String) async throws -> Lyrics? {
+    private func youtubeLyrics(videoId: String) async throws -> Lyrics? {
         let next = try await innerTube.next(["videoId": videoId], authenticated: false)
         guard let browseId = Lyrics.browseId(in: next) else { return nil }
         do {
@@ -23,6 +38,15 @@ extension YTMusic {
 }
 
 extension Lyrics {
+    /// lrc.red's timed lyrics, then YouTube's timed lines, then LRCLIB's, then YouTube's text. YouTube's are
+    /// always the recording playing, so another site's must agree with them.
+    static func chosen(youtube own: Lyrics?, apple: Lyrics?, community: Lyrics?) -> Lyrics? {
+        if let apple, apple.isSynced, own.map({ LyricsMatch.agrees($0, apple) }) ?? true { return apple }
+        if let own, own.isSynced { return own }
+        if let community, own.map({ community.isSynced && LyricsMatch.agrees($0, community) }) ?? true { return community }
+        return own
+    }
+
     /// The Lyrics tab's browse ID, which a song without lyrics leaves out.
     static func browseId(in next: JSON) -> String? {
         Renderers.watchNextTabs(next).lazy.compactMap { tab -> String? in

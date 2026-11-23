@@ -20,7 +20,7 @@ protocol MusicService: Sendable {
     func page(_ route: Route) async throws -> Page
     func loadStep(_ page: Page) async throws -> (page: Page, whole: Bool)
     func songVersion(of video: Track) async throws -> Track?
-    func lyrics(videoId: String) async throws -> Lyrics?
+    func lyrics(for track: Track) async throws -> Lyrics?
     func rating(videoId: String) async throws -> Rating
     func rate(videoId: String, _ rating: Rating) async throws
     func createPlaylist(title: String, videoIds: [String]) async throws -> String

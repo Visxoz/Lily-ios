@@ -10,6 +10,25 @@ import Testing
             """#.utf8))
     }
 
+    @Test func choosesOtherSitesOnlyWhereTheyAgreeWithYouTube() {
+        let words = [[Lyrics.Word(text: "Alpha", start: 1, end: 2)], [Lyrics.Word(text: "Beta", start: 3, end: 4)]]
+        let youtube = Lyrics(lines: ["Alpha", "Beta"], starts: [1, 3])
+        let plain = Lyrics(lines: ["Alpha", "Beta"])
+        let apple = Lyrics(lines: ["Alpha", "Beta"], starts: [1, 3], words: words, source: "Source: lrc.red")
+        let late = Lyrics(lines: ["Alpha", "Beta"], starts: [5, 7], words: words, source: "Source: lrc.red")
+        let other = Lyrics(lines: ["Gamma", "Delta"], starts: [1, 3], source: "Source: LRCLIB")
+        let community = Lyrics(lines: ["Alpha", "Beta"], starts: [1.2, 3.2], source: "Source: LRCLIB")
+        #expect(Lyrics.chosen(youtube: youtube, apple: apple, community: nil) == apple)
+        #expect(Lyrics.chosen(youtube: youtube, apple: late, community: nil) == youtube, "out of time with the recording")
+        #expect(Lyrics.chosen(youtube: youtube, apple: plain, community: nil) == youtube, "untimed never beats timed")
+        #expect(Lyrics.chosen(youtube: nil, apple: apple, community: community) == apple)
+        #expect(Lyrics.chosen(youtube: plain, apple: nil, community: community) == community)
+        #expect(Lyrics.chosen(youtube: plain, apple: nil, community: other) == plain, "another song's")
+        #expect(Lyrics.chosen(youtube: plain, apple: nil, community: plain) == plain, "untimed adds nothing to YouTube's")
+        #expect(Lyrics.chosen(youtube: nil, apple: nil, community: plain) == plain, "better than none")
+        #expect(Lyrics.chosen(youtube: nil, apple: nil, community: nil) == nil)
+    }
+
     @Test func readsSyncedLinesWithTheirStarts() throws {
         let json = try timed(#"""
             {"lyricLine":"One","cueRange":{"startTimeMilliseconds":"1500","endTimeMilliseconds":"3000","metadata":{"id":"1"}}},

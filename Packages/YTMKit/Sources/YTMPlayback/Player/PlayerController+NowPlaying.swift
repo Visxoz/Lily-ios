@@ -82,10 +82,11 @@ extension PlayerController {
 
     /// Loads the playing song's lyrics, unless they are shown or loading.
     func loadLyrics() {
-        guard let id = current?.id else {
+        guard let current else {
             lyrics = .idle
             return
         }
+        let id = current.id
         guard lyricsFor != id else { return }
         lyricsFor = id
         lyricsLoad?.cancel()
@@ -96,7 +97,7 @@ extension PlayerController {
         lyrics = .loading
         let music = music
         lyricsLoad = Task { [weak self] in
-            let result = await Result { try await music.lyrics(videoId: id) }
+            let result = await Result { try await music.lyrics(for: current) }
             guard let self else { return }
             // Kept even when the song has changed meanwhile, for when it plays again.
             if case .success(let found) = result { remember(found, for: id) }
@@ -111,13 +112,17 @@ extension PlayerController {
         }
     }
 
-    /// Fetches the next song's lyrics ahead, only while lyrics are on screen.
-    func prefetchLyrics(of id: String) {
-        guard showsLyrics, id != current?.id, lyricsCache[id] == nil, lyricsAhead.insert(id).inserted else { return }
+    /// Fetches the next song's lyrics ahead, only while lyrics are on screen; a streamed music video's known
+    /// song version's, as the song will play in its place, while a downloaded video stays.
+    func prefetchLyrics(of track: Track) {
+        guard showsLyrics else { return }
+        let song = localStream(track.id) == nil ? songVersions.knownSong(for: track.id) ?? track : track
+        let id = song.id
+        guard id != current?.id, lyricsCache[id] == nil, lyricsAhead.insert(id).inserted else { return }
         let music = music
         Task { [weak self] in
             // Not `try?`, which would fold a song without lyrics into a failure.
-            let result = await Result { try await music.lyrics(videoId: id) }
+            let result = await Result { try await music.lyrics(for: song) }
             self?.lyricsAhead.remove(id)
             if case .success(let found) = result { self?.remember(found, for: id) }
         }

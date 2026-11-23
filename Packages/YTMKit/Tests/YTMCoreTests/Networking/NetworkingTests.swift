@@ -21,6 +21,8 @@ import Testing
         #expect(allowed("https://amp-api.music.apple.com/v1/catalog/gb/search"))
         #expect(allowed("https://mvod.itunes.apple.com/itunes-assets/a.m3u8"))
         #expect(allowed("https://is1-ssl.mzstatic.com/image/thumb/Video122/a.png/720x960bb.jpg"))
+        #expect(allowed("https://lrc.red/s/USUG11904206.ttml"))
+        #expect(allowed("https://lrclib.net/api/get?track_name=a"))
     }
 
     @Test func blocksEverythingElse() {
@@ -33,6 +35,7 @@ import Testing
         #expect(!allowed("https://apple.com/"), "only Apple Music's own hosts")
         #expect(!allowed("https://mzstatic.com/"))
         #expect(!allowed("https://x.music.apple.com/"))
+        #expect(!allowed("https://evil.lrc.red/"), "only the lyrics sites' own hosts")
         #expect(!allowed("file:///etc/passwd"))
     }
 

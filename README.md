@@ -273,7 +273,7 @@ Most YouTube clients get stream URLs that YouTube's player JavaScript has to uns
 
 Apple's AudioToolbox decodes Opus, but can't read the WebM files YouTube keeps it in, so the app reads them itself and hands AudioToolbox the packets as they download. A seek past what has arrived is fetched first, found through the file's own index, and the gap before it after.
 
-The app talks only to YouTube's hosts, plus Apple Music's and Spotify's for animated art, and Last.fm if you connect it, each checked against an allowlist. It follows the proxy set in iOS, or an HTTP or SOCKS5 proxy of your own entered in **Settings ▸ Account ▸ Proxy**, kept in the Keychain and used from the app's next start.
+The app talks only to YouTube's hosts, plus Apple Music's and Spotify's for animated art, lrc.red and LRCLIB for lyrics (sent a song's title, artist and length while lyrics are open), and Last.fm if you connect it, each checked against an allowlist. It follows the proxy set in iOS, or an HTTP or SOCKS5 proxy of your own entered in **Settings ▸ Account ▸ Proxy**, kept in the Keychain and used from the app's next start.
 
 </details>
 
@@ -299,7 +299,7 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 | Path | What it holds |
 | --- | --- |
 | `App/` | The SwiftUI app |
-| `Packages/YTMKit/Sources/YTMCore` | Models, the InnerTube API, page parsing, streams and Premium, persistence, Last.fm, artwork |
+| `Packages/YTMKit/Sources/YTMCore` | Models, the InnerTube API, page parsing, streams and Premium, lyrics, persistence, Last.fm, artwork |
 | `Packages/YTMKit/Sources/YTMAudio` | Streaming download, saving downloads, the WebM and MP4 readers, decoding and the audio engine |
 | `Packages/YTMKit/Sources/YTMPlayback` | The queue, the player, Now Playing, Smart Shuffle, downloads, scrobbling |
 | `Packages/YTMKit/Sources/ytmcheck` | A macOS tool that checks the app's YouTube paths are still working |

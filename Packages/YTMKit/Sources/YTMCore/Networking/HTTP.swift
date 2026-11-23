@@ -14,12 +14,14 @@ enum HTTP {
         // Built-in artwork, such as Liked music's.
         "gstatic.com",
     ]
-    /// On these hosts only: Last.fm's API and sign-in page, and Apple Music's and Spotify's players, APIs and clips.
+    /// On these hosts only: Last.fm's API and sign-in page, Apple Music's and Spotify's players, APIs and clips,
+    /// and the lyrics sites.
     private static let hosts: Set<String> = [
         "ws.audioscrobbler.com", "www.last.fm",
         "music.apple.com", "amp-api.music.apple.com", "mvod.itunes.apple.com",
         "is1-ssl.mzstatic.com", "is2-ssl.mzstatic.com", "is3-ssl.mzstatic.com", "is4-ssl.mzstatic.com", "is5-ssl.mzstatic.com",
         "open.spotify.com", "open.spotifycdn.com", "api-partner.spotify.com", "spclient.wg.spotify.com", "canvaz.scdn.co",
+        "lrc.red", "lrclib.net",
     ]
 
     /// HTTPS on an allowed host.

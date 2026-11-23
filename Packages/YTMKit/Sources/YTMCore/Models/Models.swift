@@ -137,19 +137,30 @@ public struct PlaylistOption: Codable, Hashable, Sendable, Identifiable {
 }
 
 public struct Lyrics: Codable, Hashable, Sendable {
+    /// A word or syllable as sung, its text keeping any space after it.
+    public struct Word: Codable, Hashable, Sendable {
+        public var text: String
+        public var start: Double
+        public var end: Double
+    }
+
     public var lines: [String]
     /// Each line's start in seconds when synced, else empty.
     public var starts: [Double]
+    /// Each line's words when sung word by word, else empty; a line may still have none.
+    public var words: [[Word]]
     /// Where they come from, such as "Source: Musixmatch".
     public var source: String
 
-    public init(lines: [String], starts: [Double] = [], source: String = "") {
+    public init(lines: [String], starts: [Double] = [], words: [[Word]] = [], source: String = "") {
         self.lines = lines
         self.starts = starts
+        self.words = words
         self.source = source
     }
 
     public var isSynced: Bool { !starts.isEmpty && starts.count == lines.count }
+    public var isWordSynced: Bool { isSynced && words.count == lines.count }
 
     /// The line playing at `time`, for synced lyrics.
     public func lineIndex(at time: Double) -> Int? {

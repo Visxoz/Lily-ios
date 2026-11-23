@@ -310,6 +310,20 @@ struct PlayerControllerTests {
         await rig.player.lyricsLoad?.value
         #expect(rig.player.lyrics == .unavailable)
     }
+
+    @Test func fetchesAheadTheLyricsOfWhatWillPlay() async {
+        let rig = await started()
+        rig.player.songVersions.found(song("s"), for: "v")
+        rig.player.songVersions.found(song("t"), for: "w")
+        rig.player.downloads.index.songs = ["w": DownloadedSong(track: song("w", video: true), stream: FakeMusic.stream("w"), added: .now)]
+        rig.player.showsLyrics = true
+        rig.player.prefetchLyrics(of: song("v", video: true))
+        rig.player.prefetchLyrics(of: song("w", video: true))
+        await rig.yieldToTasks()
+        let asked = rig.music.calls.filter { $0.hasPrefix("lyrics") }
+        #expect(asked.contains("lyrics s"), "a streamed video's song version, which plays in its place")
+        #expect(asked.contains("lyrics w") && !asked.contains("lyrics t"), "a downloaded video, which stays")
+    }
 }
 
 /// YTMCore can't see YTMAudio, so its bands are checked against the engine's here.

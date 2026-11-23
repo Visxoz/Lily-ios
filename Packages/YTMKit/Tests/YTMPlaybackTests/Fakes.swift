@@ -183,10 +183,10 @@ final class FakeMusic: MusicService {
         return nil
     }
 
-    func lyrics(videoId: String) async throws -> Lyrics? {
-        log("lyrics \(videoId)")
+    func lyrics(for track: Track) async throws -> Lyrics? {
+        log("lyrics \(track.id)")
         if state.withLock(\.lyricsFail) { throw YTMError(.network, "No connection.") }
-        return state.withLock { $0.lyrics[videoId] }
+        return state.withLock { $0.lyrics[track.id] }
     }
 
     func rating(videoId: String) async throws -> Rating {

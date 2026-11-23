@@ -109,7 +109,7 @@ extension PlayerController {
         guard let next = queue.peekNext(repeat: repeatMode) else { return }
         // A downloaded video stays, as its song version may need the network.
         if next.isVideo, localStream(next.id) == nil { swapInSongVersion(next) }
-        prefetchLyrics(of: songVersions.knownSong(for: next.id)?.id ?? next.id)
+        prefetchLyrics(of: next)
         // Both sizes the playing song shows, so its artwork and colours are
         // there on the first frame.
         if let art = next.thumbnail {
