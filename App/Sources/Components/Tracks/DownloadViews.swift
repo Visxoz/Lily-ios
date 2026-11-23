@@ -87,7 +87,7 @@ struct DownloadButton: View {
                 confirming = true
             }
         } label: {
-            DownloadStateIcon(state: state, size: 28, frame: 48)
+            DownloadStateIcon(state: state, size: 24, frame: 44)
         }
         .buttonStyle(PressScale(scale: 0.88, animation: .easeOut(duration: 0.09)))
         .accessibilityLabel(state == .none ? "Download" : "Remove download")

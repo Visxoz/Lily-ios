@@ -31,15 +31,15 @@ nonisolated enum Metrics {
     static let chipHeight: CGFloat = 96
     static let chipGap: CGFloat = 12
 
-    static let headerArt: CGFloat = 232
-    static let bannerHeight: CGFloat = 300
-    static let actionsHeight: CGFloat = 88
+    static let headerArt: CGFloat = 256
+    static let bannerHeight: CGFloat = 340
+    static let actionsHeight: CGFloat = 80
     static let topResultArt: CGFloat = 96
     static let topResultHeight: CGFloat = 200
 
     static let tintHeight: CGFloat = 420
     /// How far the header scrolls away before its title shows in the bar.
-    static let stickyTitleAfter: CGFloat = 280
+    static let stickyTitleAfter: CGFloat = 300
 
     static func cardColumns(width: CGFloat) -> (count: Int, cell: CGFloat) {
         columns(width: width, minimum: cardWidth, gap: cardGap)

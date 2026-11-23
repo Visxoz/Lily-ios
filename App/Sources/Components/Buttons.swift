@@ -72,6 +72,44 @@ struct PlayButton: View {
     }
 }
 
+/// A page header's labelled button: the accent for the main action, a tonal wash for the rest.
+struct ActionPill: View {
+    let icon: Icon
+    let title: String
+    var primary = false
+    /// The icon alone, in a circle, where the row is too narrow for the words.
+    var compact = false
+    let action: () -> Void
+
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        // The accent stays readable as text in every look, so it stands out without a solid fill.
+        let foreground = primary ? theme.accent : theme.text
+        Button(action: action) {
+            HStack(spacing: 8) {
+                IconView(icon: icon, size: 22, colour: foreground)
+                if !compact {
+                    Text(title)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(foreground)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+            .padding(.leading, compact ? 0 : 16)
+            .padding(.trailing, compact ? 0 : 20)
+            .frame(width: compact ? 48 : nil, height: 48)
+            .background {
+                Capsule().fill(primary ? theme.accent.opacity(0.18) : theme.hover)
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressScale(scale: 0.96))
+        .accessibilityLabel(title)
+    }
+}
+
 struct PillButton: View {
     let title: String
     var primary = false

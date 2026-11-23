@@ -166,16 +166,16 @@ private struct HeaderBones: View {
     var label = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(spacing: 20) {
             if art {
-                Bone(width: Metrics.headerArt, height: Metrics.headerArt, radius: Metrics.cardArtRadius)
-                    .frame(maxWidth: .infinity)
+                Bone(width: Metrics.headerArt, height: Metrics.headerArt, radius: 10)
             }
-            HeaderTextBones(label: label, details: art)
+            HeaderTextBones(label: label, details: art, centred: art)
+                .frame(maxWidth: .infinity, alignment: art ? .center : .leading)
         }
         .padding(.horizontal, Metrics.pagePadding)
         .padding(.top, 16)
-        .padding(.bottom, 24)
+        .padding(.bottom, art ? 4 : 24)
         if art {
             ActionBones()
         }
@@ -189,7 +189,7 @@ private struct BannerBones: View {
             .overlay(alignment: .bottomLeading) {
                 HeaderTextBones(label: true, details: true)
                     .padding(.horizontal, Metrics.pagePadding)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 20)
             }
         ActionBones()
     }
@@ -199,18 +199,20 @@ private struct BannerBones: View {
 private struct HeaderTextBones: View {
     let label: Bool
     let details: Bool
+    var centred = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: centred ? .center : .leading, spacing: 4) {
             if label {
-                Bone(width: 70, height: 12)
-                    .frame(height: 17)
+                Bone(width: 60, height: 10)
+                    .frame(height: 14)
             }
-            Bone(width: 220, height: 40)
-                .frame(height: 52)
+            Bone(width: 220, height: 44)
+                .frame(height: 57)
             if details {
                 Bone(width: 160, height: 12)
                     .frame(height: 17)
+                    .padding(.top, 2)
             }
         }
     }
@@ -218,9 +220,9 @@ private struct HeaderTextBones: View {
 
 private struct ActionBones: View {
     var body: some View {
-        HStack(spacing: 20) {
-            Bone(width: 56, height: 56, radius: 28)
-            Bone(width: 48, height: 48, radius: 24)
+        HStack(spacing: 10) {
+            Bone(width: 104, height: 48, radius: 24)
+            Bone(width: 128, height: 48, radius: 24)
         }
         .padding(.horizontal, Metrics.pagePadding)
         .frame(height: Metrics.actionsHeight)

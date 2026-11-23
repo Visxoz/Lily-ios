@@ -44,34 +44,41 @@ struct PageHeaderView: View {
                         )
                     }
                     .backgroundExtensionEffect(isEnabled: extendsBanner)
-                    // A banner is darkened behind its text, which stays white in every look.
-                    HeaderText(header: header, foreground: theme.onColour, secondary: theme.onColour.opacity(0.7))
-                        .padding(.horizontal, Metrics.pagePadding)
-                        .padding(.bottom, 24)
+                    // A banner is darkened behind its text, which stays white in every look. An artist's Subscribe
+                    // sits beside its count of subscribers, leaving the row below room for words.
+                    HeaderText(header: header, foreground: theme.onColour, secondary: theme.onColour.opacity(0.7)) {
+                        subscribe(small: true)
+                    }
+                    .padding(.horizontal, Metrics.pagePadding)
+                    .padding(.bottom, 20)
                 }
                 .frame(height: height)
                 .padding(.top, -topInset)
             } else {
-                VStack(alignment: .leading, spacing: 24) {
-                    if header.thumbnail != nil || canPlay {
+                let hasArt = header.thumbnail != nil || canPlay
+                VStack(spacing: 20) {
+                    if hasArt {
                         ArtworkView(
-                            url: header.thumbnail, size: Self.artEdge(header, topInset: topInset), radius: Metrics.cardArtRadius,
-                            shadow: (theme.shadowDeep, 20, 8)
+                            url: header.thumbnail, size: Self.artEdge(header, topInset: topInset), radius: 10,
+                            shadow: (theme.shadowDeep, 28, 14)
                         )
-                            .frame(maxWidth: .infinity)
                     }
-                    HeaderText(header: header, foreground: theme.text, secondary: theme.textSecondary)
+                    HeaderText(header: header, foreground: theme.text, secondary: theme.textSecondary, centred: hasArt) {}
+                        .frame(maxWidth: .infinity, alignment: hasArt ? .center : .leading)
                 }
                 .padding(.horizontal, Metrics.pagePadding)
                 .padding(.top, 16)
-                .padding(.bottom, 24)
+                .padding(.bottom, hasArt ? 4 : 24)
             }
 
             if canPlay || canRadio || link != nil || canSave || canSubscribe {
-                // Closer together where they would run off the screen, as an artist's or a saved playlist's can.
+                // Shuffle, then Play, drop their words where the row would overflow, then the icons narrow, as on
+                // iPhone Duo's outer screen.
                 ViewThatFits(in: .horizontal) {
-                    actions(spacing: 20)
-                    actions(spacing: 8)
+                    actions(labels: 2)
+                    actions(labels: 1)
+                    actions(labels: 0)
+                    actions(labels: 0, target: 36)
                 }
                 .padding(.horizontal, Metrics.pagePadding)
                 .frame(height: Metrics.actionsHeight)
@@ -87,32 +94,34 @@ struct PageHeaderView: View {
         model != nil && header.subscribed != nil && header.channelId != nil
     }
 
-    private func actions(spacing: CGFloat) -> some View {
-        HStack(spacing: spacing) {
+    /// `labels` is how many of Play and Shuffle keep their words; `target` the width of each icon's.
+    private func actions(labels: Int, target: CGFloat = 44) -> some View {
+        HStack(spacing: 0) {
             if canPlay {
-                PlayButton(size: 56) { perform(.play) }
+                ActionPill(icon: .play, title: "Play", primary: true, compact: labels < 1) { perform(.play) }
+                    .padding(.trailing, 8)
             }
             if canShuffle {
-                IconButton(icon: .shuffle, size: 48, iconSize: 30) { perform(.shuffle) }
-                    .accessibilityLabel("Shuffle")
+                ActionPill(icon: .shuffle, title: "Shuffle", compact: labels < 2) { perform(.shuffle) }
+            }
+            // The rest to the far end, unless they are all there is.
+            if canPlay || canShuffle {
+                Spacer(minLength: target == 44 ? 8 : 0)
             }
             if canRadio {
-                IconButton(icon: .radio, size: 48, iconSize: 28) { perform(.radio) }
+                IconButton(icon: .radio, size: target, iconSize: 24) { perform(.radio) }
                     .accessibilityLabel("Start radio")
             }
             download
             if canSave, let model {
                 let saved = header.saved == true
-                IconButton(icon: saved ? .inLibrary : .saveToPlaylist, size: 48, iconSize: 28, active: saved) {
+                IconButton(icon: saved ? .inLibrary : .saveToPlaylist, size: target, iconSize: 24, active: saved) {
                     app.toggleInLibrary(subscribe: false, in: model)
                 }
                 .accessibilityLabel(saved ? "Remove from library" : "Save to library")
             }
-            if canSubscribe, let model {
-                let subscribed = header.subscribed == true
-                PillButton(title: subscribed ? "Subscribed" : "Subscribe", primary: !subscribed) {
-                    app.toggleInLibrary(subscribe: true, in: model)
-                }
+            if !header.banner {
+                subscribe(small: false).padding(.horizontal, 4)
             }
             if let link {
                 Menu {
@@ -128,11 +137,20 @@ struct PageHeaderView: View {
                         Button("Delete playlist", role: .destructive) { edit(.delete) }
                     }
                 } label: {
-                    IconView(icon: .more, size: 28, colour: theme.textSecondary)
-                        .frame(width: 48, height: 48)
+                    IconView(icon: .more, size: 24, colour: theme.textSecondary)
+                        .frame(width: target, height: 44)
                         .contentShape(Circle())
                 }
                 .accessibilityLabel("More")
+            }
+        }
+    }
+
+    @ViewBuilder private func subscribe(small: Bool) -> some View {
+        if canSubscribe, let model {
+            let subscribed = header.subscribed == true
+            PillButton(title: subscribed ? "Subscribed" : "Subscribe", primary: !subscribed, small: small) {
+                app.toggleInLibrary(subscribe: true, in: model)
             }
         }
     }
@@ -145,27 +163,42 @@ struct PageHeaderView: View {
     }
 }
 
-private struct HeaderText: View {
+private struct HeaderText<Trailing: View>: View {
     let header: PageHeader
     let foreground: Color
     let secondary: Color
+    /// Under centred artwork.
+    var centred = false
+    /// After the details, on their line.
+    @ViewBuilder let trailing: Trailing
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: centred ? .center : .leading, spacing: 4) {
             if !header.label.isEmpty {
                 Text(header.label)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(1.2)
+                    .textCase(.uppercase)
+                    .foregroundStyle(secondary)
             }
             Text(header.title)
                 .font(.system(size: titleSize, weight: .heavy))
-                .tracking(-0.5)
+                .tracking(titleSize * -0.02)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
                 .accessibilityAddTraits(.isHeader)
-            details
-                .font(.system(size: 14))
-                .lineLimit(2)
+            // Left out when empty, or the stack would space around nothing.
+            if !header.subtitle.isEmpty || !header.meta.isEmpty || Trailing.self != EmptyView.self {
+                HStack(spacing: 12) {
+                    details
+                        .font(.system(size: 14))
+                        .lineLimit(2)
+                    trailing
+                }
+                .padding(.top, 2)
+            }
         }
+        .multilineTextAlignment(centred ? .center : .leading)
         .foregroundStyle(foreground)
     }
 
@@ -182,9 +215,9 @@ private struct HeaderText: View {
 
     private var titleSize: CGFloat {
         switch header.title.count {
-        case ...12: 44
-        case ...18: 38
-        case ...28: 32
+        case ...12: 48
+        case ...18: 40
+        case ...28: 34
         default: 28
         }
     }
