@@ -8,12 +8,6 @@ enum Thumbnail {
     static let card = 240
     static let header = 544
 
-    /// `url` resized to `edge`, or nil if its host isn't on the allowlist.
-    static func url(_ url: String?, edge: Int) -> URL? {
-        guard let url, let resized = URL(string: resized(url, edge: edge)), HTTP.isAllowed(resized) else { return nil }
-        return resized
-    }
-
     /// googleusercontent URLs end in a size such as `=w60-h60-l90-rj`; this
     /// names `edge` instead. Other URLs come back as they are.
     static func resized(_ url: String, edge: Int) -> String {

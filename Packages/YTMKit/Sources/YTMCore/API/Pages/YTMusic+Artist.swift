@@ -89,7 +89,7 @@ extension Renderers {
             .flatMap(sharedChannelId) ?? id
         let subscription = header["subscriptionButton", "subscribeButtonRenderer"]
         let subscribers = subscription["subscriberCountText"].text.flatMap(Formatting.count)
-        // Wide banners must keep their aspect, so the largest is taken as is.
+        // The largest, whose wide size marks it as a banner for the image pipeline to ask for in its own shape.
         let banner = Thumbnail.list(in: header).array
             .max { ($0["width"].int ?? 0) < ($1["width"].int ?? 0) }?["url"].string
         var artist = ArtistDetails(id: ownId, header: PageHeader(

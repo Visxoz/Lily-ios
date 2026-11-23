@@ -132,7 +132,7 @@ public final class ImagePipeline: Sendable {
     /// Keyed by what is requested, so artwork stored at different sizes
     /// shares one decode and one download.
     static func key(_ url: String, _ edge: Int) -> String {
-        "\(edge):\(isWide(url) ? url : Thumbnail.resized(url, edge: edge))"
+        "\(edge):\(requested(url, edge: edge))"
     }
 
     @concurrent
@@ -190,11 +190,17 @@ public final class ImagePipeline: Sendable {
         return now.timeIntervalSince(date) > maxAge
     }
 
-    /// googleusercontent renders any size, so ask for the pixels drawn; a wide
-    /// banner keeps the rendition it came with, as a square size would crop it.
+    /// `requested(url, edge:)`, or nil if its host isn't on the allowlist.
     static func requestURL(_ url: String, edge: Int) -> URL? {
-        guard isWide(url) else { return Thumbnail.url(url, edge: edge) }
-        return URL(string: url).flatMap { HTTP.isAllowed($0) ? $0 : nil }
+        URL(string: requested(url, edge: edge)).flatMap { HTTP.isAllowed($0) ? $0 : nil }
+    }
+
+    /// googleusercontent renders any size, so ask for the pixels drawn. A wide banner is asked for by
+    /// height alone, which keeps the photograph's own shape: YouTube's 2.4:1 crop of it, filling a
+    /// phone's taller header, would be cropped again to a sliver.
+    static func requested(_ url: String, edge: Int) -> String {
+        guard isWide(url), let eq = url.lastIndex(of: "=") else { return Thumbnail.resized(url, edge: edge) }
+        return "\(url[..<eq])=h\(edge)-l90-rj"
     }
 
     /// Whether a googleusercontent URL's size, as `=w1440-h600-p-l90-rj`,

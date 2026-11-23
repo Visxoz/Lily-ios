@@ -53,8 +53,7 @@ import Testing
             == "https://lh3.googleusercontent.com/abc=w360-h360-l90-rj")
         let ytimg = "https://i.ytimg.com/vi/x/hqdefault.jpg"
         #expect(Thumbnail.resized(ytimg, edge: 360) == ytimg)
-        #expect(Thumbnail.url("//lh3.googleusercontent.com/abc=w60-h60", edge: 90)?.absoluteString
+        #expect(Thumbnail.resized("//lh3.googleusercontent.com/abc=w60-h60", edge: 90)
             == "https://lh3.googleusercontent.com/abc=w90-h90-l90-rj")
-        #expect(Thumbnail.url("https://example.com/a.jpg", edge: 90) == nil, "off the allowlist")
     }
 }

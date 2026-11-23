@@ -97,12 +97,14 @@ private actor DownloadLog {
 }
 
 @Suite struct ImagePipelineTests {
-    @Test func asksForTheSizeDrawnButKeepsBannersWide() {
+    @Test func asksForTheSizeDrawnButBannersInTheirOwnShape() {
         let square = "https://lh3.googleusercontent.com/abc=w120-h120-l90-rj"
         #expect(ImagePipeline.requestURL(square, edge: 240)?.absoluteString == "https://lh3.googleusercontent.com/abc=w240-h240-l90-rj")
+        #expect(ImagePipeline.requestURL("//lh3.googleusercontent.com/abc=w60-h60", edge: 90)?.absoluteString
+            == "https://lh3.googleusercontent.com/abc=w90-h90-l90-rj")
         let banner = "https://lh3.googleusercontent.com/abc=w1440-h600-p-l90-rj"
         #expect(ImagePipeline.isWide(banner))
-        #expect(ImagePipeline.requestURL(banner, edge: 360)?.absoluteString == banner)
+        #expect(ImagePipeline.requestURL(banner, edge: 360)?.absoluteString == "https://lh3.googleusercontent.com/abc=h360-l90-rj")
         let ytimg = "https://i.ytimg.com/vi/x/hqdefault.jpg"
         #expect(ImagePipeline.requestURL(ytimg, edge: 120)?.absoluteString == ytimg)
         #expect(ImagePipeline.requestURL("https://example.com/a.jpg", edge: 120) == nil, "not on the allowlist")
@@ -114,7 +116,8 @@ private actor DownloadLog {
         #expect(ImagePipeline.key(row, 168) == ImagePipeline.key(header, 168))
         #expect(ImagePipeline.key(row, 168) != ImagePipeline.key(row, 1080))
         let banner = "https://lh3.googleusercontent.com/abc=w1440-h600-p-l90-rj"
-        #expect(ImagePipeline.key(banner, 360) != ImagePipeline.key(row, 360), "a banner keeps its own rendition")
+        #expect(ImagePipeline.key(banner, 360) != ImagePipeline.key(row, 360), "a banner keeps its own shape")
+        #expect(ImagePipeline.key(banner, 360) == ImagePipeline.key("https://lh3.googleusercontent.com/abc=w540-h225-p-l90-rj", 360))
     }
 
     @Test func keepsOnlyThePlayingSongsArtworkWhileHidden() throws {
