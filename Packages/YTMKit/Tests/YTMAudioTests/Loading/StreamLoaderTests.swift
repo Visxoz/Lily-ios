@@ -99,6 +99,24 @@ struct StreamLoaderTests {
         #expect(try Data(contentsOf: cached) == file)
     }
 
+    @Test func leavesARangeTheReaderSeeksOutOf() async throws {
+        let megabyte = StreamLoader.rangeLength
+        let file = Data((0..<Int(3 * megabyte + 100)).map { UInt8(truncatingIfNeeded: $0 &* 31) })
+        let item = try AudioItem.fixture("song", length: file.count)
+        let source = RecordingByteSource(files: ["song": file])
+        let loader = try StreamLoader(item: item, cache: cache)
+        var received = Data()
+        let failure = await loader.run(source: source) { piece in
+            if received.isEmpty { loader.readPosition = 2 * megabyte + 10 }
+            received.append(piece)
+        }
+        let piece = Int64(MemoryByteSource(files: [:]).piece)
+        let ranges = [0..<megabyte, megabyte..<2 * megabyte, 2 * megabyte..<3 * megabyte, 3 * megabyte..<3 * megabyte + 100,
+                      piece..<megabyte, megabyte..<2 * megabyte]
+        #expect(failure == nil && source.ranges == ranges, "the seek's block after one piece, then the rest of the first")
+        #expect(received == file)
+    }
+
     @Test func keepsTheFileItPlaysPastTheCap() async throws {
         let cache = AudioCache(.init(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), limit: 15_000))
         let source = MemoryByteSource(files: ["a": file, "b": file, "c": file])

@@ -141,6 +141,10 @@ final class StreamLoader {
                     if at == end {
                         break
                     }
+                    // A seek out of the range is fetched now, not once the range ends; the block keeps what it has.
+                    if total > 0, let next = held.nextRange(readingAt: readPosition), !(start..<end).contains(next) {
+                        break
+                    }
                 }
                 guard !Task.isCancelled else { return nil }
                 guard at > start else { throw ByteSourceError.empty }

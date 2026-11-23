@@ -34,8 +34,10 @@ struct SeekAheadTests {
         source.open()
         let output = heard + (await playback.render(seconds: Double(960_000 - start) / Fixtures.rate))
         let ahead = stride(from: 2 * megabyte, to: length, by: Int(megabyte)).map { $0..<min($0 + megabyte, length) }
-        #expect(source.ranges == [0..<megabyte, megabyte..<2 * megabyte] + ahead + [megabyte..<2 * megabyte],
-                "the seek's block on to the end, then the gap")
+        let rest = try #require(source.ranges.dropFirst(2 + ahead.count).first)
+        #expect(source.ranges == [0..<megabyte, megabyte..<2 * megabyte] + ahead + [rest, megabyte..<2 * megabyte],
+                "the seek's block on to the end once the header is read, then the gaps")
+        #expect(rest.lowerBound > 0 && rest.upperBound == megabyte, "the first block's rest, left for the seek")
         let decoded = try DecodableFile(file).decode(from: start + shift)
         let error = zip(output[480..<decoded.count], decoded[480...]).map { abs($0 - $1) }.max() ?? .infinity
         #expect(error < 1e-6, "the item from where the seek landed, on through the switch to the whole file's packets")
