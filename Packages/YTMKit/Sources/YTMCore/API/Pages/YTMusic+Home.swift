@@ -25,7 +25,7 @@ extension YTMusic {
     /// Never kept as Home, so the next visit asks for the feed again.
     @concurrent
     public func homeStandIn() async -> Page? {
-        if let saved = await cachedHome() { return saved }
+        if let saved = await savedHome() { return saved }
         return try? await publicHome()
     }
 
@@ -37,22 +37,27 @@ extension YTMusic {
     /// Arranged as a fresh one is, since one saved by an earlier version may
     /// hold other shelves or another order.
     @concurrent
-    private func cachedHome() async -> Page? {
+    private func savedHome() async -> Page? {
         guard let saved = store.load(Page.self, from: .home) else { return nil }
         let sections = HomeFeed.arranged(saved.sections)
         return sections.isEmpty ? nil : Page(sections: sections)
     }
 
-    /// The saved Home, Library and visitor ID belong to the account they were saved under.
-    public func forgetAccount() async {
+    /// The visitor ID belongs to the account it was given to.
+    public func forgetVisitorData() async {
+        await innerTube.forgetVisitorData()
+    }
+
+    /// The saved Home and Library belong to the account they were saved under. Not async, so a read or save asked
+    /// for after it comes after it.
+    public func forgetSavedPages() {
         store.remove(.home)
         store.remove(.library)
-        await innerTube.forgetVisitorData()
     }
 
     /// Only once whole: a first page alone would stand in later as a shorter,
     /// different feed.
-    func saveHome(_ page: Page) {
+    public func saveHome(_ page: Page) {
         store.save(Page(sections: page.sections), to: .home)
     }
 
@@ -82,9 +87,7 @@ extension YTMusic {
         if let next, pagesLeft > 0, !HomeFeed.isComplete(sections) {
             return Page(sections: sections, more: .shelves(token: next, pagesLeft: pagesLeft, held: held))
         }
-        let page = Page(sections: sections)
-        saveHome(page)
-        return page
+        return Page(sections: sections)
     }
 
     /// Asked again while YouTube refuses it, up to `HomeFeed.attempts` times.

@@ -62,8 +62,6 @@ extension YTMusic {
             page.sections += HomeFeed.release(&held, after: page.sections, done: done)
             if let next, !done, !HomeFeed.isComplete(page.sections) {
                 page.more = .shelves(token: next, pagesLeft: pagesLeft - 1, held: held)
-            } else if whole, await auth.isSignedIn {
-                saveHome(page)
             }
         }
         return (page, whole)

@@ -95,7 +95,12 @@ extension AppModel {
         let since = pageCache[route]?.at
         let step = try await Task { [api] in try await api.loadStep(page) }.value
         if generation == accountGeneration, let kept = pageCache[route], kept.at == since {
-            if step.whole { pageCache[route]?.page = step.page.keepingLibraryState(of: kept.page) } else { pageCache[route] = nil }
+            if step.whole {
+                pageCache[route]?.page = step.page.keepingLibraryState(of: kept.page)
+                saveIfWholeHome(step.page, for: route)
+            } else {
+                pageCache[route] = nil
+            }
         }
         return step
     }
@@ -123,7 +128,12 @@ extension AppModel {
         pageCache[.library] = CachedPage(page: saved, at: .now - Self.pageFreshFor)
     }
 
-    /// Only called for the account signed in now, so Library is saved for it alone.
+    /// Only for the account signed in now, as `cache` is, so the feed is saved for it alone.
+    private func saveIfWholeHome(_ page: Page, for route: Route) {
+        if route == .home, isSignedIn, page.more == nil { api.saveHome(page) }
+    }
+
+    /// Only called for the account signed in now, so Library and Home are saved for it alone.
     private func cache(_ page: Page, for route: Route) {
         // Expired pages are kept to show while they reload, but not those left half-loaded, which load afresh.
         pageCache = pageCache.filter { $0.value.isFresh || $0.value.page.more == nil }
@@ -133,5 +143,6 @@ extension AppModel {
         }
         pageCache[route] = CachedPage(page: page, at: .now)
         if route == .library { api.saveLibrary(page) }
+        saveIfWholeHome(page, for: route)
     }
 }

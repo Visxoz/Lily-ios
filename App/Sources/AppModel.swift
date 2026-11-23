@@ -255,7 +255,7 @@ final class AppModel {
     /// Drops everything the last account loaded. `quietly`, as for a sign-in YouTube rejected,
     /// skips announcing it and switching to Library or Home.
     func accountChanged(quietly: Bool = false) async {
-        await api.forgetAccount()
+        await api.forgetVisitorData()
         isSignedIn = await api.auth.isSignedIn
         account = nil
         // It may be another account's.
@@ -269,6 +269,8 @@ final class AppModel {
         pageRefreshes.values.forEach { $0.cancel() }
         pageRefreshes.removeAll()
         homeAhead.take()?.cancel()
+        // With the bump, so the last account's pages are neither saved after it nor read by the next.
+        api.forgetSavedPages()
         accountGeneration += 1
         if !quietly {
             sheet = nil
