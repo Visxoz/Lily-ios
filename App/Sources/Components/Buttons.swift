@@ -17,29 +17,42 @@ struct IconButton: View {
     var size: CGFloat = 32
     var iconSize: CGFloat = 18
     var active = false
-    /// The theme's secondary text when nil.
     var colour: Color?
     let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            IconLabel(icon: icon, size: size, iconSize: iconSize, active: active, colour: colour)
+        }
+        .buttonStyle(PressScale(scale: 0.88, animation: .easeOut(duration: 0.09)))
+        .accessibilityAddTraits(active ? .isSelected : [])
+    }
+}
+
+/// `IconButton`'s look, for menus and system controls that take the tap.
+struct IconLabel: View {
+    let icon: Icon
+    var size: CGFloat = 32
+    var iconSize: CGFloat = 18
+    var active = false
+    /// The theme's secondary text when nil.
+    var colour: Color?
 
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                IconView(icon: icon, size: iconSize, colour: iconColour)
-                if active {
-                    Circle()
-                        .fill(theme.accent)
-                        .frame(width: 4, height: 4)
-                        .offset(y: iconSize / 2 + 4)
-                }
+        ZStack {
+            IconView(icon: icon, size: iconSize, colour: iconColour)
+            if active {
+                Circle()
+                    .fill(theme.accent)
+                    .frame(width: 4, height: 4)
+                    .offset(y: iconSize / 2 + 4)
             }
-            .frame(width: size, height: size)
-            .contentShape(Circle())
         }
-        .buttonStyle(PressScale(scale: 0.88, animation: .easeOut(duration: 0.09)))
-        .accessibilityAddTraits(active ? .isSelected : [])
+        .frame(width: size, height: size)
+        .contentShape(Circle())
     }
 
     private var iconColour: Color {
