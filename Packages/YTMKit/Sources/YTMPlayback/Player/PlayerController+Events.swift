@@ -13,13 +13,13 @@ extension PlayerController {
                 gapless.forget()
                 advanceGapless(to: queued)
             } else {
-                // A song the player no longer had queued crossed over, as the queue changed at that very moment;
-                // play what it says now.
+                // A song the player no longer had queued crossed over, as the queue changed or a sleep timer was set
+                // at that very moment; play what it says now.
                 gapless.forget()
-                next(user: false)
+                songEnded()
             }
         case .finished:
-            next(user: false)
+            songEnded()
         case .failed(let id, let message):
             // The queued song failed to open: the current one ends with `finished`, and the next then loads afresh.
             if id == gapless.queued?.itemID {

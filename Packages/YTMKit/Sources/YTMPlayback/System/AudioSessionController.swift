@@ -114,9 +114,15 @@ import os
         guard recommended, resumeAfterInterruption else { return }
         player.setPaused(false)
     }
+
+    func forgetResume() {
+        resumeAfterInterruption = false
+    }
     #else
     init(player _: PlayerController) {}
 
     func activate() {}
+
+    func forgetResume() {}
     #endif
 }

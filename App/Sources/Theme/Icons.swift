@@ -7,7 +7,7 @@ nonisolated enum Icon: CaseIterable, Sendable {
     case volume, volumeLow, volumeOff
     case close, queue, lyrics, radio, account, note, more, clock, history
     case thumbUp, thumbUpFilled, thumbDown, thumbDownFilled, check, add, chevron
-    case download, downloaded, pin, saveToPlaylist, inLibrary, airplay
+    case download, downloaded, pin, saveToPlaylist, inLibrary, airplay, bedtime
 
     var path: Path { Self.paths[self] ?? Path() }
 
@@ -54,6 +54,7 @@ nonisolated enum Icon: CaseIterable, Sendable {
         case .saveToPlaylist: "M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z"
         case .inLibrary: "M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7.53 12L9 10.5l1.4-1.41 2.07 2.08L17.6 6 19 7.41 12.47 14zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"
         case .airplay: "M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
+        case .bedtime: "M12.34 2.02C6.59 1.82 2 6.42 2 12c0 5.52 4.48 10 10 10 3.71 0 6.93-2.02 8.66-5.02-7.51-.25-12.09-8.43-8.32-14.96z"
         }
     }
 }

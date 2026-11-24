@@ -52,6 +52,8 @@ public struct MotionClip: Sendable {
     public internal(set) var libraryRevision = 0
     /// The last seek, so views that pull `currentTime` only while playing still catch one made while paused.
     public internal(set) var lastSeek = Seek(count: 0, to: 0)
+    /// Never kept between launches.
+    public internal(set) var sleepTimer: SleepTimer?
 
     /// Messages for the user. One consumer, which must live as long as the player: cancelling the loop that reads
     /// it ends the stream for good.
@@ -124,6 +126,8 @@ public struct MotionClip: Sendable {
     @ObservationIgnored var ratingLoad: Task<Void, Never>?
     /// The wait before opening a song again after its connection dropped.
     @ObservationIgnored var reopenWait: Task<Void, Never>?
+    /// A timed sleep's wait.
+    @ObservationIgnored var sleepWait: Task<Void, Never>?
 
     public convenience init(
         api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared, audio: AudioPlayer
@@ -164,7 +168,7 @@ public struct MotionClip: Sendable {
     }
 
     isolated deinit {
-        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, continuing, lyricsLoad, ratingLoad, reopenWait] {
+        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, continuing, lyricsLoad, ratingLoad, reopenWait, sleepWait] {
             task?.cancel()
         }
         toastSink.finish()
@@ -256,6 +260,11 @@ public struct MotionClip: Sendable {
 
     func activateAudioSession() {
         audioSession?.activate()
+    }
+
+    /// A call's end then leaves playback paused.
+    func forgetInterruptionResume() {
+        audioSession?.forgetResume()
     }
 
     /// Captures the settings and account now, so the work can run, and run again, off the main actor.

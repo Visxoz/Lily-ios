@@ -14,6 +14,7 @@ struct PlayerOptions: View {
                     QualityBadge(stream: stream)
                 }
                 Spacer()
+                SleepTimerMenu()
                 AirPlayButton()
                 opener(.lyrics, icon: .lyrics, label: "Lyrics")
                 opener(.upNext, icon: .queue, label: "Up next")

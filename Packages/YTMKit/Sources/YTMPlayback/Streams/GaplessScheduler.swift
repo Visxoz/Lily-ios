@@ -75,6 +75,7 @@ struct GaplessScheduler {
 extension PlayerController {
     /// Run every tick while playing; copies nothing until a song is due.
     func updateGapless(at position: Double) {
+        guard sleepTimer != .endOfSong else { return }
         let next = queue.peekNext(repeat: repeatMode)
         let plan = gapless.plan(
             position: position, duration: playback.duration, started: playback.started,
