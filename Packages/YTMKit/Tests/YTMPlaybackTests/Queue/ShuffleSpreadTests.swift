@@ -87,6 +87,37 @@ struct ShuffleSpreadTests {
         #expect(same < 20 * 12, "\(same) same-artist neighbours in 20 queues")
     }
 
+    /// As a 5,000-song playlist's rest arrives in one batch behind its first page.
+    @Test func aLargeBatchGoesInWholeAndSpread() throws {
+        let songs = (0..<5_100).map { Song(n: $0, artist: $0 % 10, album: $0 / 10 % 5) }
+        var q = Queue<Song>(seed: 11)
+        q.set(items: songs.prefix(100), start: 0, shuffle: true)
+        q.advance(user: false, repeat: .off)
+        q.playNext(Song(n: -1, artist: 0, album: 0))
+        let played = Array(q.items.prefix(3))
+        q.extend(songs[100...])
+        let order = Array(q.items)
+        #expect(Array(order.prefix(3)) == played, "what has played and the one played next stay put")
+        #expect(order.map(\.n).sorted() == [-1] + Array(0..<songs.count), "each song in once")
+        let same = neighbours(order.dropFirst(3)) { $0.artist == $1.artist }
+        // A plain shuffle of ten even artists averages about 510.
+        #expect(same < 50, "\(same) same-artist neighbours")
+        q.setShuffle(false)
+        let playing = try #require(q.current)
+        #expect(Array(q.items).filter { $0.n >= 0 } == songs)
+        #expect(playing == played[1])
+    }
+
+    /// As a radio added under the last song, where every song added shares the one place left.
+    @Test func aBatchBehindTheLastSongIsSpreadToo() {
+        var q = Queue<Song>(seed: 5)
+        q.set(items: [Song(n: -1, artist: 9, album: 9)], start: 0, shuffle: true)
+        q.extend((0..<60).map { Song(n: $0, artist: $0 % 3, album: $0 % 2) })
+        let same = neighbours(Array(q.items.dropFirst())) { $0.artist == $1.artist }
+        // A plain shuffle of three even artists averages about 20, the spread about 1.
+        #expect(same < 10, "\(same) same-artist neighbours")
+    }
+
     @Test func isTheSameForTheSameSeed() {
         func shuffled() -> [Song] {
             var q = Queue<Song>(seed: 7)

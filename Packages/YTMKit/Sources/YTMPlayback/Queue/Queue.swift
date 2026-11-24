@@ -51,7 +51,7 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
     }
 
     /// A random index below `upperBound` (zero when it is zero), for shuffled starts.
-    public mutating func randomBelow(_ upperBound: Int) -> Int {
+    mutating func randomBelow(_ upperBound: Int) -> Int {
         Int.random(in: 0..<max(upperBound, 1), using: &generator)
     }
 
@@ -226,39 +226,71 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
         if currentIndex == nil { currentIndex = start }
     }
 
-    /// While shuffled, each item goes in at random among the entries still to play, and goes last should shuffle
-    /// be turned off; otherwise they are appended.
+    /// While shuffled, the items go in at random among the entries still to play, and go last should shuffle be
+    /// turned off; otherwise they are appended.
     public mutating func extend(_ items: some Sequence<Element>) {
         guard var ranked = unshuffledCount else { return append(contentsOf: items) }
+        var added: [Entry] = []
+        added.reserveCapacity(items.underestimatedCount)
+        for item in items {
+            var new = entry(item)
+            new.rank = ranked
+            ranked += 1
+            added.append(new)
+        }
+        unshuffledCount = ranked
+        guard !added.isEmpty else { return }
+        revision += 1
         // Behind the entries played next or recommended right after the current, which the order doesn't know, so
         // they still play next.
         let after = currentIndex.map { $0 + 1 } ?? 0
         var start = after + entries[after...].prefix { $0.rank == nil }.count
-        let before = entries.count
-        for item in items {
-            var added = entry(item)
-            added.rank = ranked
-            ranked += 1
-            // A few draws for a place not beside the same artist, as spreading again would reorder what is shown.
-            var at = start
-            for _ in 0..<4 {
-                at = start + randomBelow(entries.count - start + 1)
-                if !beside(at, item.shuffleArtist) { break }
-            }
-            entries.insert(added, at: at)
-            if currentIndex == nil {
-                // The rest go after it, so the first stays current.
-                currentIndex = at
-                start = at + 1
-            }
+        if currentIndex == nil {
+            // Only an empty queue has no current; the first becomes it, so the rest go after it.
+            entries.insert(added.removeFirst(), at: start)
+            currentIndex = start
+            start += 1
         }
-        unshuffledCount = ranked
-        if entries.count > before { revision += 1 }
+        mixIn(added, from: start)
     }
 
-    /// Whether an item put in at `at` would sit beside one by `artist`.
-    private func beside(_ at: Int, _ artist: String) -> Bool {
-        (at > 0 && entries[at - 1].item.shuffleArtist == artist) || (at < entries.count && entries[at].item.shuffleArtist == artist)
+    /// Puts `batch` in at random among the entries from `start` in one pass, as an insert each would copy the queue
+    /// once per song, and a long playlist arrives in batches of thousands. Each draws a slot before one of those
+    /// entries or at the end; those drawing the same slot go in the order drawn, so the batch is spread first: with
+    /// few entries left to play, as for a radio added under the last song, most share one slot.
+    private mutating func mixIn(_ batch: [Entry], from start: Int) {
+        guard !batch.isEmpty else { return }
+        let added = spread(batch.map(\.item), by: [\.shuffleArtist, \.shuffleAlbum]).map { batch[$0] }
+        let slots = entries.count - start + 1
+        // Each slot's draws as a list: its first, and each one's next.
+        var first = [Int?](repeating: nil, count: slots)
+        var last = [Int?](repeating: nil, count: slots)
+        var following = [Int?](repeating: nil, count: added.count)
+        for (n, new) in added.enumerated() {
+            let artist = new.item.shuffleArtist
+            // A few draws for a place not beside the same artist, as spreading again would reorder what is shown.
+            var slot = 0
+            for _ in 0..<4 {
+                slot = randomBelow(slots)
+                let at = start + slot
+                let left = last[slot].map { added[$0].item.shuffleArtist } ?? (at > 0 ? entries[at - 1].item.shuffleArtist : nil)
+                let right = at < entries.count ? entries[at].item.shuffleArtist : nil
+                if left != artist && right != artist { break }
+            }
+            if let previous = last[slot] { following[previous] = n } else { first[slot] = n }
+            last[slot] = n
+        }
+        var merged = Array(entries[..<start])
+        merged.reserveCapacity(entries.count + added.count)
+        for slot in 0..<slots {
+            var next = first[slot]
+            while let n = next {
+                merged.append(added[n])
+                next = following[n]
+            }
+            if start + slot < entries.count { merged.append(entries[start + slot]) }
+        }
+        entries = merged
     }
 
     // MARK: Smart Shuffle's recommendations

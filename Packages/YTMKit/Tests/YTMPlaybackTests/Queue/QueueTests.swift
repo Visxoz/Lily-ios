@@ -346,6 +346,16 @@ struct QueueTests {
         #expect(q.peekNext(repeat: .off) == 99)
     }
 
+    @Test func theFirstAddedToAnEmptyShuffledQueuePlaysFirst() {
+        var q = Queue<Int>(seed: 42)
+        q.setShuffle(true)
+        q.extend(0..<50)
+        #expect(q.currentIndex == 0 && q.current == 0)
+        #expect(items(q).sorted() == Array(0..<50))
+        q.setShuffle(false)
+        #expect(items(q) == Array(0..<50))
+    }
+
     @Test func tracksAddedUnshuffledGoLast() {
         var q = queue(3)
         q.extend([7, 8])
