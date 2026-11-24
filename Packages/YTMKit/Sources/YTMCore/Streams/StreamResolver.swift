@@ -2,18 +2,17 @@ import Foundation
 import os
 import Synchronization
 
-/// The free path: asks the clients YouTube hands plain URLs to, so playing needs no player script.
-/// Each is tried only once the one before fails, as YouTube tends to break one at a time.
+/// The free path: asks the clients YouTube hands plain URLs to, so playing needs no player script. Each is tried only
+/// once the one before fails, as YouTube tends to break one at a time.
 struct StreamResolver: Sendable {
     let innerTube: InnerTube
 
     private static let log = Logger(subsystem: "Lily", category: "Streams")
 
-    /// Names of clients whose URLs googlevideo cuts off here, as it does past the first megabyte on
-    /// networks where it wants a PO token, the one refused longest ago first. Kept for the session.
+    /// Clients whose URLs googlevideo cuts off here, as it does past the first megabyte on networks where it wants a
+    /// PO token, the one refused longest ago first. Kept for the session.
     private static let cutOffClients = Mutex<[String]>([])
 
-    /// Asks `client` last for the rest of the session.
     static func cutOff(client: String) {
         guard ClientProfile.plainStreamClients.contains(where: { $0.name == client }),
               cutOffClients.withLock({ mark(&$0, client) }) else { return }
@@ -28,16 +27,34 @@ struct StreamResolver: Sendable {
         return new
     }
 
-    /// The clients not cut off, then those that are, refused longest ago first: one may still resolve
-    /// a song the others refuse, and a download walking on from refusal to refusal reaches each
-    /// before coming back to any.
-    static func clients(cut: [String]) -> [ClientProfile] {
+    /// Clients whose `player` request failed for a song a later client then played, by when: they are asked after the
+    /// rest for `demotedFor`, rather than costing every song a round trip.
+    private static let failedClients = Mutex<[String: ContinuousClock.Instant]>([:])
+    static let demotedFor: Duration = .seconds(10 * 60)
+
+    /// The clients not cut off, then those that are, refused longest ago first: one may still resolve a song the
+    /// others refuse, and a download walking on from refusal to refusal reaches each before coming back to any. Of
+    /// those not cut off, ones `failed` within `demotedFor` go after the rest, failed longest ago first.
+    static func clients(
+        cut: [String], failed: [String: ContinuousClock.Instant] = [:], at now: ContinuousClock.Instant = .now
+    ) -> [ClientProfile] {
         let all = ClientProfile.plainStreamClients
-        return all.filter { !cut.contains($0.name) } + cut.compactMap { name in all.first { $0.name == name } }
+        let open = all.filter { !cut.contains($0.name) }
+        let demoted = { (client: ClientProfile) in failed[client.name].flatMap { now - $0 < Self.demotedFor ? $0 : nil } }
+        let sunk = open.compactMap { client in demoted(client).map { (client, $0) } }.sorted { $0.1 < $1.1 }.map(\.0)
+        return open.filter { demoted($0) == nil } + sunk + cut.compactMap { name in all.first { $0.name == name } }
     }
 
-    /// YouTube sometimes bot-checks a visitor ID, so when every client fails they are asked
-    /// once more with a fresh one, kept only if it works. With `itag`, that format only.
+    /// After a pass that `played` with one client, the ones asked before it that failed are demoted and it is not. A
+    /// pass where all fail says nothing of any one client: the song, the visitor ID or the network failed.
+    static func record(_ failed: inout [String: ContinuousClock.Instant], failing: [String], played: String, at now: ContinuousClock.Instant) {
+        failed = failed.filter { now - $0.value < demotedFor }
+        for name in failing { failed[name] = now }
+        failed[played] = nil
+    }
+
+    /// YouTube sometimes bot-checks a visitor ID, so when every client fails they are asked once more with a fresh one,
+    /// kept only if it works. With `itag`, that format only.
     func resolve(videoId: String, maxKbps: Int?, itag: Int? = nil) async throws -> ResolvedStream {
         let visitor = try await innerTube.visitorData()
         do {
@@ -55,13 +72,20 @@ struct StreamResolver: Sendable {
     /// Fails with the first client's reason, as the first is the usual one.
     private func resolveWithClients(videoId: String, maxKbps: Int?, itag: Int?, visitorData: String) async throws -> ResolvedStream {
         var firstError: (any Error)?
-        for client in Self.clients(cut: Self.cutOffClients.withLock { $0 }) {
+        var failing: [String] = []
+        for client in Self.clients(cut: Self.cutOffClients.withLock { $0 }, failed: Self.failedClients.withLock { $0 }) {
             do {
-                return try await resolve(videoId: videoId, as: client, maxKbps: maxKbps, itag: itag, visitorData: visitorData)
+                let stream = try await resolve(videoId: videoId, as: client, maxKbps: maxKbps, itag: itag, visitorData: visitorData)
+                // A client without one format isn't broken, so a refresh for an itag demotes none.
+                if itag == nil, !failing.isEmpty {
+                    Self.failedClients.withLock { Self.record(&$0, failing: failing, played: client.name, at: .now) }
+                }
+                return stream
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 firstError = firstError ?? error
+                failing.append(client.name)
             }
         }
         throw firstError ?? Self.noAudio
@@ -91,8 +115,7 @@ struct StreamResolver: Sendable {
         )
     }
 
-    /// The best plain-URL stream, or with `itag`, that one. A client that answers with scrambled URLs
-    /// only counts as having none.
+    /// The best plain-URL stream, or with `itag`, that one. A client that answers with scrambled URLs only has none.
     static func stream(in json: JSON, userAgent: String, maxKbps: Int?, itag: Int? = nil) throws -> ResolvedStream {
         let response = try PlayerResponse(json: json)
         let chosen = if let itag {

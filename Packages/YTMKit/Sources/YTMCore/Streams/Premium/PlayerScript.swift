@@ -1,8 +1,7 @@
 import Foundation
 import os
 
-/// YouTube's web player for one version, cut down to the code that
-/// unscrambles stream URLs.
+/// YouTube's web player for one version, cut down to the code that unscrambles stream URLs.
 struct PlayerScript: Codable, Sendable {
     /// The player version, eight hex digits.
     let id: String
@@ -11,15 +10,15 @@ struct PlayerScript: Codable, Sendable {
     /// `PlayerTrimmer`'s script.
     let code: String
 
-    /// Unscrambles an `n` value and a signature, in a throwaway context.
+    /// In a throwaway context.
     func solve(n: String?, signature: String?) async throws -> Solver.Solution {
         try await Solver.solve(code, n: n, signature: signature)
     }
 
     private static let iframeAPI = "https://www.youtube.com/iframe_api"
 
-    /// Inputs the player must change before a new version is trusted, as it
-    /// is cached until YouTube's next one. Premium formats always need the signature.
+    /// Inputs the player must change before a new version is trusted, as it is cached until YouTube's next one.
+    /// Premium formats always need the signature.
     static let checkN = "abcdefghijklmnop"
     static let checkSignature = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -79,9 +78,9 @@ struct PlayerScript: Codable, Sendable {
     }
 }
 
-/// Shared by every song, with a pause after a failure so a broken player isn't fetched for each one.
-/// Songs a running session solves with an old player start failing once YouTube moves on, so the
-/// version is checked hourly in the background, or sooner once a Premium stream fails.
+/// Shared by every song, with a pause after a failure so a broken player isn't fetched for each one. Songs a running
+/// session solves with an old player start failing once YouTube moves on, so the version is checked hourly in the
+/// background, or sooner once a Premium stream fails.
 actor PlayerScripts {
     static let shared = PlayerScripts()
 
@@ -90,9 +89,15 @@ actor PlayerScripts {
     static let recheck: Duration = .seconds(60 * 60)
 
     private var current: (script: PlayerScript, check: Check)?
-    /// The load in flight, which callers await only while no player is known.
+    /// Callers await it only while no player is known.
     private var loading: Task<PlayerScript, any Error>?
     private var failed: ContinuousClock.Instant?
+    /// A stand-in for `PlayerScript.load` in tests.
+    private let fetch: @Sendable (FileStore) async throws -> PlayerScript
+
+    init(fetch: @escaping @Sendable (FileStore) async throws -> PlayerScript = { try await PlayerScript.load(store: $0) }) {
+        self.fetch = fetch
+    }
 
     func player(store: FileStore) async throws -> PlayerScript {
         let now = ContinuousClock.now
@@ -101,6 +106,14 @@ actor PlayerScripts {
             // A known script keeps solving while a newer one is fetched, so no song waits for the recheck.
             if loading == nil, !backingOff, current?.check.take(at: now) == true { refresh(store: store) }
             return script
+        }
+        // At launch the saved script plays the first song while YouTube's version is checked; a stale one costs that
+        // song its Premium stream at worst, as its failure retries it free. Should the check fail, it is due again
+        // after the back-off rather than in an hour.
+        if loading == nil, let saved = store.load(PlayerScript.self, from: .player) {
+            current = (saved, Check(checked: now - Self.recheck + Self.backoff, fromDisk: true))
+            if !backingOff { refresh(store: store) }
+            return saved
         }
         if backingOff {
             throw YTMError.playerUnprepared
@@ -114,14 +127,15 @@ actor PlayerScripts {
         let task = Task {
             defer { loading = nil }
             do {
-                let script = try await PlayerScript.load(store: store)
+                let script = try await fetch(store)
                 if let old = current?.script.id, old != script.id {
                     Logger.premium.info("player \(script.id, privacy: .public) replaces \(old, privacy: .public)")
                 } else if current != nil {
                     Logger.premium.debug("the Premium player \(script.id, privacy: .public) is still current")
                 }
                 // A recheck keeps its claim's time and any failure since, which asks for the next one sooner.
-                current = (script, current?.check ?? Check(checked: .now))
+                // The saved script's back-dated check starts the hour afresh once YouTube's version is known.
+                current = (script, current.flatMap { $0.check.fromDisk ? nil : $0.check } ?? Check(checked: .now))
                 failed = nil
                 return script
             } catch {
@@ -141,13 +155,15 @@ actor PlayerScripts {
 
     /// When the held player is due a check against YouTube's current one.
     struct Check {
-        /// When it was loaded or last checked.
+        /// Loaded or last checked.
         var checked: ContinuousClock.Instant
         /// A Premium stream failed since.
         var suspect = false
+        /// The script saved last launch, not yet checked against YouTube's.
+        var fromDisk = false
 
-        /// Due hourly, or after the floor once suspect, claiming it so only one runs and a failed
-        /// check waits for the next.
+        /// Due hourly, or after the floor once suspect, claiming it so only one runs and a failed check waits for the
+        /// next.
         mutating func take(at now: ContinuousClock.Instant) -> Bool {
             let age = now - checked
             guard age >= PlayerScripts.recheck || (suspect && age >= PlayerScripts.backoff) else { return false }

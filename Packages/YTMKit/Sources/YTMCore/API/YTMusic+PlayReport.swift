@@ -1,14 +1,16 @@
 import Foundation
+import Synchronization
 
 extension YTMusic {
-    /// Pings the account's player response's stats URL with its cookie, so the
-    /// play shows in its history and shapes its recommendations. Returns where
-    /// the play's watch time goes, should YouTube say.
+    /// Pings the account's player response's stats URL with its cookie, so the play shows in its history and shapes
+    /// its recommendations. Returns where the play's watch time goes, should YouTube say. A play the Premium path
+    /// just resolved for this account reuses that answer's tracking rather than asking again.
     @concurrent
     public func reportPlay(videoId: String) async throws -> WatchTime? {
         let client = ClientProfile.webRemix
         let cookie = try await statsCookie()
-        let player = try await innerTube.post("player", body: ["videoId": videoId], client: client)
+        let kept = PlayTrackings.shared.withLock { $0.take(videoId: videoId, login: PlayReport.login(cookie), at: .now) }
+        let player = if let kept { kept } else { try await innerTube.post("player", body: ["videoId": videoId], client: client) }
         // Both pings carry the same nonce, which ties the watch time to the play.
         let cpn = PlayReport.cpn()
         guard let url = PlayReport.statsURL(player["playbackTracking", "videostatsPlaybackUrl", "baseUrl"].string, client: client.name, cpn: cpn)
@@ -107,8 +109,8 @@ public struct Watched: Sendable {
 }
 
 enum PlayReport {
-    /// A stats URL from the player response, for the play `cpn`. Nil without one, or when it is
-    /// anywhere but youtube.com: it is sent the account's cookie.
+    /// A stats URL from the player response, for the play `cpn`. Nil without one, or when it is anywhere but
+    /// youtube.com: it is sent the account's cookie.
     static func statsURL(_ base: String?, client: String, cpn: String) -> URL? {
         guard let base, var parts = URLComponents(string: base), HTTP.isYouTube(parts.host) else { return nil }
         parts.percentEncodedQueryItems = (parts.percentEncodedQueryItems ?? []) + [
@@ -119,8 +121,8 @@ enum PlayReport {
         return parts.url.flatMap { HTTP.isAllowed($0) ? $0 : nil }
     }
 
-    /// A GET as the web client, with the account's cookie. `HTTP` keeps the URL, which carries the
-    /// session's tracking tokens, out of its errors.
+    /// A GET as the web client, with the account's cookie. `HTTP` keeps the URL, which carries the session's
+    /// tracking tokens, out of its errors.
     static func ping(_ url: URL, cookie: String) async throws {
         guard HTTP.isYouTube(url.host()) else { throw YTMError.blocked }
         var request = URLRequest(url: url)
@@ -132,9 +134,55 @@ enum PlayReport {
         GoogleAuth.login(cookie)?.hashValue
     }
 
+    /// The login of the cookie stored now, if signed in.
+    static func login(_ auth: GoogleAuth) async -> Int? {
+        guard let cookie = await auth.sessionCookie else { return nil }
+        return login(cookie)
+    }
+
     /// A client playback nonce, from the web player's alphabet.
     static func cpn() -> String {
         let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
         return String((0..<16).map { _ in alphabet[Int.random(in: 0..<alphabet.count)] })
+    }
+}
+
+/// The `playbackTracking` of signed-in WEB_REMIX player answers the Premium path had, by video, so `reportPlay`
+/// needn't ask again. In memory only, as a restored stream's answer is long gone, and each taken once, so a repeat
+/// play asks afresh as before.
+struct PlayTrackings: Sendable {
+    static let shared = Mutex(PlayTrackings())
+
+    /// Prefetched streams can be an hour old; tracking that old is asked for again.
+    static let freshFor: Duration = .seconds(10 * 60)
+    /// Downloads resolve many songs never played here.
+    static let limit = 32
+
+    private struct Kept: Sendable {
+        let player: JSON
+        let login: Int
+        let at: ContinuousClock.Instant
+    }
+
+    private var kept: [String: Kept] = [:]
+
+    /// `login` is the account the answer was asked as; nil keeps nothing. Nor does an answer YouTube gave signed
+    /// out, as the Premium request doesn't watch for an ended session.
+    mutating func keep(_ player: JSON, videoId: String, login: Int?, at now: ContinuousClock.Instant) {
+        let tracking = player["playbackTracking"]
+        guard let login, tracking["videostatsPlaybackUrl", "baseUrl"].string != nil, let raw = tracking.raw,
+              !Renderers.answeredSignedOut(player) else { return }
+        kept = kept.filter { now - $0.value.at < Self.freshFor }
+        if kept[videoId] == nil, kept.count >= Self.limit, let oldest = kept.min(by: { $0.value.at < $1.value.at }) {
+            kept[oldest.key] = nil
+        }
+        // Only the tracking, not the whole answer with its stream URLs.
+        kept[videoId] = Kept(player: JSON(NSDictionary(object: raw, forKey: "playbackTracking" as NSString)), login: login, at: now)
+    }
+
+    /// A player answer holding only its tracking, when one for `login` is fresh.
+    mutating func take(videoId: String, login: Int?, at now: ContinuousClock.Instant) -> JSON? {
+        guard let entry = kept.removeValue(forKey: videoId), entry.login == login, now - entry.at < Self.freshFor else { return nil }
+        return entry.player
     }
 }

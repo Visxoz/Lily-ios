@@ -1,8 +1,7 @@
 import Foundation
 import os
 
-/// YouTube offers Premium formats (256 kbps) only to signed-in web clients,
-/// whose URLs are scrambled by its player script.
+/// YouTube offers Premium formats (256 kbps) only to signed-in web clients, whose URLs its player script scrambles.
 struct PremiumResolver: Sendable {
     let innerTube: InnerTube
     let player: PlayerScript
@@ -28,7 +27,13 @@ struct PremiumResolver: Sendable {
         for client in Self.clients {
             let response: PlayerResponse
             do {
-                response = try await PlayerResponse(json: request(videoId: videoId, as: client))
+                // Read either side of the request, so an account switched meanwhile keeps nothing.
+                let login = if client == .webRemix { await PlayReport.login(innerTube.auth) } else { Int?.none }
+                let json = try await request(videoId: videoId, as: client)
+                response = try PlayerResponse(json: json)
+                if let login, await PlayReport.login(innerTube.auth) == login {
+                    PlayTrackings.shared.withLock { $0.keep(json, videoId: videoId, login: login, at: .now) }
+                }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -77,8 +82,8 @@ struct PremiumResolver: Sendable {
         ], client: client, retries: 0, watchesSession: false)
     }
 
-    /// Premium formats come first, so a song with AAC 141 but no Opus 774 doesn't fall to the
-    /// free Opus beside them; a bitrate cap, which they never fit, goes to the rest.
+    /// Premium formats come first, so a song with AAC 141 but no Opus 774 doesn't fall to the free Opus beside them;
+    /// a bitrate cap, which they never fit, goes to the rest.
     static func choose(_ formats: [Format], signedIn: Bool, anyFormat: Bool, maxKbps: Int?) -> Choice {
         let premium = formats.filter { premiumItags.contains($0.itag) }
         if signedIn, maxKbps == nil, let format = bestAudio(premium, maxKbps: nil) { return .play(format) }
@@ -134,7 +139,7 @@ struct PremiumResolver: Sendable {
         return fields
     }
 
-    /// Percent-encodes all but unreserved characters, so a value is safe anywhere in a query.
+    /// All but unreserved characters, so a value is safe anywhere in a query.
     private static func encoded(_ value: String) -> String {
         value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? value
     }
