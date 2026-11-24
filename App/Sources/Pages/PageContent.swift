@@ -19,6 +19,13 @@ struct PageContent: View {
     @State private var isWide = false
     @State private var dialog: PlaylistDialog?
     @State private var newName = ""
+    /// Past its own fade in.
+    @State private var arrived = false
+    /// The page awaits a further step; set after each change, so the change still reads the page before it.
+    @State private var stepDue = false
+
+    /// How long a loaded page takes to fade in over its skeleton (`PageScreen`).
+    static let arrival = 0.45
 
     /// So a page opened again starts in its colour. Keyed by URL and a banner's width, which its frost is cut to; the
     /// height isn't known until the header is measured, and doesn't change it.
@@ -90,6 +97,10 @@ struct PageContent: View {
         }
         // The cards' art is fetched as the page is built, rather than as each scrolls in, and stops once it is left.
         .task(id: [cardCount, model?.replacements ?? 0]) { await prefetchArt() }
+        .task {
+            try? await Task.sleep(for: .seconds(Self.arrival))
+            arrived = true
+        }
         .environment(\.pinsPlaylists, route.showsPins)
         .modifier(PlaylistDialogs(dialog: $dialog, name: $newName, title: page.header?.title ?? "", model: model))
     }
@@ -151,15 +162,20 @@ struct PageContent: View {
                 // The rest loads while the page is on screen (`PageScreen`).
                 if let more = page.more {
                     VStack(alignment: .leading, spacing: 0) {
-                        if case .shelves = more {
+                        if more.isShelves {
                             SectionBones(layouts: model?.shelvesToCome ?? [])
                         } else {
                             TrackBones(count: 3, art: true)
                         }
                     }
                     .skeleton()
+                    // Gone before the shelves fading in over them show; songs pop in, so theirs go at once.
+                    .transition(more.isShelves ? .opacity.animation(.linear(duration: 0.18)) : .identity)
                 }
             }
+            // A step's shelves fade in once the page's own fade is over, so the two don't compound.
+            .animation(arrived && stepDue ? .easeOut(duration: 0.4) : nil, value: page.sections.count)
+            .onChange(of: page.more != nil, initial: true) { stepDue = $1 }
             .padding(.bottom, Metrics.pageBottom)
             .background(alignment: .top) {
                 if !isSplit {
@@ -332,5 +348,11 @@ private struct Refresh: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+private extension Continuation {
+    var isShelves: Bool {
+        if case .shelves = self { true } else { false }
     }
 }
