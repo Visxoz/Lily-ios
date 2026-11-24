@@ -10,7 +10,7 @@ extension YTMusic {
         async let sites = Self.otherSites(for: track)
         let own = try await youtubeLyrics(videoId: track.id)
         let found = await sites
-        let apple = found.apple.compactMap { Lyrics.checked($0, against: own) }
+        var apple = found.apple.compactMap { Lyrics.checked($0, against: own) }
         var others = found.others.compactMap { Lyrics.checked($0, against: own) }
         let agreed = apple + others
         // KuGou is slow and often has another version, so it's asked only for word timing the rest lack, where
@@ -18,10 +18,15 @@ extension YTMusic {
         let wantsWords = own != nil && !agreed.contains(where: \.isWordSynced)
         // LRCLIB only for timing YouTube's lyrics lack, unless the hub asked it already.
         let wantsLines = own?.isSynced != true && !found.answered.contains("lrclib") && !agreed.contains(where: \.isSynced)
+        // The hub stops at word timing before checking it, so when that disagreed before lrc.red answered, it's
+        // asked here.
+        let wantsLrcRed = wantsWords && !found.answered.contains("binimum")
         // Held to a few seconds, as the lyrics wait on them; LRCLIB's may take a search after a miss.
         async let kugou = wantsWords ? LyricsSite.within(.seconds(4)) { try await KuGou.lyrics(for: track) } : nil
         async let lrclib = wantsLines ? LyricsSite.within(.seconds(7)) { try await LRCLIB.lyrics(for: track) } : nil
+        async let lrcRed = wantsLrcRed ? LyricsSite.within(.seconds(4)) { try await LrcRed.lyrics(for: track) } : nil
         others += await [kugou, lrclib].compactMap { Lyrics.checked($0, against: own) }
+        if let late = Lyrics.checked(await lrcRed, against: own) { apple.append(late) }
         // The other sites fold a cancellation into nil, which mustn't pass for their having none.
         try Task.checkCancellation()
         return Lyrics.chosen(youtube: own, apple: apple, others: others)
@@ -31,12 +36,20 @@ extension YTMusic {
     /// YouTube's, so both run alongside them.
     private static func otherSites(for track: Track) async -> LyricsHub.Found {
         var found = await LyricsHub.lyrics(for: track) ?? LyricsHub.Found()
-        if !found.apple.contains(where: \.isWordSynced), let lrcRed = try? await LrcRed.lyrics(for: track) { found.apple.append(lrcRed) }
+        guard !found.apple.contains(where: \.isWordSynced), !hubMissedLrcRed(found, for: track) else { return found }
+        if let lrcRed = try? await LrcRed.lyrics(for: track) { found.apple.append(lrcRed) }
+        // Its own answer stands for the hub's, so it isn't asked again once YouTube's lyrics are in.
+        found.answered.insert("binimum")
         return found
     }
 
-    /// Timed lines as the Android app is given them, else the web client's
-    /// block of text. Nil when the song has none.
+    /// The hub's binimum is lrc.red, so its having nothing is lrc.red's answer, unless lrc.red would be asked under
+    /// other names than the hub was.
+    static func hubMissedLrcRed(_ found: LyricsHub.Found, for track: Track) -> Bool {
+        found.answered.contains("binimum") && !found.apple.contains { $0.source == LrcRed.source } && LrcRed.searchesAsGiven(track)
+    }
+
+    /// Timed lines as the Android app is given them, else the web client's block of text. Nil when the song has none.
     private func youtubeLyrics(videoId: String) async throws -> Lyrics? {
         let next = try await innerTube.next(["videoId": videoId], authenticated: false)
         guard let browseId = Lyrics.browseId(in: next) else { return nil }
@@ -80,8 +93,7 @@ extension Lyrics {
         }.first
     }
 
-    /// Nil when the answer isn't in the shape expected or has no lines.
-    /// Synced only if every line has its time.
+    /// Nil when the answer isn't in the shape expected or has no lines. Synced only if every line has its time.
     init?(timed response: JSON) {
         let data = response["contents", "elementRenderer", "newElement", "type", "componentType", "model", "timedLyricsModel", "lyricsData"]
         let timed = data["timedLyricsData"].array
@@ -100,8 +112,7 @@ extension Lyrics {
         self.init(lines: lines, starts: starts.count == lines.count ? starts : [], source: data["sourceMessage"].string ?? "")
     }
 
-    /// Nil when YouTube answers with a message, such as "Lyrics not
-    /// available", instead.
+    /// Nil when YouTube answers with a message, such as "Lyrics not available", instead.
     init?(plain response: JSON) throws {
         let contents = response["contents"]
         if contents["messageRenderer"].exists { return nil }
@@ -112,8 +123,8 @@ extension Lyrics {
         self.init(lines: Self.lines(body), source: shelf["footer"].text ?? "")
     }
 
-    /// Keeps the blank lines between verses; `\r\n` is one break, and a
-    /// final break ends the last line rather than starting an empty one.
+    /// Keeps the blank lines between verses; `\r\n` is one break, and a final break ends the last line rather than
+    /// starting an empty one.
     static func lines(_ body: String) -> [String] {
         var lines = body.split(omittingEmptySubsequences: false) { $0 == "\n" || $0 == "\r\n" }.map(String.init)
         if lines.last?.isEmpty == true { lines.removeLast() }

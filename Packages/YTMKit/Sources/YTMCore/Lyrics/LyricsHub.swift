@@ -34,42 +34,85 @@ public enum LyricsHub {
         request.httpBody = LyricsSite.query([
             "videoId": track.id, "song": track.title, "artist": track.artistNames, "duration": track.duration.map(String.init), "token": jwt,
         ]).map { Data($0.utf8) }
+        let bytes: URLSession.AsyncBytes
         do {
-            return try await LyricsSite.send(request).map { found(in: $0) }
+            guard let answer = try await LyricsSite.stream(request) else { return nil }
+            bytes = answer
         } catch let error as YTMError where error.status == 403 {
             await HubPass.shared.refused(jwt)
             return nil
         } catch {
             return nil
         }
+        // Ends the request when reading stops early.
+        defer { bytes.task.cancel() }
+        return await found(streaming: bytes)
     }
 
-    /// The answer's events, `data:` lines of `{"provider": …, "results": {…}}`.
-    static func found(in stream: Data) -> Found {
-        var byProvider: [String: Lyrics] = [:]
-        var answered: Set<String> = []
-        let text = String(decoding: stream, as: UTF8.self).replacingOccurrences(of: "\r\n", with: "\n")
-        for event in text.components(separatedBy: "\n\n") {
+    /// The answer's events, `data:` lines of `{"provider": …, "results": {…}}`, each site's as it comes rather than
+    /// all once the slowest has answered: read until nothing still to come could be chosen over what has, and when
+    /// the answer stalls or fails, what came before it.
+    static func found<Bytes: AsyncSequence>(streaming bytes: Bytes) async -> Found where Bytes.Element == UInt8 {
+        let (newline, carriageReturn): (UInt8, UInt8) = (10, 13)
+        var events = Events()
+        var event: [UInt8] = []
+        do {
+            for try await byte in bytes where byte != carriageReturn {
+                if byte == newline, event.last == newline {
+                    events.read(String(decoding: event, as: UTF8.self))
+                    event.removeAll(keepingCapacity: true)
+                    if events.isSettled { return events.found }
+                } else {
+                    event.append(byte)
+                }
+            }
+            events.read(String(decoding: event, as: UTF8.self))
+        } catch {
+            // What came is kept: a site's lyrics are whole in its own event.
+        }
+        return events.found
+    }
+
+    /// The events read so far, by site.
+    struct Events {
+        /// Apple Music's kind, best first, then the others.
+        private static let apple = ["golyrics", "spicy", "binimum"]
+        private static let others = ["qq", "kugou", "lrclib"]
+
+        private var byProvider: [String: Lyrics] = [:]
+        private var answered: Set<String> = []
+
+        var found: Found {
+            Found(apple: Self.apple.compactMap { byProvider[$0] }, others: Self.others.compactMap { byProvider[$0] }, answered: answered)
+        }
+
+        /// Word timing from a site that every site ranked above has answered without, which `Lyrics.chosen` takes
+        /// over anything still to come if it agrees with YouTube's. Not waiting for that check costs the later
+        /// sites when it doesn't, though lrc.red, KuGou and LRCLIB are then still asked directly.
+        var isSettled: Bool {
+            for provider in Self.apple {
+                guard answered.contains(provider) else { return false }
+                if byProvider[provider]?.isWordSynced == true { return true }
+            }
+            return false
+        }
+
+        mutating func read(_ event: String) {
             let data = event.split(separator: "\n").filter { $0.hasPrefix("data:") }.map { $0.dropFirst(5).drop(while: \.isWhitespace) }.joined()
-            guard let json = try? JSON(data: Data(data.utf8)), let provider = json["provider"].string else { continue }
+            guard let json = try? JSON(data: Data(data.utf8)), let provider = json["provider"].string else { return }
             answered.insert(provider)
             let results = json["results"]
             let lyrics: Lyrics? = switch provider {
-            case "golyrics": results["lyrics"].string.flatMap { ttml(unwrapped($0, "ttml"), "Source: Better Lyrics") }
-            case "spicy": results["lyrics"].string.flatMap { ttml($0, "Source: Spicy Lyrics") }
-            case "binimum": results["lyrics"].string.flatMap { ttml($0, LrcRed.source) }
-            case "qq": results["lyrics"].string.flatMap { qrc(unwrapped($0, "lyrics")) }
-            case "kugou": results["lyrics"].string.flatMap { LRC.lyrics(unwrapped($0, "lyrics"), source: KuGou.source) }
+            case "golyrics": results["lyrics"].string.flatMap { LyricsHub.ttml(LyricsHub.unwrapped($0, "ttml"), "Source: Better Lyrics") }
+            case "spicy": results["lyrics"].string.flatMap { LyricsHub.ttml($0, "Source: Spicy Lyrics") }
+            case "binimum": results["lyrics"].string.flatMap { LyricsHub.ttml($0, LrcRed.source) }
+            case "qq": results["lyrics"].string.flatMap { LyricsHub.qrc(LyricsHub.unwrapped($0, "lyrics")) }
+            case "kugou": results["lyrics"].string.flatMap { LRC.lyrics(LyricsHub.unwrapped($0, "lyrics"), source: KuGou.source) }
             case "lrclib": LRCLIB.lyrics(synced: results["synced"].string, plain: results["plain"].string)
             default: nil
             }
             if let lyrics { byProvider[provider] = lyrics }
         }
-        return Found(
-            apple: ["golyrics", "spicy", "binimum"].compactMap { byProvider[$0] },
-            others: ["qq", "kugou", "lrclib"].compactMap { byProvider[$0] },
-            answered: answered
-        )
     }
 
     /// QRC, bare or in QQ Music's XML.

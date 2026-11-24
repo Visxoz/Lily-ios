@@ -34,13 +34,27 @@ enum LyricsSite {
     }
 
     static func send(_ request: URLRequest) async throws -> Data? {
-        var request = request
-        request.timeoutInterval = 4
-        request.setValue("Lily", forHTTPHeaderField: "User-Agent")
         do {
-            return try await HTTP.data(for: request).0
+            return try await HTTP.data(for: prepared(request)).0
         } catch let error as YTMError where error.status == 404 {
             return nil
         }
+    }
+
+    /// `send`'s answer as it arrives, for one sent in parts.
+    static func stream(_ request: URLRequest) async throws -> URLSession.AsyncBytes? {
+        do {
+            return try await HTTP.bytes(for: prepared(request))
+        } catch let error as YTMError where error.status == 404 {
+            return nil
+        }
+    }
+
+    /// The 4 s is how long the site may fall silent, not how long it may take.
+    private static func prepared(_ request: URLRequest) -> URLRequest {
+        var request = request
+        request.timeoutInterval = 4
+        request.setValue("Lily", forHTTPHeaderField: "User-Agent")
+        return request
     }
 }

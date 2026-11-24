@@ -8,7 +8,15 @@ import Testing
         return "event: provider\ndata: \(String(decoding: data, as: UTF8.self))\n\n"
     }
 
-    @Test func readsEachSitesLyricsBestFirst() throws {
+    /// The whole answer, as one that has already ended.
+    private func read(_ text: String) async -> LyricsHub.Found {
+        let (stream, continuation) = AsyncStream.makeStream(of: UInt8.self)
+        for byte in text.utf8 { continuation.yield(byte) }
+        continuation.finish()
+        return await LyricsHub.found(streaming: stream)
+    }
+
+    @Test func readsEachSitesLyricsBestFirst() async throws {
         let ttml = #"<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0" end="2.0">Alpha</p></div></body></tt>"#
         let qrc = #"<QrcInfos><Lyric_1 LyricContent="[1000,1000]Alpha(1000,1000)"/></QrcInfos>"#
         let stream = try [
@@ -21,13 +29,13 @@ import Testing
             event("someday", ["lyrics": "Alpha"]),
             "data: [DONE]\n\n",
         ].joined()
-        let found = LyricsHub.found(in: Data(stream.utf8))
+        let found = await read(stream)
         #expect(found.apple.map(\.source) == ["Source: Better Lyrics", "Source: lrc.red"])
         #expect(found.others.map(\.source) == ["Source: QQ Music", "Source: KuGou", "Source: LRCLIB"])
         #expect(found.others.first?.isWordSynced == true)
         #expect((found.apple + found.others).allSatisfy { $0.lines == ["Alpha"] && $0.starts == [1] })
         #expect(found.answered == ["lrclib", "qq", "binimum", "golyrics", "kugou", "someday"])
-        #expect(LyricsHub.found(in: Data("<html>busy</html>".utf8)) == LyricsHub.Found())
+        #expect(await read("<html>busy</html>") == LyricsHub.Found())
     }
 
     @Test func readsWhenAPassWasIssuedAndLapses() throws {

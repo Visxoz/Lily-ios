@@ -1,8 +1,8 @@
 import Foundation
 import Network
 
-/// Every URL taken from a response, and every redirect, is checked with
-/// `isAllowed`, so a hostile or broken response can never send the app elsewhere.
+/// Every URL taken from a response, and every redirect, is checked with `isAllowed`, so a hostile or broken response
+/// can never send the app elsewhere.
 enum HTTP {
     /// Allowed with their subdomains.
     private static let domains = [
@@ -24,22 +24,19 @@ enum HTTP {
         "lrc.red", "lrclib.net", "mobileservice.kugou.com", "krcs.kugou.com", "lyrics.api.dacubeking.com",
     ]
 
-    /// HTTPS on an allowed host.
     static func isAllowed(_ url: URL) -> Bool {
         guard url.scheme?.lowercased() == "https", let host = url.host()?.lowercased(), !host.isEmpty else {
             return false
         }
-        return hosts.contains(host) || domains.contains { host == $0 || host.hasSuffix("." + $0) }
+        return hosts.contains(host) || domains.contains { HostAllowlist.isHost(host, within: $0) }
     }
 
     /// youtube.com or a subdomain: the only hosts sent or let set the account's cookies.
     static func isYouTube(_ host: String?) -> Bool {
-        guard let host = host?.lowercased() else { return false }
-        return host == "youtube.com" || host.hasSuffix(".youtube.com")
+        host.map { HostAllowlist.isHost($0, within: "youtube.com") } ?? false
     }
 
-    /// Nothing is cached and no cookie is kept: the signed-in Cookie header is
-    /// set per request from the Keychain.
+    /// Nothing is cached and no cookie is kept: the signed-in Cookie header is set per request from the Keychain.
     static let api: URLSession = {
         let config = uncached()
         // A request that has not answered in 15 s is not going to.
@@ -71,10 +68,10 @@ enum HTTP {
         return URLSession(configuration: config, delegate: RedirectGuard.shared, delegateQueue: nil)
     }
 
-    /// Artwork, cached on disk across launches, within Lily for Windows's budget. Pages prefetch their cards'
-    /// art and song rows load theirs as they show. Kept here, as a session's `configuration` is a copy.
+    /// Artwork, cached on disk across launches, within Lily for Windows's budget. Kept here, as a session's
+    /// `configuration` is a copy. Little in memory, as the image cache already holds the art decoded.
     static let artworkCache = URLCache(
-        memoryCapacity: 8 << 20,
+        memoryCapacity: 1 << 20,
         diskCapacity: 64 << 20,
         directory: URL.cachesDirectory.appending(path: "artwork", directoryHint: .isDirectory)
     )
@@ -82,18 +79,17 @@ enum HTTP {
     static let media: URLSession = {
         let config = URLSessionConfiguration.default
         config.urlCache = artworkCache
-        // Artwork URLs name their image and size, so a stored copy is right for
-        // a long while; revalidating after the short max-age only delays the
-        // image. `ImagePipeline` fetches one older than 30 days again.
+        // Artwork URLs name their image and size, so a stored copy is right for a long while; revalidating after the
+        // short max-age only delays the image. `ImagePipeline` fetches one older than 30 days again.
         config.requestCachePolicy = .returnCacheDataElseLoad
         config.httpMaximumConnectionsPerHost = 8
         config.timeoutIntervalForRequest = 20
         return session(config)
     }()
 
-    /// Checks the host and fails outside 2xx; errors omit the URL, which may carry stream signatures.
-    /// `retries` re-asks a 5xx, 429, stray 403 or timeout. `refusals` pauses and counts each attempt,
-    /// `sign` sets its headers once its turn comes, and `answered` sees every answer.
+    /// Checks the host and fails outside 2xx; errors omit the URL, which may carry stream signatures. `retries`
+    /// re-asks a 5xx, 429, stray 403 or timeout. `refusals` pauses and counts each attempt, `sign` sets its headers
+    /// once its turn comes, and `answered` sees every answer.
     static func data(
         for request: URLRequest, session: URLSession = api, retries: Int = 0, refusals: Refusals? = nil,
         sign: (inout URLRequest) async -> Void = { _ in },
@@ -127,6 +123,24 @@ enum HTTP {
         }
     }
 
+    /// The body as it arrives, checked as `data` is, without retries. Only the answer's status is checked here:
+    /// reading the bytes can still fail, as on a stall.
+    static func bytes(for request: URLRequest, session: URLSession = api) async throws -> URLSession.AsyncBytes {
+        guard let url = request.url, isAllowed(url) else { throw YTMError.blocked }
+        do {
+            let (bytes, response) = try await session.bytes(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status) else {
+                bytes.task.cancel()
+                throw YTMError(status: status)
+            }
+            return bytes
+        } catch let error as URLError {
+            if error.code == .cancelled { throw CancellationError() }
+            throw YTMError(error)
+        }
+    }
+
     /// To a temporary file the caller moves, so a large body never sits in memory; checked as `data` is, without retries.
     static func download(_ request: URLRequest) async throws -> URL {
         guard let url = request.url, isAllowed(url) else { throw YTMError.blocked }
@@ -148,8 +162,8 @@ enum HTTP {
         status == 429 || (500..<600).contains(status)
     }
 
-    /// A 403 not for want of permission, as to someone else's private playlist: YouTube refuses
-    /// a share of requests so, at random and in runs, and answers the same request moments later.
+    /// A 403 not for want of permission, as to someone else's private playlist: YouTube refuses a share of requests
+    /// so, at random and in runs, and answers the same request moments later.
     static func isStrayRefusal(status: Int, body: Data) -> Bool {
         guard status == 403 else { return false }
         let message = (try? JSON(data: body))?["error", "message"].string ?? ""
@@ -163,14 +177,19 @@ enum HTTP {
     }
 }
 
-/// The audio engine can't import YTMCore, so the player checks each stream URL,
-/// refreshed ones too, here before passing it on.
+/// The audio engine can't import YTMCore, so the player checks each stream URL, refreshed ones too, here.
 public enum HostAllowlist {
     public static func allows(_ url: URL) -> Bool { HTTP.isAllowed(url) }
+
+    /// `host` is `domain` or one of its subdomains, whatever the case of either.
+    public static func isHost(_ host: some StringProtocol, within domain: String) -> Bool {
+        let (host, domain) = (host.lowercased(), domain.lowercased())
+        return host == domain || host.hasSuffix("." + domain)
+    }
 }
 
-/// Follows a redirect only to an allowed host; any other ends the request
-/// with the redirect's own status, which `HTTP.data` reports as refused.
+/// Follows a redirect only to an allowed host; any other ends the request with the redirect's own status, which
+/// `HTTP.data` reports as refused.
 private final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
     static let shared = RedirectGuard()
 

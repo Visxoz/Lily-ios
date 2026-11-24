@@ -18,6 +18,13 @@ enum LrcRed {
         return TTML.lyrics(ttml, source: source)
     }
 
+    /// Whether `lyrics` searches under the names `track` has, with nothing cut or simplified, as the hub is sent them.
+    static func searchesAsGiven(_ track: Track) -> Bool {
+        let title = LyricsMatch.title(track.title)
+        guard let artist = LyricsMatch.artist(track) else { return true }
+        return title == track.title && artist == track.artistNames && LyricsMatch.simplified(title + artist) == title + artist
+    }
+
     private static func search(_ title: String, _ artist: String, for track: Track) async throws -> String? {
         guard let duration = track.duration,
               // No album: lrc.red takes it as a filter, and YouTube's often names another edition.
