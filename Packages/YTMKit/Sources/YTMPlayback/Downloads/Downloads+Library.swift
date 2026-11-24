@@ -18,13 +18,24 @@ extension Downloads {
     /// Failed songs count as done, so an album with a song YouTube won't send still finishes.
     public func state(of route: Route) -> DownloadState {
         if fetching.contains(route) { return .waiting }
-        guard let collection = index.collections.first(where: { $0.route == route }) else { return .none }
-        let tracks = collection.tracks
-        let done = tracks.count { index.songs[$0.id] != nil || failed.contains($0.id) }
-        guard done < tracks.count else { return .downloaded }
+        guard let tally = tally(of: route) else { return .none }
+        guard tally.done < tally.count else { return .downloaded }
         guard canDownload else { return .waiting }
-        let partial = tracks.reduce(0) { $0 + (progress[$1.id] ?? 0) }
-        return .downloading((Double(done) + partial) / Double(tracks.count))
+        // Only this collection's songs' boxes are read, so other songs' steps don't redraw its views.
+        let partial = progress.reduce(0.0) { tally.ids.contains($1.key) ? $0 + $1.value.fraction : $0 }
+        return .downloading((Double(tally.done) + partial) / Double(tally.count))
+    }
+
+    /// Worked out once per change to the index or failed songs rather than at every step of a download.
+    /// Reading `revision` keeps views showing it observing those changes even when the tally is kept.
+    private func tally(of route: Route) -> CollectionTally? {
+        if tallies.revision != revision { tallies = (revision, [:]) }
+        if let tally = tallies.byRoute[route] { return tally }
+        guard let tracks = index.collections.first(where: { $0.route == route })?.tracks else { return nil }
+        let done = tracks.count { index.songs[$0.id] != nil || failed.contains($0.id) }
+        let tally = CollectionTally(ids: Set(tracks.map(\.id)), done: done, count: tracks.count)
+        tallies.byRoute[route] = tally
+        return tally
     }
 
     /// A playlist page shows its songs a batch at a time, so the rest are asked for.
@@ -53,8 +64,17 @@ extension Downloads {
         changed()
     }
 
-    /// Nil when nothing is downloaded or on its way.
+    /// Nil when nothing is downloaded or on its way. Kept until the index, failed songs or the network
+    /// change, as it sorts every song.
     public var page: Page? {
+        let key = PageKey(revision: revision, canDownload: canDownload, online: online)
+        if let builtPage, builtPage.key == key { return builtPage.page }
+        let page = buildPage()
+        builtPage = (key, page)
+        return page
+    }
+
+    private func buildPage() -> Page? {
         guard !isEmpty else { return nil }
         let songs = index.songs.values.sorted { $0.added > $1.added }.map(\.track)
         let coming = wanted.filter { index.songs[$0.id] == nil && !failed.contains($0.id) }

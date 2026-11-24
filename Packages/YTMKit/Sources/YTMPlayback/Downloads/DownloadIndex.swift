@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import YTMCore
 
 public enum DownloadState: Equatable, Sendable {
@@ -7,6 +8,25 @@ public enum DownloadState: Equatable, Sendable {
     case waiting
     case downloading(Double)
     case downloaded
+}
+
+/// From 0 to 1. Each song downloading has its own, so a step redraws only the views showing that song.
+@MainActor @Observable final class DownloadProgress {
+    var fraction: Double = 0
+}
+
+/// An album's or playlist's songs that are done, kept until the index or failed songs change.
+struct CollectionTally {
+    var ids: Set<String>
+    var done: Int
+    var count: Int
+}
+
+/// What the Downloads page shows beyond the index and failed songs.
+struct PageKey: Equatable {
+    var revision: Int
+    var canDownload: Bool
+    var online: Bool?
 }
 
 /// What the phone keeps, saved as `downloads.json`.

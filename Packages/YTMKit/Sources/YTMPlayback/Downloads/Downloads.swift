@@ -13,6 +13,7 @@ import YTMCore
 
     var index = DownloadIndex() {
         didSet {
+            revision += 1
             // A finished song changes only `songs`, which none of these depend on.
             guard index.singles != oldValue.singles || index.collections != oldValue.collections
                 || index.smart != oldValue.smart else { return }
@@ -21,10 +22,15 @@ import YTMCore
             collected = Set(index.collections.flatMap { $0.tracks.map(\.id) })
         }
     }
-    /// From 0 to 1, for each song downloading.
-    private(set) var progress: [String: Double] = [:] {
+    /// Each song downloading. The map changes only as songs start and stop; a step changes just that
+    /// song's box, so it redraws only the views showing that song.
+    var progress: [String: DownloadProgress] = [:] {
         didSet { if isActive == progress.isEmpty { isActive.toggle() } }
     }
+    /// Bumped as the index or failed songs change, so what is worked out from them is redone only then.
+    private(set) var revision = 0
+    @ObservationIgnored var builtPage: (key: PageKey, page: Page?)?
+    @ObservationIgnored var tallies: (revision: Int, byRoute: [Route: CollectionTally]) = (0, [:])
     /// The app asks iOS for background time while this is true. Stored rather than worked out from
     /// `progress`, so views reading it don't redraw with every step.
     public private(set) var isActive = false {
@@ -36,7 +42,9 @@ import YTMCore
     /// Cellular or a hotspot, for the Wi-Fi only setting.
     private(set) var metered = false
     /// Tried again when the app or the network comes back.
-    var failed: Set<String> = []
+    var failed: Set<String> = [] {
+        didSet { revision += 1 }
+    }
     /// Albums and playlists whose song lists are loading.
     var fetching: Set<Route> = []
 
@@ -92,7 +100,7 @@ import YTMCore
     /// A song that failed reads as not downloaded, so its menu offers to try again.
     public func state(of videoId: String) -> DownloadState {
         if index.songs[videoId] != nil { return .downloaded }
-        if let fraction = progress[videoId] { return .downloading(fraction) }
+        if let box = progress[videoId] { return .downloading(box.fraction) }
         return wantedIDs.contains(videoId) && !failed.contains(videoId) ? .waiting : .none
     }
 
@@ -229,7 +237,7 @@ import YTMCore
     private func start(_ track: Track) {
         serial += 1
         let serial = serial
-        progress[track.id] = 0
+        progress[track.id] = DownloadProgress()
         let (music, chooser, audio, quality) = (music, chooser, audio, settings.value.downloadQuality)
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
             Task { @MainActor in self?.progressed(track.id, serial, fraction) }
@@ -261,8 +269,9 @@ import YTMCore
     }
 
     private func progressed(_ id: String, _ serial: Int, _ fraction: Double) {
-        guard active[id]?.serial == serial else { return }
-        progress[id] = fraction
+        // Read, not written through the map, so the step reaches only the box's own observers.
+        guard active[id]?.serial == serial, let box = progress[id] else { return }
+        box.fraction = fraction
     }
 
     private func finished(_ track: Track, _ serial: Int, _ result: Result<ResolvedStream, any Error>) {
@@ -298,7 +307,7 @@ import YTMCore
 
     /// As downloads stop and the app leaves the screen.
     func saveIfPending() {
-        if indexSaving.isPending { saveNow() }
+        indexSaving.flush(saveNow)
     }
 
     private static func isNetwork(_ error: any Error) -> Bool {
@@ -332,7 +341,7 @@ import YTMCore
         }
     }
 
-    private func follow(online: Bool, metered: Bool) {
+    func follow(online: Bool, metered: Bool) {
         let could = canDownload
         if self.online != online { self.online = online }
         if self.metered != metered { self.metered = metered }

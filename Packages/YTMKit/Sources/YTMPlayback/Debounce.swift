@@ -25,4 +25,11 @@ import Foundation
         pending?.cancel()
         pending = nil
     }
+
+    /// Writes now in place of the pending action, as when the app leaves the foreground; nothing if none is pending.
+    func flush(_ write: @MainActor () -> Void) {
+        guard isPending else { return }
+        cancel()
+        write()
+    }
 }
