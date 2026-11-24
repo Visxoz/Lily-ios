@@ -7,7 +7,7 @@ nonisolated enum Icon: CaseIterable, Sendable {
     case volume, volumeLow, volumeOff
     case close, queue, lyrics, radio, account, note, more, clock, history
     case thumbUp, thumbUpFilled, thumbDown, thumbDownFilled, check, add, chevron
-    case download, downloaded, pin, saveToPlaylist, inLibrary
+    case download, downloaded, pin, saveToPlaylist, inLibrary, airplay
 
     var path: Path { Self.paths[self] ?? Path() }
 
@@ -53,6 +53,7 @@ nonisolated enum Icon: CaseIterable, Sendable {
         case .pin: "M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"
         case .saveToPlaylist: "M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z"
         case .inLibrary: "M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7.53 12L9 10.5l1.4-1.41 2.07 2.08L17.6 6 19 7.41 12.47 14zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"
+        case .airplay: "M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
         }
     }
 }
