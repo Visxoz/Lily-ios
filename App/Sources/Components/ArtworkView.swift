@@ -8,8 +8,8 @@ struct ArtworkView: View {
     var radius: CGFloat = 4
     /// For sharing a decode made elsewhere rather than one at the size drawn.
     var pixelEdge: Int?
-    /// Cast by a shape behind the opaque artwork, so the blur comes from a path once instead of
-    /// being rendered off screen each frame the image fades in or resizes.
+    /// Cast by a shape behind the opaque artwork, so the blur comes from a path once instead of being rendered off
+    /// screen each frame the image fades in or resizes.
     var shadow: (colour: Color, radius: CGFloat, y: CGFloat)?
 
     @Environment(\.theme) private var theme
@@ -28,14 +28,16 @@ struct ArtworkView: View {
     }
 }
 
-/// Small artwork shares one decode, `ImagePipeline.smallEdge`, so a song's rows and mini player reuse
-/// it. An image already in memory shows on the first frame, so scrolling back never flickers.
+/// Small artwork shares one decode, `ImagePipeline.smallEdge`, so a song's rows and mini player reuse it. An image
+/// already in memory shows on the first frame, so scrolling back never flickers.
 struct ArtworkImage: View {
     let url: String?
     /// The shorter side drawn, in points: what the decode is sized to.
     let edge: CGFloat
     var placeholder = true
     var pixelEdge: Int?
+    /// The width drawn in pixels, where a wide image fills a narrower frame (a banner), so no more of it is held.
+    var pixelWidth: Int?
 
     @Environment(\.displayScale) private var displayScale
     @Environment(\.theme) private var theme
@@ -44,6 +46,7 @@ struct ArtworkImage: View {
     private struct Key: Hashable {
         let url: String
         let pixels: Int
+        let width: Int?
     }
 
     private struct Loaded {
@@ -52,7 +55,7 @@ struct ArtworkImage: View {
     }
 
     var body: some View {
-        let key = url.map { Key(url: $0, pixels: pixels) }
+        let key = url.map { Key(url: $0, pixels: pixels, width: pixelWidth) }
         ZStack {
             if let key, let image = image(for: key) {
                 Image(decorative: image, scale: displayScale)
@@ -82,11 +85,14 @@ struct ArtworkImage: View {
     /// Until the load has run, a copy already in memory at any size stands in.
     private func image(for key: Key) -> CGImage? {
         if let loaded, loaded.key == key { return loaded.image }
+        if let width = key.width, let image = ImagePipeline.shared.cachedImage(for: key.url, pixelEdge: key.pixels, maxWidth: width) {
+            return image
+        }
         return Self.cachedAnySize(key.url, preferring: key.pixels, scale: displayScale)
     }
 
-    /// `pixels` first, then every size the app draws, so opening a card's page or playing it never
-    /// waits on a download for art already decoded at another size.
+    /// `pixels` first, then every size the app draws, so opening a card's page or playing it never waits on a
+    /// download for art already decoded at another size.
     static func cachedAnySize(_ url: String, preferring pixels: Int? = nil, scale: CGFloat) -> CGImage? {
         let edges = [
             pixels, ImagePipeline.playerEdge, Self.pixels(edge: Metrics.headerArt, scale: scale),
@@ -99,12 +105,12 @@ struct ArtworkImage: View {
 
     private func load(_ key: Key?) async {
         guard let key, loaded?.key != key else { return }
-        if let image = ImagePipeline.shared.cachedImage(for: key.url, pixelEdge: key.pixels) {
+        if let image = ImagePipeline.shared.cachedImage(for: key.url, pixelEdge: key.pixels, maxWidth: key.width) {
             loaded = Loaded(key: key, image: image)
             return
         }
         let start = ContinuousClock.now
-        guard let image = await ImagePipeline.shared.image(for: key.url, pixelEdge: key.pixels), !Task.isCancelled else {
+        guard let image = await ImagePipeline.shared.image(for: key.url, pixelEdge: key.pixels, maxWidth: key.width), !Task.isCancelled else {
             return
         }
         let next = Loaded(key: key, image: image)

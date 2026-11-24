@@ -35,8 +35,7 @@ struct RootView: View {
         .sheet(item: presented { $0 != .nowPlaying }) { sheet in
             SheetContent(sheet: sheet, transition: transition)
         }
-        // Full screen rather than a sheet, so a swipe down is the zoom's own
-        // close rather than the sheet sliding away and then zooming.
+        // Full screen rather than a sheet, so a swipe down is the zoom's own close, not a slide away then a zoom.
         .fullScreenCover(item: presented { $0 == .nowPlaying }) { sheet in
             SheetContent(sheet: sheet, transition: transition)
         }
@@ -45,6 +44,12 @@ struct RootView: View {
         .tint(app.theme.accent)
         .task { await app.followTheme() }
         .task { await app.followPinned() }
+        // NSCache needn't let go of anything when memory runs short, so the artwork Back or a scroll would reuse goes.
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: UIApplication.didReceiveMemoryWarningNotification) {
+                ImagePipeline.shared.purge(keeping: app.player.current?.thumbnail)
+            }
+        }
         .modifier(FollowPlayer())
         .modifier(HingeCheck())
     }

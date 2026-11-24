@@ -4,8 +4,7 @@ enum PanelTab: Int {
     case upNext, lyrics
 }
 
-/// The queue and lyrics fade out at the bottom rather than end in a hard cut
-/// across the artwork's colour.
+/// The queue and lyrics fade out at the bottom rather than end in a hard cut across the artwork's colour.
 struct SidePanel: View {
     let tab: PanelTab
     /// Whether the panel's page is the one on screen.
@@ -20,8 +19,7 @@ struct SidePanel: View {
         endPoint: .bottom
     )
 
-    /// Beside the player the controls go to the foot, where a thumb reaches on
-    /// an open phone, rather than the top middle, where none does.
+    /// Beside the player the controls go to the foot, where a thumb reaches on an open phone, not the top middle.
     private var isBeside: Bool { close == nil }
 
     var body: some View {
@@ -57,9 +55,9 @@ struct SidePanel: View {
             switch tab {
             case .upNext:
                 UpNextPanel(isShown: isShown, actionsBelow: isBeside) { close?() }
+                    .equatable()
             case .lyrics:
-                // Only while on screen, as the player loads lyrics then
-                // and they follow the song many times a second.
+                // Only while on screen, as the player loads lyrics then and they follow the song many times a second.
                 if isShown {
                     LyricsPanel { close?() }
                 } else {
@@ -74,8 +72,8 @@ struct SidePanel: View {
     }
 }
 
-/// Whether letting go of a list pulled well past its top closes the panel;
-/// the list and the page share the swipe's direction, so it would only bounce.
+/// Whether letting go of a list pulled well past its top closes the panel; the list and the page share the swipe's
+/// direction, so it would only bounce.
 func pulledPastTop(_ old: ScrollPhase, _ new: ScrollPhase, _ geometry: ScrollGeometry) -> Bool {
     old == .interacting && new != .interacting && geometry.contentOffset.y + geometry.contentInsets.top < -60
 }

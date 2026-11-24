@@ -23,15 +23,14 @@ nonisolated struct ArtworkColours: Equatable, Sendable {
     /// Made once, as Core Image contexts are costly to set up and safe to share.
     private static let context = CIContext(options: [.cacheIntermediates: false])
 
-    /// A page's tint, and its artwork frosted for behind its header.
+    /// A page's tint, and its artwork frosted for behind its header; `maxWidth` as the banner's, so both share one decode.
     @concurrent
-    static func backdrop(url: String, pixelEdge: Int) async -> PageBackdrop? {
-        guard let image = await image(url, pixelEdge: pixelEdge) else { return nil }
+    static func backdrop(url: String, pixelEdge: Int, maxWidth: Int? = nil) async -> PageBackdrop? {
+        guard let image = await image(url, pixelEdge: pixelEdge, maxWidth: maxWidth) else { return nil }
         return PageBackdrop(tint: ArtworkPalette.accent(image), frosted: frost(image))
     }
 
-    /// Blurred once here, not by the view on every frame the page scrolls, and shrunk first as nothing sharp
-    /// survives the blur.
+    /// Blurred once here, not by the view on every frame, and shrunk first as nothing sharp survives the blur.
     private static func frost(_ image: CGImage) -> Frosted? {
         let frostedEdge = 64.0
         let scale = frostedEdge / Double(min(image.width, image.height))
@@ -52,8 +51,8 @@ nonisolated struct ArtworkColours: Equatable, Sendable {
         return Frosted(image: output, luminance: ArtworkPalette.luminance(colour))
     }
 
-    private static func image(_ url: String, pixelEdge: Int) async -> CGImage? {
-        let image = await ImagePipeline.shared.image(for: url, pixelEdge: pixelEdge)
+    private static func image(_ url: String, pixelEdge: Int, maxWidth: Int? = nil) async -> CGImage? {
+        let image = await ImagePipeline.shared.image(for: url, pixelEdge: pixelEdge, maxWidth: maxWidth)
         return Task.isCancelled ? nil : image
     }
 }

@@ -155,6 +155,8 @@ private actor DownloadLog {
         store(next)
         pipeline.setHidden(false)
         #expect(held(playing) && held(next), "growing again drops nothing")
+        pipeline.purge(keeping: next)
+        #expect(held(next) && !held(playing), "a memory warning keeps only the playing song's")
     }
 
     @Test func aRequestDuringAPrefetchWaitsForItsDownload() async {
@@ -210,6 +212,38 @@ private actor DownloadLog {
         let whole = try #require(ImagePipeline.decode(data as Data, edge: 600))
         #expect((whole.width, whole.height) == (400, 300), "never scaled up")
         #expect(ImagePipeline.decode(Data("not an image".utf8), edge: 100) == nil)
+    }
+
+    @Test func cutsAWideDecodeToTheWidthShownAboutItsMiddle() throws {
+        let data = NSMutableData()
+        let destination = try #require(CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))
+        // Blue in the middle, between black bars the cut leaves out.
+        CGImageDestinationAddImage(destination, try image(400, 300) { x, _ in (100..<300).contains(x) ? (0, 0, 255) : (0, 0, 0) }, nil)
+        #expect(CGImageDestinationFinalize(destination))
+        let cut = try #require(ImagePipeline.decode(data as Data, edge: 300, maxWidth: 200))
+        #expect((cut.width, cut.height) == (200, 300))
+        for x in [0, 199] {
+            let colour = try pixel(cut, x: x)
+            #expect(colour[2] > 200 && colour[0] < 50, "blue at column \(x), not the bars")
+        }
+        let narrow = try #require(ImagePipeline.decode(data as Data, edge: 150, maxWidth: 400))
+        #expect((narrow.width, narrow.height) == (200, 150), "only cut where wider")
+        let banner = "https://lh3.googleusercontent.com/abc=w1440-h600-p-l90-rj"
+        #expect(ImagePipeline.key(banner, 360, maxWidth: 400) != ImagePipeline.key(banner, 360), "a cut is kept apart")
+    }
+
+    /// `image`'s colour at column `x` of its top row, as RGBA.
+    private func pixel(_ image: CGImage, x: Int) throws -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        try bytes.withUnsafeMutableBytes { buffer in
+            let context = try #require(CGContext(
+                data: buffer.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: space,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ))
+            context.draw(image, in: CGRect(x: -x, y: 1 - image.height, width: image.width, height: image.height))
+        }
+        return bytes
     }
 
     @Test func fetchesACachedCopyAgainOnceAMonthOld() throws {

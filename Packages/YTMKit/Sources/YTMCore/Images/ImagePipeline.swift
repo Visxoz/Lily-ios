@@ -4,27 +4,25 @@ import Foundation
 import ImageIO
 import os
 
-/// Artwork decoded off the main actor at the size shown, from memory, then the
-/// downloads' artwork, then `HTTP.media`'s disk URL cache, then the network.
+/// Artwork decoded off the main actor at the size shown, from memory, then the downloads' artwork, then
+/// `HTTP.media`'s disk URL cache, then the network.
 public final class ImagePipeline: Sendable {
     public static let shared = ImagePipeline()
 
-    /// Now Playing's artwork in pixels (the phone's width less its margins,
-    /// at 3x), shared with the lock screen so both use one decode.
+    /// Now Playing's artwork (the phone's width less its margins, at 3x), shared with the lock screen's decode.
     public static let playerEdge = 1080
-    /// Any artwork drawn 56 points or smaller (56 at 3x), in pixels, so a
-    /// row's copy, the mini player's and the prefetched one share one decode.
+    /// Any artwork drawn 56 points or smaller (at 3x), so a row's copy, the mini player's and the prefetched one
+    /// share one decode.
     public static let smallEdge = 168
 
-    /// Decoded artwork kept, in bytes: enough for a Home feed's cards and the
-    /// player's 1080-pixel copy to outlast a scroll.
+    /// In bytes: enough for a Home feed's cards and the player's 1080-pixel copy to outlast a scroll.
     static let memoryLimit = 96 << 20
     /// The limit while the app is in the background, where nothing draws artwork: the playing song's player and row
     /// copies, kept for its return, and the next song's, which `StreamPrefetcher` decodes for the lock screen
     /// (4.5 MB each at 1080 pixels, over Windows's whole 2 MB).
     static let hiddenLimit = 10 << 20
-    /// Prefetches at once per page, besides any its last run left finishing: few, so the
-    /// artwork a view asks for itself never queues behind a page's worth for the media host's connections.
+    /// Prefetches at once per page, besides any its last run left finishing: few, so the artwork a view asks for
+    /// itself never queues behind a page's worth for the media host's connections.
     private static let prefetchWidth = 4
     private static let log = Logger(subsystem: "Lily", category: "ImagePipeline")
     /// Downloaded songs' artwork, at the player's size, which serves every smaller one.
@@ -40,15 +38,15 @@ public final class ImagePipeline: Sendable {
     let memory = MemoryCache(limit: memoryLimit)
     private let downloads = Downloads()
 
-    /// Artwork from `url` scaled so its shorter side is `pixelEdge` pixels,
-    /// or nil when it can't be had or the caller was cancelled.
-    public func image(for url: String, pixelEdge: Int) async -> CGImage? {
-        let key = Self.key(url, pixelEdge)
+    /// Scaled so its shorter side is `pixelEdge` pixels, and cut to `maxWidth` about its middle where wider (a
+    /// banner filling a frame narrower than the photograph); nil when it can't be had or the caller was cancelled.
+    public func image(for url: String, pixelEdge: Int, maxWidth: Int? = nil) async -> CGImage? {
+        let key = Self.key(url, pixelEdge, maxWidth: maxWidth)
         if let image = memory[key] { return image }
         return await downloads.image(for: key) { [memory] in
             // Another request may have finished it since the check above.
             if let image = memory[key] { return image }
-            guard let image = await Self.fetch(url, edge: pixelEdge) else { return nil }
+            guard let image = await Self.fetch(url, edge: pixelEdge, maxWidth: maxWidth) else { return nil }
             memory.insert(image, for: key)
             return image
         }
@@ -59,17 +57,24 @@ public final class ImagePipeline: Sendable {
     /// grows again. Artwork on screen stays, as its views hold it, so only what Back or a scroll would reuse goes,
     /// to be read from disk again.
     public func setHidden(_ hidden: Bool, keeping playing: String? = nil) {
-        let kept = playing.map { url in [Self.playerEdge, Self.smallEdge].map { Self.key(url, $0) } } ?? []
-        memory.setLimit(hidden ? Self.hiddenLimit : Self.memoryLimit, keeping: kept)
+        memory.setLimit(hidden ? Self.hiddenLimit : Self.memoryLimit, keeping: Self.playingKeys(playing))
     }
 
-    /// Artwork already decoded at `pixelEdge`, without fetching.
-    public func cachedImage(for url: String, pixelEdge: Int) -> CGImage? {
-        memory[Self.key(url, pixelEdge)]
+    /// As `setHidden` empties it, leaving the limit, for a memory warning, which may come in either state.
+    public func purge(keeping playing: String? = nil) {
+        memory.removeAll(keeping: Self.playingKeys(playing))
     }
 
-    /// Downloads artwork into the disk URL cache without decoding it, so memory
-    /// stays bounded. Nothing more starts once the caller is cancelled.
+    private static func playingKeys(_ playing: String?) -> [String] {
+        playing.map { url in [playerEdge, smallEdge].map { key(url, $0) } } ?? []
+    }
+
+    /// Without fetching.
+    public func cachedImage(for url: String, pixelEdge: Int, maxWidth: Int? = nil) -> CGImage? {
+        memory[Self.key(url, pixelEdge, maxWidth: maxWidth)]
+    }
+
+    /// Into the disk URL cache without decoding, so memory stays bounded. Nothing more starts once cancelled.
     public func prefetch(_ urls: [String], pixelEdge: Int) async {
         await withTaskGroup(of: Void.self) { group in
             var seen = Set<String>()
@@ -129,15 +134,15 @@ public final class ImagePipeline: Sendable {
         return kept.appending(path: name)
     }
 
-    /// Keyed by what is requested, so artwork stored at different sizes
-    /// shares one decode and one download.
-    static func key(_ url: String, _ edge: Int) -> String {
-        "\(edge):\(requested(url, edge: edge))"
+    /// By what is requested, so artwork stored at different sizes shares one decode and download; a cut one by width.
+    static func key(_ url: String, _ edge: Int, maxWidth: Int? = nil) -> String {
+        let whole = "\(edge):\(requested(url, edge: edge))"
+        return maxWidth.map { "\(whole):w\($0)" } ?? whole
     }
 
     @concurrent
-    private static func fetch(_ url: String, edge: Int) async -> CGImage? {
-        if let data = try? Data(contentsOf: keptFile(url)), let image = decode(data, edge: edge) {
+    private static func fetch(_ url: String, edge: Int, maxWidth: Int?) async -> CGImage? {
+        if let data = try? Data(contentsOf: keptFile(url)), let image = decode(data, edge: edge, maxWidth: maxWidth) {
             return image
         }
         guard let url = requestURL(url, edge: edge) else {
@@ -145,11 +150,11 @@ public final class ImagePipeline: Sendable {
             return nil
         }
         var request = URLRequest(url: url)
-        if let kept = inDateCopy(of: &request), let image = decode(kept, edge: edge) { return image }
+        if let kept = inDateCopy(of: &request), let image = decode(kept, edge: edge, maxWidth: maxWidth) { return image }
         do {
             let (data, _) = try await HTTP.data(for: request, session: HTTP.media)
             try Task.checkCancellation()
-            guard let image = decode(data, edge: edge) else {
+            guard let image = decode(data, edge: edge, maxWidth: maxWidth) else {
                 log.debug("Undecodable artwork.")
                 // Only artwork that decodes is kept.
                 HTTP.artworkCache.removeCachedResponse(for: request)
@@ -161,8 +166,7 @@ public final class ImagePipeline: Sendable {
         }
     }
 
-    /// Fetches `url` at `edge` for the URL cache to keep, unless it already
-    /// holds it. The bytes are dropped: `fetch` reads them back from the cache.
+    /// For the URL cache to keep, unless it holds it already. The bytes are dropped: `fetch` reads them back from it.
     @concurrent
     private static func download(_ url: String, edge: Int) async {
         guard !FileManager.default.fileExists(atPath: keptFile(url).path(percentEncoded: false)),
@@ -195,16 +199,14 @@ public final class ImagePipeline: Sendable {
         URL(string: requested(url, edge: edge)).flatMap { HTTP.isAllowed($0) ? $0 : nil }
     }
 
-    /// googleusercontent renders any size, so ask for the pixels drawn. A wide banner is asked for by
-    /// height alone, which keeps the photograph's own shape: YouTube's 2.4:1 crop of it, filling a
-    /// phone's taller header, would be cropped again to a sliver.
+    /// googleusercontent renders any size, so ask for the pixels drawn. A wide banner is asked for by height alone,
+    /// keeping the photograph's shape: YouTube's 2.4:1 crop, filling a phone's taller header, would be cut to a sliver.
     static func requested(_ url: String, edge: Int) -> String {
         guard isWide(url), let eq = url.lastIndex(of: "=") else { return Thumbnail.resized(url, edge: edge) }
         return "\(url[..<eq])=h\(edge)-l90-rj"
     }
 
-    /// Whether a googleusercontent URL's size, as `=w1440-h600-p-l90-rj`,
-    /// names a width and height that differ.
+    /// A googleusercontent URL's size, as `=w1440-h600-p-l90-rj`, names a width and height that differ.
     static func isWide(_ url: String) -> Bool {
         guard url.contains("googleusercontent.com"), let eq = url.lastIndex(of: "=") else { return false }
         let size = url[url.index(after: eq)...].split(separator: "-", maxSplits: 2)
@@ -214,17 +216,17 @@ public final class ImagePipeline: Sendable {
         return width != height
     }
 
-    /// `data` decoded with its shorter side at most `edge` pixels, the
-    /// orientation applied, and decoded now rather than on first draw.
-    static func decode(_ data: Data, edge: Int) -> CGImage? {
+    /// Shorter side at most `edge`, orientation applied, decoded now rather than on first draw; then cut to
+    /// `maxWidth` about its middle where wider, as the view crops it.
+    static func decode(_ data: Data, edge: Int, maxWidth: Int? = nil) -> CGImage? {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? Int,
               let height = properties[kCGImagePropertyPixelHeight] as? Int
         else { return nil }
-        // ImageIO bounds the longer side, while the view crops to fill, so
-        // the shorter side is what has to reach the edge drawn. Never scaled up.
+        // ImageIO bounds the longer side, while the view crops to fill, so the shorter side must reach the edge drawn.
+        // Never scaled up.
         let shorter = max(min(width, height), 1)
         let longer = max(width, height)
         let longest = shorter > edge ? (longer * edge + shorter - 1) / shorter : longer
@@ -234,6 +236,24 @@ public final class ImagePipeline: Sendable {
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
         ] as CFDictionary
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options)
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else { return nil }
+        guard let maxWidth, maxWidth > 0, image.width > maxWidth else { return image }
+        return middle(of: image, width: maxWidth) ?? image
+    }
+
+    /// Drawn into a bitmap of its own, as `cropping(to:)` would keep the whole decode alive behind the cut.
+    private static func middle(of image: CGImage, width: Int) -> CGImage? {
+        let space = image.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)
+        // An opaque photograph stays opaque, so it is drawn without blending.
+        let alpha: CGImageAlphaInfo = [.none, .noneSkipFirst, .noneSkipLast].contains(image.alphaInfo) ? .noneSkipFirst : .premultipliedFirst
+        guard let space,
+              let context = CGContext(
+                  data: nil, width: width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                  bitmapInfo: alpha.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+              )
+        else { return nil }
+        let left = (image.width - width) / 2
+        context.draw(image, in: CGRect(x: -left, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
     }
 }

@@ -10,8 +10,9 @@ struct PageHeaderView: View {
     let backdrop: PageBackdrop?
     /// The navigation bar's height, which a banner reaches up under.
     let topInset: CGFloat
-    /// Under iPhone Duo's column of tabs; nowhere else, where it would
-    /// mirror the banner up into the space a pull to refresh opens.
+    /// The banner's width in pixels, which its decode is cut to; nil until measured.
+    let bannerPixelWidth: Int?
+    /// Under iPhone Duo's column of tabs only; elsewhere it would mirror the banner into the pull to refresh's space.
     let extendsBanner: Bool
     /// Wider than tall, as iPhone Duo open.
     let isWide: Bool
@@ -26,8 +27,11 @@ struct PageHeaderView: View {
 
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    @State private var fit = ActionsFit()
 
-    /// The page samples its tint at this size too, so the decode is shared.
+    private nonisolated static let actionsSpace = "actions"
+
+    /// The page samples its tint at this size (and a banner's width) too, so the decode is shared.
     static func artEdge(_ header: PageHeader, topInset: CGFloat) -> CGFloat {
         header.banner ? Metrics.bannerHeight + topInset : Metrics.headerArt
     }
@@ -37,7 +41,8 @@ struct PageHeaderView: View {
             if header.banner {
                 let height = Self.artEdge(header, topInset: topInset)
                 ZStack(alignment: .bottomLeading) {
-                    ArtworkImage(url: header.thumbnail, edge: height, placeholder: false)
+                    // Not loaded until the width is known, so an uncut decode never lands in the cache beside the cut one.
+                    ArtworkImage(url: bannerPixelWidth == nil ? nil : header.thumbnail, edge: height, placeholder: false, pixelWidth: bannerPixelWidth)
                         .frame(height: height)
                         // Sharp down to just above the text, then as if behind frosted glass, which the text sits
                         // on. Laid out as the photograph, so the two line up.
@@ -91,16 +96,12 @@ struct PageHeaderView: View {
             }
 
             if canPlay || canRadio || link != nil || canSave || canSubscribe {
-                // Shuffle, then Play, drop their words where the row would overflow, then the icons narrow, as on
-                // iPhone Duo's outer screen.
-                ViewThatFits(in: .horizontal) {
-                    actions(labels: 2)
-                    actions(labels: 1)
-                    actions(labels: 0)
-                    actions(labels: 0, target: 36)
-                }
-                .padding(.horizontal, Metrics.pagePadding)
-                .frame(height: Metrics.actionsHeight)
+                // The room the row has, which the row inside measures itself against.
+                Color.clear
+                    .overlay(alignment: .leading) { actions }
+                    .coordinateSpace(.named(Self.actionsSpace))
+                    .padding(.horizontal, Metrics.pagePadding)
+                    .frame(height: Metrics.actionsHeight)
             }
         }
     }
@@ -118,8 +119,43 @@ struct PageHeaderView: View {
         model != nil && header.subscribed != nil && header.channelId != nil
     }
 
-    /// `labels` is how many of Play and Shuffle keep their words; `target` the width of each icon's.
-    private func actions(labels: Int, target: CGFloat = 44) -> some View {
+    /// Built once, so its download button and menu aren't made again for each width tried. Shuffle, then Play, drop
+    /// their words where the row would overflow, then the icons narrow, as on iPhone Duo's outer screen.
+    private var actions: some View {
+        let narrow = fit.narrow
+        return HStack(spacing: 0) {
+            // The rest to the far end, unless they are all there is.
+            if canPlay || canShuffle {
+                if narrow {
+                    pills(labels: 0, gap: 0)
+                } else {
+                    // Offered the room the icons leave, so the first that fits is the first whole row that would.
+                    ViewThatFits(in: .horizontal) {
+                        pills(labels: 2, gap: 8)
+                        pills(labels: 1, gap: 8)
+                        pills(labels: 0, gap: 8)
+                    }
+                }
+            }
+            icons(target: narrow ? 36 : 44)
+        }
+        .onGeometryChange(for: ActionsMeasure.self) { proxy in
+            ActionsMeasure(width: proxy.size.width, room: proxy.bounds(of: .named(Self.actionsSpace))?.width ?? proxy.size.width)
+        } action: { measure in
+            // Only a row with full-size icons says whether they fit, and one that fits changes nothing, so the
+            // header isn't drawn again on every page opened.
+            // shortcut: narrowed, the icons stay so after the row gets shorter (a button gone, Subscribed back to
+            // Subscribe, a smaller text size), until the room changes; measure the full-size row apart should that show.
+            if fit.narrow {
+                fit.room = measure.room
+            } else if measure.width > measure.room + 0.5 {
+                fit = ActionsFit(room: measure.room, needed: measure.width)
+            }
+        }
+    }
+
+    /// `labels` is how many of Play and Shuffle keep their words; `gap` the least room before the icons.
+    private func pills(labels: Int, gap: CGFloat) -> some View {
         HStack(spacing: 0) {
             if canPlay {
                 ActionPill(icon: .play, title: "Play", primary: true, compact: labels < 1) { perform(.play) }
@@ -128,10 +164,13 @@ struct PageHeaderView: View {
             if canShuffle {
                 ActionPill(icon: .shuffle, title: "Shuffle", compact: labels < 2) { perform(.shuffle) }
             }
-            // The rest to the far end, unless they are all there is.
-            if canPlay || canShuffle {
-                Spacer(minLength: target == 44 ? 8 : 0)
-            }
+            Spacer(minLength: gap)
+        }
+    }
+
+    /// `target` is the width of each icon's.
+    private func icons(target: CGFloat) -> some View {
+        HStack(spacing: 0) {
             if canRadio {
                 IconButton(icon: .radio, size: target, iconSize: 24) { perform(.radio) }
                     .accessibilityLabel("Start radio")
@@ -185,6 +224,21 @@ struct PageHeaderView: View {
             if let model { app.setPrivacy(privacy, in: model) }
         })
     }
+}
+
+/// The action row's width and the room it has, measured together so neither is stale against the other.
+private nonisolated struct ActionsMeasure: Equatable {
+    let width: CGFloat
+    let room: CGFloat
+}
+
+/// The icons narrow once a row with full-size ones overflows, and widen again once the room reaches that row.
+private nonisolated struct ActionsFit: Equatable {
+    var room: CGFloat = 0
+    /// The row with full-size icons, when it overflowed; zero while it fits.
+    var needed: CGFloat = 0
+
+    var narrow: Bool { needed > room + 0.5 }
 }
 
 private struct HeaderText<Trailing: View>: View {

@@ -2,12 +2,11 @@ import SwiftUI
 import YTMCore
 import YTMPlayback
 
-/// Rows, the selection and each row's actions follow queue entries by ID,
-/// not place, so an open swipe or menu acts on its own song however the
-/// queue moves.
-struct UpNextPanel: View {
-    /// Off screen, the list keeps the song playing at its top, ready for the
-    /// swipe up.
+/// Rows, the selection and each row's actions follow queue entries by ID, not place, so an open swipe or menu acts on
+/// its own song however the queue moves. Equatable, so Now Playing redrawing runs the list over every entry only when
+/// the queue or whether the panel is on screen has changed.
+struct UpNextPanel: View, Equatable {
+    /// Off screen, the list keeps the song playing at its top, ready for the swipe up.
     let isShown: Bool
     /// Beside the player, under the list rather than over it.
     let actionsBelow: Bool
@@ -18,6 +17,11 @@ struct UpNextPanel: View {
     @Environment(\.theme) private var theme
     @State private var editMode = EditMode.inactive
     @State private var selection = Set<Queue<Track>.Entry.ID>()
+
+    /// `close` is left out: each one the screen makes only sets its own state, so an older copy does the same.
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.isShown == rhs.isShown && lhs.actionsBelow == rhs.actionsBelow
+    }
 
     var body: some View {
         let queue = app.player.queue
@@ -31,8 +35,7 @@ struct UpNextPanel: View {
                 list(queue)
             }
         }
-        // Picks stay with their entries through an edit; a new queue, whose
-        // entries are all new, lets them go.
+        // Picks stay with their entries through an edit; a new queue, whose entries are all new, lets them go.
         .onChange(of: queue.revision) {
             guard !selection.isEmpty else { return }
             selection.formIntersection(app.player.queue.entries.lazy.map(\.id))
@@ -126,8 +129,7 @@ struct UpNextPanel: View {
         }
     }
 
-    /// Where the entries `ids` sit now, worked out only as an action runs;
-    /// none for entries gone meanwhile.
+    /// Where the entries `ids` sit now, worked out only as an action runs; none for entries gone meanwhile.
     private func offsets(_ ids: Set<Queue<Track>.Entry.ID>) -> IndexSet {
         let entries = app.player.queue.entries
         return IndexSet(entries.indices.filter { ids.contains(entries[$0].id) })

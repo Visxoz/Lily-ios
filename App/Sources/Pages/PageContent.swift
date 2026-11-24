@@ -14,18 +14,17 @@ struct PageContent: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var frame = Frame()
     @State private var position = ScrollPosition(edge: .top)
-    @State private var titleShown = false
+    @State private var sticky = StickyTitleState()
     @State private var backdrop: PageBackdrop?
     @State private var isWide = false
     @State private var dialog: PlaylistDialog?
     @State private var newName = ""
 
-    /// So a page opened again starts in its colour. Keyed by URL alone: the
-    /// size isn't known until the header is measured, and doesn't change it.
+    /// So a page opened again starts in its colour. Keyed by URL and a banner's width, which its frost is cut to; the
+    /// height isn't known until the header is measured, and doesn't change it.
     private static var backdrops: [String: PageBackdrop] = [:]
 
-    /// The scroll view's width, the bar's height over it, and the column
-    /// iPhone Duo keeps its tabs in down one side.
+    /// The scroll view's width, the bar's height over it, and the column iPhone Duo keeps its tabs in down one side.
     private nonisolated struct Frame: Equatable {
         var width: CGFloat = 0
         var top: CGFloat = 0
@@ -35,6 +34,9 @@ struct PageContent: View {
     private nonisolated struct TintSource: Hashable {
         let url: String
         let pixels: Int
+        let width: Int?
+
+        var key: String { width.map { "\(url):w\($0)" } ?? url }
     }
 
     var body: some View {
@@ -58,16 +60,16 @@ struct PageContent: View {
         }
         .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { isWide = $0 }
         // The scroll view is a new one, at the top, either side of the change.
-        .onChange(of: splitHeader == nil) { titleShown = false }
+        .onChange(of: splitHeader == nil) { sticky.shown = false }
         .background { theme.panel.modifier(PastEdges()).ignoresSafeArea() }
         .navigationTitle(page.header?.title ?? "")
         .toolbarTitleDisplayMode(.inline)
         .toolbar {
             if let header = page.header {
                 ToolbarItem(placement: .principal) {
-                    StickyTitle(title: header.title, canPlay: canPlay) { app.perform(.play, on: page) }
-                        .opacity(stickyTitleShown ? 1 : 0)
-                        .animation(Theme.normal, value: stickyTitleShown)
+                    StickyTitle(title: header.title, canPlay: canPlay, isSplit: splitHeader != nil, state: sticky) {
+                        app.perform(.play, on: page)
+                    }
                 }
             }
         }
@@ -75,19 +77,18 @@ struct PageContent: View {
         .task(id: tintSource) {
             guard let tintSource else { return }
             // Held in the view too, as another page may empty the cache while this one stays in a stack.
-            if let cached = Self.backdrops[tintSource.url] {
+            if let cached = Self.backdrops[tintSource.key] {
                 backdrop = cached
                 return
             }
-            if let found = await ArtworkColours.backdrop(url: tintSource.url, pixelEdge: tintSource.pixels) {
+            if let found = await ArtworkColours.backdrop(url: tintSource.url, pixelEdge: tintSource.pixels, maxWidth: tintSource.width) {
                 backdrop = found
                 // Emptied once full rather than evicted one by one: past 64 pages, a revisit only fades in again.
                 if Self.backdrops.count >= 64 { Self.backdrops.removeAll() }
-                Self.backdrops[tintSource.url] = found
+                Self.backdrops[tintSource.key] = found
             }
         }
-        // The cards' art is fetched as the page is built, rather than as each
-        // scrolls in, and stops once it is left.
+        // The cards' art is fetched as the page is built, rather than as each scrolls in, and stops once it is left.
         .task(id: [cardCount, model?.replacements ?? 0]) { await prefetchArt() }
         .environment(\.pinsPlaylists, route.showsPins)
         .modifier(PlaylistDialogs(dialog: $dialog, name: $newName, title: page.header?.title ?? "", model: model))
@@ -99,11 +100,6 @@ struct PageContent: View {
         return header
     }
 
-    /// Beside the tracks the header never scrolls away, so neither is it repeated in the bar.
-    private var stickyTitleShown: Bool {
-        titleShown && splitHeader == nil
-    }
-
     private var tint: PageTint {
         let shown = shownBackdrop
         // Tinted, not frosted, under a banner on a wide screen, where more glass would read as a band of blur.
@@ -112,7 +108,7 @@ struct PageContent: View {
     }
 
     private var shownBackdrop: PageBackdrop? {
-        backdrop ?? tintSource.flatMap { Self.backdrops[$0.url] }
+        backdrop ?? tintSource.flatMap { Self.backdrops[$0.key] }
     }
 
     private func headerView(_ header: PageHeader) -> PageHeaderView {
@@ -123,6 +119,7 @@ struct PageContent: View {
             canRadio: header.radioId != nil,
             backdrop: shownBackdrop,
             topInset: frame.top,
+            bannerPixelWidth: bannerPixelWidth,
             extendsBanner: frame.side > 0,
             isWide: isWide,
             download: canPlay && Downloads.isDownloadable(route) ? DownloadButton(route: route, page: page) : nil,
@@ -170,17 +167,14 @@ struct PageContent: View {
                 }
             }
         }
-        // The mask stands in for the scroll view's clip so it can run past
-        // the sides (`PastEdges`). It overhangs top and bottom as the safe
-        // area eases in on a tab's first page, briefly clipping the tint; not
-        // while Now Playing shrinks the screen, whose edges still clip.
+        // The mask stands in for the scroll view's clip so it can run past the sides (`PastEdges`). It overhangs top
+        // and bottom as the safe area eases in on a tab's first page, briefly clipping the tint, bar while Now
+        // Playing shrinks the screen, whose edges still clip.
         .scrollClipDisabled()
         .mask { PastEdgesMask() }
         .scrollPosition($position)
         .onChange(of: model?.replacements) { position.scrollTo(edge: .top) }
-        // The tint runs unbroken under the bar, whose edge shows only with
-        // the sticky title.
-        .scrollEdgeEffectHidden(!stickyTitleShown, for: .top)
+        .modifier(StickyEdge(state: sticky, isSplit: isSplit))
         // Beside the header, the tracks' half alone.
         .onGeometryChange(for: Frame.self) { proxy in
             Frame(
@@ -191,7 +185,7 @@ struct PageContent: View {
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > Metrics.stickyTitleAfter
         } action: { _, shown in
-            titleShown = shown
+            sticky.shown = shown
         }
     }
 
@@ -199,17 +193,15 @@ struct PageContent: View {
         !page.headerTracks.isEmpty
     }
 
-    /// So a further step that adds cards fetches their art too, and one that
-    /// only adds songs fetches nothing.
+    /// So a further step that adds cards fetches their art too, and one that only adds songs fetches nothing.
     private var cardCount: Int {
         page.sections.reduce(0) { count, section in
             if case .cards(let s) = section { count + s.cards.count } else { count }
         }
     }
 
-    /// Song rows load their own art as they come on screen, so a long
-    /// playlist's isn't all downloaded at once. The chips and the top result
-    /// draw none of this art, or their own, so they are left out.
+    /// Song rows load their own art as they come on screen, so a long playlist's isn't all downloaded at once. The
+    /// chips and the top result draw none of this art, or their own, so they are left out.
     private func prefetchArt() async {
         // The first screen's own loads go first, so none is asked for twice.
         try? await Task.sleep(for: .milliseconds(250))
@@ -222,9 +214,15 @@ struct PageContent: View {
     }
 
     private var tintSource: TintSource? {
-        guard let header = page.header, let url = header.thumbnail else { return nil }
+        guard let header = page.header, let url = header.thumbnail, !header.banner || bannerPixelWidth != nil else { return nil }
         let edge = PageHeaderView.artEdge(header, topInset: frame.top)
-        return TintSource(url: url, pixels: ArtworkImage.pixels(edge: edge, scale: displayScale))
+        return TintSource(url: url, pixels: ArtworkImage.pixels(edge: edge, scale: displayScale), width: bannerPixelWidth)
+    }
+
+    /// A banner's width in pixels, which its decode and the tint's are cut to so they share it; none until measured.
+    private var bannerPixelWidth: Int? {
+        guard page.header?.banner == true, frame.width > 0 else { return nil }
+        return Int((frame.width * displayScale).rounded(.up))
     }
 }
 
@@ -250,9 +248,8 @@ private struct Greeting: View {
     }
 }
 
-/// While Now Playing's zoom shrinks the screen, the page runs past its sides
-/// to hide the black behind; only then, or a sliding page would overlap the
-/// one beside it.
+/// While Now Playing's zoom shrinks the screen, the page runs past its sides to hide the black behind; only then, or
+/// a sliding page would overlap the one beside it.
 private struct PastEdges: ViewModifier {
     static let width: CGFloat = 16
 
@@ -279,14 +276,27 @@ private struct PastEdgesMask: View {
     }
 }
 
+/// Whether the page has scrolled past its header, apart from the page so crossing it redraws only the bar.
+@Observable private final class StickyTitleState {
+    var shown = false
+
+    /// Beside the tracks the header never scrolls away, so neither is it repeated in the bar.
+    func isShown(split: Bool) -> Bool {
+        shown && !split
+    }
+}
+
 private struct StickyTitle: View {
     let title: String
     let canPlay: Bool
+    let isSplit: Bool
+    let state: StickyTitleState
     let play: () -> Void
 
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let shown = state.isShown(split: isSplit)
         HStack(spacing: 10) {
             if canPlay {
                 PlayButton(size: 30, action: play)
@@ -296,6 +306,18 @@ private struct StickyTitle: View {
                 .foregroundStyle(theme.text)
                 .lineLimit(1)
         }
+        .opacity(shown ? 1 : 0)
+        .animation(Theme.normal, value: shown)
+    }
+}
+
+/// The tint runs unbroken under the bar, whose edge shows only with the sticky title.
+private struct StickyEdge: ViewModifier {
+    let state: StickyTitleState
+    let isSplit: Bool
+
+    func body(content: Content) -> some View {
+        content.scrollEdgeEffectHidden(!state.isShown(split: isSplit), for: .top)
     }
 }
 
