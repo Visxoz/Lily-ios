@@ -2,8 +2,7 @@ import Foundation
 import YTMAudio
 import YTMCore
 
-// The seams the player talks through, so its logic can be tested without
-// YouTube or a sound device.
+// The seams the player talks through, so its logic can be tested without YouTube or a sound device.
 
 protocol MusicService: Sendable {
     var isSignedIn: Bool { get async }

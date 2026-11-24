@@ -2,8 +2,8 @@ import Foundation
 import os
 
 extension YTMusic {
-    /// Nil when signed out, or when YouTube no longer takes the session. The picture comes
-    /// from the guide, as the menu has been seen to keep serving the one before a change.
+    /// Nil when signed out, or when YouTube no longer takes the session. The picture comes from the guide, as the
+    /// menu has been seen to keep serving the one before a change.
     @concurrent
     public func account() async throws -> Account? {
         guard await auth.isSignedIn else { return nil }
@@ -12,8 +12,8 @@ extension YTMusic {
         return Account(menu: menu, guidePhoto: Account.photo(await guide?["userProfile", "accountPhoto", "thumbnails"] ?? .missing))
     }
 
-    /// Asks Google for fresh session cookies, as an open YouTube tab does every few minutes:
-    /// nothing else renews the app's own session. Does nothing signed out; a failure is only logged.
+    /// Asks Google for fresh session cookies, as an open YouTube tab does every few minutes: nothing else renews the
+    /// app's own session. Does nothing signed out; a failure is only logged.
     @concurrent
     public func renewSignIn() async {
         guard let cookie = await auth.sessionCookie, let url = URL(string: "https://accounts.youtube.com/RotateCookies") else {
@@ -35,8 +35,8 @@ extension YTMusic {
         }
     }
 
-    /// Checks the stored cookie with YouTube, which costs a page load. Nil when signed out
-    /// or YouTube couldn't be asked.
+    /// Checks the stored cookie with YouTube, which costs a page load. Nil when signed out or YouTube couldn't be
+    /// asked.
     @concurrent
     public func isSessionValid() async -> Bool? {
         guard let cookie = await auth.sessionCookie, let url = URL(string: "https://www.youtube.com/results?search_query=") else {

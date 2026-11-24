@@ -1,8 +1,8 @@
 import Foundation
 
 extension Renderers {
-    /// A song or video from a `musicResponsiveListItemRenderer`'s body; nil for
-    /// rows that open a page, live streams, and rows without an ID or title.
+    /// A song or video from a `musicResponsiveListItemRenderer`'s body; nil for rows that open a page, live streams,
+    /// and rows without an ID or title.
     static func track(_ renderer: JSON, context: ItemContext = ItemContext()) -> Track? {
         if renderer["navigationEndpoint", "browseEndpoint"].exists { return nil }
         let badges = renderer["badges"].array
@@ -14,8 +14,7 @@ extension Renderers {
         let watch = playButton.exists ? playButton : titleRuns.first?["navigationEndpoint", "watchEndpoint"] ?? .missing
         guard let id = renderer["playlistItemData", "videoId"].string ?? watch["videoId"].string, !id.isEmpty else { return nil }
 
-        // The details are found by their links and shapes rather than their
-        // column order, which differs between lists.
+        // The details are found by their links and shapes rather than their column order, which differs between lists.
         let details = columns.dropFirst().flatMap(\.runs)
         let segments = columns.dropFirst().flatMap { Renderers.segments($0.runs) }
         var artists = linkedArtists(details)

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Covers only the commands Material Symbols use: moves, lines, cubic curves
-/// (with the smooth form) and closing, absolute and relative.
+/// Covers only the commands Material Symbols use: moves, lines, cubic curves (with the smooth form) and closing,
+/// absolute and relative.
 nonisolated enum SVGPath {
     static func parse(_ data: String) -> Path {
         var scanner = Scanner(bytes: Array(data.utf8))
@@ -62,21 +62,18 @@ nonisolated enum SVGPath {
         return path
     }
 
-    /// The previous control point mirrored through `point`, or `point`
-    /// itself when the previous segment was not a curve.
+    /// The previous control point mirrored through `point`, or `point` itself when the previous segment wasn't a curve.
     private static func reflected(_ control: CGPoint?, about point: CGPoint) -> CGPoint {
         guard let control else { return point }
         return CGPoint(x: 2 * point.x - control.x, y: 2 * point.y - control.y)
     }
 
-    /// Reads commands and numbers, which SVG lets run together: "1.1.9" is
-    /// 1.1 and .9, and "2-.5" is 2 and -.5.
+    /// Reads commands and numbers, which SVG lets run together: "1.1.9" is 1.1 and .9, and "2-.5" is 2 and -.5.
     private struct Scanner {
         let bytes: [UInt8]
         var index = 0
 
-        /// The next command letter, or `previous` repeated when numbers
-        /// follow without one; nil at the end.
+        /// The next command letter, or `previous` repeated when numbers follow without one; nil at the end.
         mutating func command(after previous: UInt8) -> UInt8? {
             skipSeparators()
             guard index < bytes.count else { return nil }

@@ -19,12 +19,11 @@ private struct PageBody: View {
     @State private var model: PageModel
     @Environment(AppModel.self) private var app
     @Environment(\.scenePhase) private var scenePhase
-    /// The app went to the background with the page on screen, so the next
-    /// visit is a return to the app rather than to the page.
+    /// The app went to the background with the page on screen, so the next visit is a return to the app, not the page.
     @State private var backgrounded = false
 
-    /// A new account or a return from the background, as Home may have aged;
-    /// Control Centre and the like leave the app in the foreground.
+    /// A new account or a return from the background, as Home may have aged; Control Centre and the like leave the app
+    /// in the foreground.
     private struct Visit: Hashable {
         let account: Int
         let foreground: Bool

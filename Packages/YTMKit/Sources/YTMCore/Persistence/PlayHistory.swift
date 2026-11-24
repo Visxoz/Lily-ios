@@ -19,8 +19,8 @@ public struct PlayHistory: Codable, Sendable {
         self.skipped = skipped.intersection(seen)
     }
 
-    /// Cleaned as `init(tracks:)` cleans, so a hand-edited file can't bring in repeats. A file from
-    /// before skips were kept counts every play as heard.
+    /// Cleaned as `init(tracks:)` cleans, so a hand-edited file can't bring in repeats. A file from before skips were
+    /// kept counts every play as heard.
     public init(from decoder: any Decoder) throws {
         let file = try decoder.container(keyedBy: CodingKeys.self)
         var skipped = Set<String>()

@@ -2,10 +2,9 @@ import Foundation
 import Network
 import os
 
-/// The user's own HTTP or SOCKS5 proxy, kept in the Keychain as its address may hold a password.
-/// Without one, every session follows the proxy set in iOS.
+/// The user's own HTTP or SOCKS5 proxy, kept in the Keychain as its address may hold a password. Without one, every
+/// session follows the proxy set in iOS.
 public enum Proxy {
-    /// A proxy address as typed, parsed.
     struct Address: Equatable, Sendable {
         let scheme: String
         /// Without an IPv6 address's brackets.
@@ -36,8 +35,8 @@ public enum Proxy {
         }
     }()
 
-    /// For every session and the sign-in page; empty without the user's own, so iOS's applies.
-    /// The first read touches the Keychain, so never on the main actor.
+    /// For every session and the sign-in page; empty without the user's own, so iOS's applies. The first read touches
+    /// the Keychain, so never on the main actor.
     public static var configurations: [ProxyConfiguration] {
         inUse.map { [configuration(for: $0)] } ?? []
     }
@@ -55,8 +54,8 @@ public enum Proxy {
         return (proxy?.shown, proxy != inUse)
     }
 
-    /// Saves `text` as the proxy for the next start, or none when it is empty. Returns its address
-    /// without any password, and whether it differs from the one in use, credentials included.
+    /// For the next start, or none when `text` is empty. Returns its address without any password, and whether it
+    /// differs from the one in use, credentials included.
     @concurrent
     public static func save(_ text: String) async throws(YTMError) -> (address: String?, pending: Bool) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -102,8 +101,8 @@ public enum Proxy {
         return Address(scheme: scheme, host: host.lowercased(), port: port, user: parts.user, password: parts.password)
     }
 
-    /// Every request is HTTPS, so an HTTP proxy is asked to CONNECT. SOCKS5 resolves names
-    /// through the proxy either way, so socks5 and socks5h behave alike.
+    /// Every request is HTTPS, so an HTTP proxy is asked to CONNECT. SOCKS5 resolves names through the proxy either
+    /// way, so socks5 and socks5h behave alike.
     static func configuration(for proxy: Address) -> ProxyConfiguration {
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(proxy.host), port: NWEndpoint.Port(integerLiteral: proxy.port))
         let configuration = proxy.scheme.hasPrefix("socks5")

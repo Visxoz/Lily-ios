@@ -38,7 +38,8 @@ actor AppleMusicCatalogue {
                 let data = try await HTTP.data(for: request).0
                 return Self.covers(in: try JSON(data: data)["results", "albums", "data"].array, album: album, artist: artist)
             } catch let error as YTMError where error.status == 401 {
-                // A token kept a while may have been withdrawn, so the script's current one is tried; a fresh one refused is final.
+                // A token kept a while may have been withdrawn, so the script's current one is tried; a fresh one
+                // refused is final.
                 refuse(token.jwt)
                 guard attempt == 0, token.fetched.map({ .now - $0 > Self.backoff }) ?? true else {
                     withdrawn = true

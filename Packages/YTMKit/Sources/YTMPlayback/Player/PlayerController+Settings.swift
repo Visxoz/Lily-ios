@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import YTMCore
 
-/// Settings changes take effect as made: normalisation within the few seconds the
-/// engine has scheduled, quality, crossfade and Automix from the next song queued, speed at once.
+/// Settings changes take effect as made: normalisation within the few seconds the engine has scheduled, quality,
+/// crossfade and Automix from the next song queued, speed at once.
 extension PlayerController {
     public func toggleMute() {
         settings.value.muted.toggle()
@@ -31,8 +31,7 @@ extension PlayerController {
     /// Plays go to the account's YouTube history, and their watch time with them.
     var reportsToYouTube: Bool { signedIn && settings.value.youtubeHistory }
 
-    /// Call after signing in or out. Dropping the saved Home, the old account's,
-    /// is the caller's job.
+    /// Call after signing in or out. Dropping the saved Home, the old account's, is the caller's job.
     public func accountDidChange() async {
         recorder.forgetWatch()
         chooser.reset()
@@ -90,8 +89,7 @@ extension PlayerController {
             queueEdited()
         }
         if old.quality != new.quality {
-            // Streams resolved ahead, or being resolved, at the old quality
-            // are dropped; the playing song carries on as it is.
+            // Streams resolved ahead, or being resolved, at the old quality are dropped; the playing song carries on.
             queueing?.cancel()
             prefetcher.clear()
             gapless.forget()

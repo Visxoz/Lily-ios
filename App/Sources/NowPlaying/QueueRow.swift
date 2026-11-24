@@ -1,8 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// The playing title is bold rather than in the accent, which the artwork
-/// behind Now Playing drowns.
+/// The playing title is bold rather than in the accent, which the artwork behind Now Playing drowns.
 struct QueueRow: View {
     let track: Track
     let current: Bool

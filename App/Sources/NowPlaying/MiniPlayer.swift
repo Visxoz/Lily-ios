@@ -47,8 +47,8 @@ struct MiniPlayer: View {
             }
             .contentShape(Capsule())
             .glassEffect(.regular.interactive(), in: Capsule())
-            // Shaped as the capsule, so Now Playing shrinks into its rounded
-            // ends rather than a rectangle they replace on the last frame.
+            // Shaped as the capsule, so Now Playing shrinks into its rounded ends rather than a rectangle they replace
+            // on the last frame.
             .matchedTransitionSource(id: tab, in: transition) { $0.clipShape(.rect(cornerRadius: Self.height / 2)) }
             .onTapGesture { app.sheet = .nowPlaying }
             .accessibilityElement(children: .contain)
@@ -63,8 +63,7 @@ struct MiniPlayer: View {
     }
 }
 
-/// Pulled only twice a second while playing, as a 2-point line moves too
-/// little to need more.
+/// Pulled only twice a second while playing, as a 2-point line moves too little to need more.
 struct MiniProgress: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
@@ -93,8 +92,8 @@ struct Playhead<Content: View>: View {
     @ViewBuilder let content: (Double) -> Content
 
     @Environment(AppModel.self) private var app
-    /// The place last sought, shown while paused as the engine's clock may not
-    /// have reached it and a paused playhead is never pulled again.
+    /// The place last sought, shown while paused as the engine's clock may not have reached it and a paused playhead
+    /// is never pulled again.
     @State private var sought: Double?
 
     var body: some View {

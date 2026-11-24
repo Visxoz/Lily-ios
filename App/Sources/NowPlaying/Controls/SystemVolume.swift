@@ -9,8 +9,7 @@ import SwiftUI
     @ObservationIgnored private var observation: NSKeyValueObservation?
     @ObservationIgnored private weak var volumeView: MPVolumeView?
 
-    /// Starts observing when its view is made, which happens once, not in
-    /// `init`, which SwiftUI reruns and throws away on every redraw.
+    /// Starts observing when its view is made, which happens once, not in `init`, which SwiftUI reruns on every redraw.
     fileprivate func attach(_ view: MPVolumeView) {
         volumeView = view
         let session = AVAudioSession.sharedInstance()
@@ -22,8 +21,8 @@ import SwiftUI
         }
     }
 
-    /// iOS offers no call that sets the volume, so this moves a system volume
-    /// view's slider; without one the bar stays put rather than show a change.
+    /// iOS offers no call that sets the volume, so this moves a system volume view's slider; without one the bar stays
+    /// put rather than show a change.
     func set(_ value: Float) {
         guard let slider = volumeView?.subviews.lazy.compactMap({ $0 as? UISlider }).first else { return }
         level = value

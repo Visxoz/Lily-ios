@@ -71,8 +71,7 @@ extension YTMusic {
         let shelf = try await libraryShelf(.playlists)
         let saved = try await libraryCards(shelf, all: all)
         let likedCard = await liked
-        // Episodes for Later is a podcast page, which does not open as a
-        // playlist; Liked music leads the list already.
+        // Episodes for Later is a podcast page, which does not open as a playlist; Liked music leads the list already.
         let playlists = saved.filter {
             $0.id != BuiltInPlaylist.episodesForLater && (likedCard == nil || $0.id != BuiltInPlaylist.likedMusic)
         }
@@ -146,8 +145,7 @@ enum LibraryList: CaseIterable {
         }
     }
 
-    /// The first batch comes in a section list, or as the grid or shelf's own
-    /// continuation.
+    /// The first batch comes in a section list, or as the grid or shelf's own continuation.
     static func shelf(in response: JSON) -> JSON {
         let list = Renderers.sectionList(in: response)
         guard list.exists else { return response["continuationContents"].onlyValue?.value ?? .missing }
@@ -159,8 +157,7 @@ enum LibraryList: CaseIterable {
         shelf.first("items", "contents").array
     }
 
-    /// Counts the songs listed when they all are, else the header's count.
-    /// Nil when the page has no list of songs.
+    /// Counts the songs listed when they all are, else the header's count. Nil when the page has no list of songs.
     static func likedMusicCard(_ response: JSON) -> Card? {
         let shelf = Renderers.trackShelf(in: response)
         guard shelf.exists else { return nil }

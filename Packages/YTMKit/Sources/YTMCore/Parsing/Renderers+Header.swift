@@ -1,8 +1,8 @@
 import Foundation
 
 extension Renderers {
-    /// An album or playlist page's header renderer, from the two-column page's
-    /// first tab or else its own header, from inside the wrapper owned playlists add.
+    /// An album or playlist page's header renderer, from the two-column page's first tab or else its own header, from
+    /// inside the wrapper owned playlists add.
     static func detailHeader(in response: JSON) -> JSON {
         for wrapper in headerWrappers(in: response) {
             let editable = wrapper["musicEditablePlaylistDetailHeaderRenderer", "header"]
@@ -58,8 +58,8 @@ extension Renderers {
             .first { $0.exists } ?? .missing
     }
 
-    /// The whole list's track count from a header's second subtitle: "64
-    /// songs • 3 hours", or "1B views • 200 songs • 6+ hours".
+    /// The whole list's track count from a header's second subtitle: "64 songs • 3 hours", or
+    /// "1B views • 200 songs • 6+ hours".
     static func trackCount(_ header: JSON) -> Int? {
         let parts = segments(header["secondSubtitle"].runs)
         let index = parts.count > 2 ? 1 : 0

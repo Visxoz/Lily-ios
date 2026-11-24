@@ -21,9 +21,8 @@ extension AppModel {
         return kept
     }
 
-    /// History isn't cached, so a song just played shows next time. Leaving the screen doesn't
-    /// cancel the request: the page still lands in the cache, and a second visit shares it.
-    /// If YouTube fails, a downloaded album or playlist falls back to the songs on the phone, uncached.
+    /// History isn't cached, so a song just played shows next time. Leaving the screen doesn't cancel the request: the
+    /// page still lands in the cache. If YouTube fails, a downloaded album or playlist falls back to the phone's songs.
     func fetchPage(_ route: Route) async throws -> Page {
         if let load = pageLoads[route] { return try await load.value }
         let generation = accountGeneration

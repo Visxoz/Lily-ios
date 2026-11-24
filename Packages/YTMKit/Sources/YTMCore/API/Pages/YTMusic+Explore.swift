@@ -104,8 +104,8 @@ struct MoodsAndGenres: Sendable {
     var all: [Card] { moods + genres }
 }
 
-/// Shelves whose "More" opens a playlist are chart lists (top songs, then
-/// trending); the rest hold the chart playlists and the top artists.
+/// Shelves whose "More" opens a playlist are chart lists (top songs, then trending); the rest hold the chart
+/// playlists and the top artists.
 struct Charts: Sendable {
     static let browseId = "FEmusic_charts"
     static let params = "sgYPRkVtdXNpY19leHBsb3Jl"
@@ -142,8 +142,8 @@ private extension [Section] {
     }
 }
 
-/// A value kept for the session. Callers arriving mid-fetch share it; a
-/// failure isn't kept, so the next caller asks again.
+/// A value kept for the session. Callers arriving mid-fetch share it; a failure isn't kept, so the next caller asks
+/// again.
 actor SessionCache<Value: Sendable> {
     private var cached: Value?
     private var fetching: Task<Value, any Error>?

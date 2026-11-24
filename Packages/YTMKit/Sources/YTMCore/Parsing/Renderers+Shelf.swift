@@ -1,8 +1,8 @@
 import Foundation
 
 extension Renderers {
-    /// A wrapped shelf as one section: a track list played as `mode` if it has
-    /// songs, else cards laid out as `layout` or by its kind; nil when empty.
+    /// A wrapped shelf as one section: a track list played as `mode` if it has songs, else cards laid out as `layout`
+    /// or by its kind; nil when empty.
     static func section(
         _ wrapped: JSON, context: ItemContext = ItemContext(), mode: QueueMode = .section, layout: CardLayout? = nil
     ) -> Section? {

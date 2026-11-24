@@ -2,18 +2,15 @@ import AVFoundation
 import Synchronization
 @testable import YTMAudio
 
-/// The app's audio engine rendering offline into memory, as fast as it decodes.
-///
-/// Rendering offline outruns the player's completion callbacks, so the engine
-/// sometimes restarts its player where a real device never would; the checks
-/// measure what it scheduled, which is exact regardless.
+/// The app's audio engine rendering offline into memory, as fast as it decodes. That outruns the player's completion
+/// callbacks, so the engine sometimes restarts its player where a real device never would; the checks measure what
+/// it scheduled, which is exact regardless.
 final class OfflineEngine: Sendable {
     /// As a phone's speaker runs.
     static let rate = 48_000.0
     /// The most the offline graph takes at once.
     static let chunk: AVAudioFrameCount = 4_096
-    /// How long a step waits on the download before rendering anyway, as a
-    /// device plays a stall as silence.
+    /// How long a step waits on the download before rendering anyway, as a device plays a stall as silence.
     static let stallLimit: Duration = .seconds(10)
 
     struct Buffer: Hashable, Sendable {

@@ -325,7 +325,6 @@ enum MotionLookup {
         [normalised(name)] + name.split { $0 == "," || $0 == "&" }.map { normalised(String($0)) }
     }
 
-    /// Lowercase, without accents, without Apple's " - Single" or " - EP", and only letters and digits.
     static func normalised(_ name: String) -> String {
         var name = name[...]
         for suffix in [" - Single", " - EP"] where name.hasSuffix(suffix) {
@@ -335,7 +334,6 @@ enum MotionLookup {
         return String(folded.unicodeScalars.filter(CharacterSet.alphanumerics.contains))
     }
 
-    /// Requests never use Low Data Mode, and metered networks only when allowed.
     static func request(_ url: URL, cellular: Bool) -> URLRequest {
         var request = URLRequest(url: url)
         request.allowsExpensiveNetworkAccess = cellular

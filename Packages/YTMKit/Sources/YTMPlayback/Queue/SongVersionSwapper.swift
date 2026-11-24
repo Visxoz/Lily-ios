@@ -2,8 +2,8 @@ import Foundation
 import os
 import YTMCore
 
-/// Swaps music videos for their song versions, which are audio only and have
-/// Premium formats, only once the song's own stream is ready, so nothing waits.
+/// Swaps music videos for their song versions, which are audio only and have Premium formats, only once the song's
+/// own stream is ready, so nothing waits.
 struct SongVersionSwapper {
     /// Most videos remembered; past it the cache starts over.
     static let limit = 256
@@ -62,8 +62,7 @@ extension PlayerController {
             putSongVersion(song, for: videoId)
             return
         }
-        // Kept only if the swap succeeds: the video may have left the queue,
-        // or started playing, meanwhile.
+        // Kept only if the swap succeeds: the video may have left the queue, or started playing, meanwhile.
         resolveAhead(song) { $0.putSongVersion(song, for: videoId) }
     }
 

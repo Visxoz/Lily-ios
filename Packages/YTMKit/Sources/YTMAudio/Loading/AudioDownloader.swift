@@ -13,7 +13,7 @@ public actor AudioDownloader {
     private let source: any ByteSource
 
     /// `proxies` is asked for at the first download, off the main actor.
-    public init(directory: URL, proxies: @escaping @Sendable () -> [ProxyConfiguration] = { [] }) {
+    public init(directory: URL, proxies: @escaping @Sendable () -> [ProxyConfiguration]) {
         self.directory = directory
         source = HTTPByteSource(proxies: proxies)
     }

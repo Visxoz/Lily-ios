@@ -200,7 +200,6 @@ enum LyricsMatch {
         return text.applyingTransform(StringTransform("Hant-Hans"), reverse: false) ?? text
     }
 
-    /// The folded runs of letters and digits.
     private static func words(_ text: some StringProtocol) -> [Substring] {
         folded(text).split { !$0.isLetter && !$0.isNumber }
     }

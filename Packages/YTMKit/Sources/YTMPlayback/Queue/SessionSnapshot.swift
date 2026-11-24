@@ -52,8 +52,7 @@ extension PlayerController {
         sessionSaving.schedule { [weak self] in self?.writeSession() }
     }
 
-    /// Writes the session, history and settings now, as when the app leaves
-    /// the foreground.
+    /// Writes the session, history and settings now, as when the app leaves the foreground.
     public func persistSession() {
         sessionSaving.cancel()
         writeSession()
@@ -83,8 +82,8 @@ extension PlayerController {
         playback.heldPosition = session.position
         if let saved = session.stream {
             let age = Duration.seconds(Date.now.timeIntervalSince(saved.resolved))
-            // Only with half its hour left, so it still covers a play well after launch; not if the
-            // clock was set back, which would keep it fresh for ever.
+            // Only with half its hour left, so it still covers a play well after launch; not if the clock was set
+            // back, which would keep it fresh for ever.
             if age >= .zero, age < StreamPrefetcher.freshFor / 2 { prefetcher.store(track.id, .init(stream: saved.stream, resolvedAt: .now - age, epoch: prefetcher.epoch)) }
         }
         current = track
@@ -95,14 +94,12 @@ extension PlayerController {
         return track
     }
 
-    /// The rating loads only if none has been set or loaded since `rating`,
-    /// the rating generation at restore.
+    /// The rating loads only if none has been set or loaded since `rating`, the rating generation at restore.
     func warmUp(_ restored: Track?, rating: UInt64) {
         preparePremium()
         guard let restored, current?.id == restored.id else { return }
         if ratingGeneration == rating { loadRating(of: restored.id) }
-        // So the first play needn't wait on YouTube. Not warmed: the play
-        // fetches the start itself.
+        // So the first play needn't wait on YouTube. Not warmed: the play fetches the start itself.
         guard isStopped else { return }
         resolveAhead(restored, warming: false)
     }

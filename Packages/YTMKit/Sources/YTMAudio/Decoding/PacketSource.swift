@@ -1,16 +1,15 @@
 import AudioToolbox
 import Foundation
 
-/// Lists where each packet lies in the file, so packets are read from the cache file when decoded
-/// rather than held in memory.
+/// Lists where each packet lies in the file, so packets are read from the cache file when decoded, not held in memory.
 protocol PacketSource: AnyObject {
     /// Nil until the container's header has been read.
     var format: SourceFormat? { get }
     var packets: PacketIndex { get }
     /// Codec frames of padding after the music, known once the last packet is read.
     var trailingFrames: Int64 { get }
-    /// Where a seek can start listing packets without the bytes before, from the container's index:
-    /// WebM's Cues or MP4's sidx, which YouTube puts before the first packet.
+    /// Where a seek can start listing packets without the bytes before, from the container's index: WebM's Cues or
+    /// MP4's sidx, which YouTube puts before the first packet.
     var seekPoints: [SeekPoint] { get }
     /// Reads the next bytes of the file; every byte comes once, in order.
     func parse(_ bytes: UnsafeRawBufferPointer) throws
@@ -57,8 +56,8 @@ struct PacketIndex {
         let frames: UInt16
     }
 
-    /// A day of 20 ms packets. A container can list packets in a few bytes
-    /// each, so a damaged one could otherwise fill memory with them.
+    /// A day of 20 ms packets. A container can list packets in a few bytes each, so a damaged one could otherwise
+    /// fill memory with them.
     static let capacity = Int(SourceFormat.longestSeconds) * 50
 
     private(set) var entries: ContiguousArray<Entry> = []

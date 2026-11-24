@@ -1,16 +1,15 @@
 import Foundation
 import os
 
-/// Scrobbling to Last.fm, with plays queued on disk until it takes them and
-/// the session in the Keychain. When a play counts is the player's to judge.
+/// Plays are queued on disk until Last.fm takes them, the session is in the Keychain. When a play counts is the
+/// player's to judge.
 public actor LastFM {
     public static let shared = LastFM(store: .shared)
 
-    /// How often to ask whether the user has allowed access, and for how long:
-    /// the token lasts an hour, and signing up first can take a while.
+    /// The token lasts an hour, and signing up first can take a while.
     static let pollEvery = Duration.seconds(3)
     static let pollFor = Duration.seconds(20 * 60)
-    /// The wait before sending again after a failure or a refused play.
+    /// After a failure or a refused play.
     static let retryAfter = Duration.seconds(60)
 
     private static let sessionItem = "lastfm.session"
@@ -18,26 +17,22 @@ public actor LastFM {
 
     private let store: FileStore
     private let keys = Keys.builtIn
-    // Read on first use rather than at launch, so neither the Keychain nor
-    // the disk is touched on the main actor.
+    // Read on first use rather than at launch, so neither the Keychain nor the disk is touched on the main actor.
     private lazy var session: Session? = Self.read(Session.self, from: Self.sessionItem)
     private lazy var pending = loadPending()
     private var sending = false
-    /// Last.fm refused a batch as invalid, so this many of its plays go one
-    /// at a time, to find the one it refuses and drop it alone.
+    /// Last.fm refused a batch as invalid, so this many of its plays go one at a time, to find and drop the bad one.
     private var singles = 0
-    /// Bumped by connecting and disconnecting, so replies for an earlier
-    /// account or attempt are ignored.
+    /// Bumped by connecting and disconnecting, so replies for an earlier account or attempt are ignored.
     private var generation: UInt64 = 0
     private var retry: Task<Void, Never>?
     private let revoked: AsyncStream<Void>.Continuation
 
-    /// Yields when Last.fm revokes access; the account is signed out with its
-    /// plays kept for when it connects again. One consumer.
+    /// Yields when Last.fm revokes access; the account is signed out with its plays kept for when it connects again.
+    /// One consumer.
     public nonisolated let accessRevoked: AsyncStream<Void>
 
-    /// Sends the plays left from an earlier run; the player makes the shared
-    /// instance at launch.
+    /// Sends the plays left from an earlier run; the player makes the shared instance at launch.
     init(store: FileStore) {
         self.store = store
         (accessRevoked, revoked) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -45,12 +40,11 @@ public actor LastFM {
     }
 
     public var username: String? { session?.name }
-    /// Whether this build has the API keys, without which Settings offers
-    /// no Connect.
+    /// Without the build's API keys, Settings offers no Connect.
     public static var isAvailable: Bool { Keys.builtIn != nil }
 
-    /// Opens the page where the user allows access, then polls until they
-    /// have. Ends on cancellation, another sign-in or a sign-out.
+    /// Opens the page where the user allows access, then polls until they have. Ends on cancellation, another sign-in
+    /// or a sign-out.
     public func signIn(open: @Sendable (URL) async -> Void) async throws {
         guard let keys else {
             throw YTMError(.refused, "Last.fm isn't available in this build.")
@@ -85,9 +79,8 @@ public actor LastFM {
         }
     }
 
-    /// Forgets the account, or stops waiting for one. A connected account's
-    /// unsent plays are dropped, so none reach the next one; stopping a wait
-    /// keeps those of an account whose access was revoked.
+    /// Forgets the account, or stops waiting for one. A connected account's unsent plays are dropped, so none reach
+    /// the next one; stopping a wait keeps those of an account whose access was revoked.
     public func signOut() {
         let connected = session != nil
         end()
@@ -97,7 +90,6 @@ public actor LastFM {
         }
     }
 
-    /// Shows `track`, just started, as what the account is listening to.
     public func nowPlaying(_ track: Track) async {
         guard let session, let keys, let play = Play(track, at: .now) else { return }
         let generation = generation
@@ -108,7 +100,6 @@ public actor LastFM {
         }
     }
 
-    /// Logs a play that counted, queued on disk until Last.fm takes it.
     public func scrobble(_ track: Track, startedAt: Date) async {
         guard session != nil, let play = Play(track, at: startedAt) else { return }
         pending.push(play)
@@ -126,8 +117,7 @@ public actor LastFM {
         Task { await drain() }
     }
 
-    /// Sends the oldest plays, then the rest, until none are left or Last.fm
-    /// can't take them for now.
+    /// Oldest first, until none are left or Last.fm can't take them for now.
     private func drain() async {
         defer { sending = false }
         while let session, let keys, !pending.isEmpty {
@@ -144,15 +134,13 @@ public actor LastFM {
                     // One play spoils a batch; find it, and drop it alone.
                     singles = batch.count
                 } else {
-                    // Waits before the next, so a refusal that isn't about
-                    // the play costs a play a minute, not them all.
+                    // Waits before the next, so a refusal that isn't about the play costs a play a minute, not all.
                     Self.log.warning("Last.fm refused a play: \(message, privacy: .public)")
                     sent(batch)
                     wait = true
                 }
             } catch {
-                // An earlier account's reply, whose plays are gone, goes
-                // straight on to the plays that waited behind it.
+                // An earlier account's reply, whose plays are gone, goes straight on to the plays behind it.
                 wait = generation == self.generation
                 failed(error, generation: generation)
             }
@@ -163,16 +151,15 @@ public actor LastFM {
         }
     }
 
-    /// Drops `batch`, which Last.fm has taken or refused. Saved only here, so a pass
-    /// that changes nothing, as offline, rewrites nothing.
+    /// Drops `batch`, which Last.fm has taken or refused. Saved only here, so a pass that changes nothing, as offline,
+    /// rewrites nothing.
     private func sent(_ batch: [Play]) {
         pending.remove(batch)
         singles = max(singles - 1, 0)
         store.save(pending, to: .scrobbles)
     }
 
-    /// Tries the plays again in a while, as nothing else may send them until
-    /// another play counts.
+    /// Nothing else may send the plays until another play counts.
     private func retryLater() {
         retry = Task { [weak self] in
             try? await Task.sleep(for: Self.retryAfter)
@@ -201,8 +188,7 @@ public actor LastFM {
         Self.write(Session?.none, to: Self.sessionItem)
     }
 
-    /// Signs out an account whose access was revoked, keeping its plays.
-    /// Replies for an earlier account change nothing.
+    /// Signs out an account whose access was revoked, keeping its plays. Replies for an earlier account change nothing.
     private func failed(_ error: any Error, generation: UInt64) {
         guard generation == self.generation, let failure = error as? Failure else { return }
         switch failure {
@@ -216,7 +202,7 @@ public actor LastFM {
         }
     }
 
-    /// Throws when a sign-in or sign-out has overtaken the attempt.
+    /// A sign-in or sign-out has overtaken the attempt.
     private func current(_ generation: UInt64) throws {
         if generation != self.generation { throw CancellationError() }
     }

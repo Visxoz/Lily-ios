@@ -1,8 +1,8 @@
 import SwiftUI
 import YTMCore
 
-/// The mini player is the app's own since the tab bar accessory is too short to
-/// reach comfortably; each tab has one, so the zoom sources never share an ID.
+/// The mini player is the app's own since the tab bar accessory is too short to reach comfortably; each tab has one,
+/// so the zoom sources never share an ID.
 struct TabRoot<Content: View>: View {
     let tab: AppTab
     let transition: Namespace.ID
@@ -39,8 +39,8 @@ struct TabRoot<Content: View>: View {
     }
 }
 
-/// The stack's inset doesn't reach the pages' scroll views, so each page keeps
-/// the mini player's room itself, or its last rows sit under it out of reach.
+/// The stack's inset doesn't reach the pages' scroll views, so each page keeps the mini player's room itself, or its
+/// last rows sit under it out of reach.
 private struct MiniPlayerRoom: ViewModifier {
     let tab: AppTab
 

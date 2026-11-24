@@ -9,8 +9,7 @@ import AppKit
 #endif
 
 @MainActor final class NowPlayingCenter {
-    /// Seconds the system's reckoning of the position may drift, as through a
-    /// stall, before it is told again.
+    /// Seconds the system's reckoning of the position may drift, as through a stall, before it is told again.
     private static let allowedDrift = 1.0
 
     private let info = MPNowPlayingInfoCenter.default()
@@ -66,8 +65,7 @@ import AppKit
             metadata[MPMediaItemPropertyArtwork] = Self.artwork(image)
             return
         }
-        // The row's small copy, scaled up by the system, so the lock screen
-        // has artwork while the large one loads.
+        // The row's small copy, scaled up by the system, so the lock screen has artwork while the large one loads.
         if let small = ImagePipeline.shared.cachedImage(for: url, pixelEdge: ImagePipeline.smallEdge) {
             metadata[MPMediaItemPropertyArtwork] = Self.artwork(small)
         }
@@ -80,8 +78,7 @@ import AppKit
         }
     }
 
-    /// A new dictionary restarts the system's reckoning from its elapsed
-    /// time, which must be brought up to now.
+    /// A new dictionary restarts the system's reckoning from its elapsed time, which must be brought up to now.
     private func republish() {
         if let published {
             let elapsed = reckoned(published)
@@ -95,8 +92,7 @@ import AppKit
         metadata[MPMediaItemPropertyPlaybackDuration] = duration > 0 ? duration : nil
     }
 
-    /// `playing` sets the play button; `advancing` (not loading or stalled) lets
-    /// the system run the position on by itself.
+    /// `playing` sets the play button; `advancing` (not loading or stalled) lets the system run the position on.
     func setPlayback(playing: Bool, advancing: Bool, elapsed: Double) {
         guard trackID != nil else { return }
         let rate = advancing ? speed : 0
@@ -124,8 +120,8 @@ import AppKit
         commands.likeCommand.isActive = isLiked
     }
 
-    // Nonisolated: MediaPlayer asks for the image on its own queue, and a
-    // closure made on the main actor would trap there.
+    // Nonisolated: MediaPlayer asks for the image on its own queue, and a closure made on the main actor would trap
+    // there.
     nonisolated private static func artwork(_ image: CGImage) -> MPMediaItemArtwork {
         let size = CGSize(width: image.width, height: image.height)
         #if canImport(UIKit)
@@ -268,8 +264,8 @@ import AppKit
 }
 
 private extension MPRemoteCommand {
-    /// The system calls handlers from its own thread, so they hop to the main
-    /// actor rather than assume it, with the event's values, not the event.
+    /// The system calls handlers from its own thread, so they hop to the main actor rather than assume it, with the
+    /// event's values, not the event.
     func addTarget<Value: Sendable>(
         on player: PlayerController, reading read: @escaping @Sendable (MPRemoteCommandEvent) -> Value?,
         _ action: @escaping @MainActor @Sendable (PlayerController, Value) -> Void

@@ -1,4 +1,5 @@
 import Foundation
+import YTMCore
 
 /// The hosts Google's sign-in may show; everything else leaves for the browser.
 nonisolated enum SignInHosts {
@@ -6,8 +7,6 @@ nonisolated enum SignInHosts {
     /// Sign-in passes through these on its way to YouTube Music. Never handed to
     /// the system, which would open the YouTube apps and leave sign-in behind.
     private static let youtubeHosts: Set<String> = ["youtube.com", "www.youtube.com", "m.youtube.com", musicHost]
-    /// A signed-in session has one of these.
-    private static let sessionCookies: Set<String> = ["SAPISID", "__Secure-3PAPISID"]
     /// Sign-in and cookie consent hosts, allowed on any path.
     private static let signInHosts: Set<String> = [
         "accounts.youtube.com", "consent.google.com", "consent.youtube.com", "gds.google.com",
@@ -60,12 +59,11 @@ nonisolated enum SignInHosts {
     /// The cookies sent to YouTube Music, once a session is among them.
     static func session(in cookies: [HTTPCookie]) -> [HTTPCookie]? {
         let music = cookies.filter(goesToMusic)
-        return music.contains { sessionCookies.contains($0.name) } ? music : nil
+        return music.contains { GoogleAuth.loginCookies.contains($0.name) } ? music : nil
     }
 
     private static func goesToMusic(_ cookie: HTTPCookie) -> Bool {
-        let domain = cookie.domain.trimmingPrefix(".")
-        return musicHost == domain || musicHost.hasSuffix("." + domain)
+        HostAllowlist.isHost(musicHost, within: String(cookie.domain.trimmingPrefix(".")))
     }
 
     /// `accounts.google.<tld>` for one of Google's own domains, so that

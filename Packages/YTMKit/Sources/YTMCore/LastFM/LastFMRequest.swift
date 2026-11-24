@@ -17,8 +17,7 @@ extension LastFM {
         }()
     }
 
-    /// A connected account. The key does not expire; the user can revoke it
-    /// on Last.fm, which `Failure.signedOut` then reports.
+    /// The key does not expire; the user can revoke it on Last.fm, which `Failure.signedOut` then reports.
     struct Session: Codable, Sendable {
         var name: String
         var key: String
@@ -28,9 +27,9 @@ extension LastFM {
         var artist: String
         var track: String
         var album: String?
-        /// Length in seconds.
+        /// In seconds.
         var duration: Int?
-        /// When the play started, in Unix seconds.
+        /// The play's start, in Unix seconds.
         var timestamp: Int64
     }
 
@@ -38,11 +37,9 @@ extension LastFM {
         /// The account's access was revoked; it has to connect again.
         case signedOut
         case notYetAllowed
-        /// Last.fm will never take the request as it is: invalid parameters,
-        /// or a token that expired.
+        /// Last.fm will never take the request as it is: invalid parameters, or a token that expired.
         case rejected(String)
-        /// The built-in keys are unknown, suspended or mismatched. Plays
-        /// wait, as for `failed`, but connecting stops.
+        /// The built-in keys are unknown, suspended or mismatched. Plays wait, as for `failed`, but connecting stops.
         case invalidKeys
         /// Last.fm could not be reached or could not answer; try again later.
         case failed(String)
@@ -50,11 +47,9 @@ extension LastFM {
 }
 
 extension LastFM.Play {
-    /// `track` started at `start`, or nil when it lacks the artist or
-    /// title Last.fm refuses a play without.
+    /// Nil without the artist or title Last.fm refuses a play without.
     init?(_ track: Track, at start: Date) {
-        // The first artist, as Last.fm's catalogue lists features in the
-        // title rather than as artists.
+        // The first artist, as Last.fm's catalogue lists features in the title rather than as artists.
         artist = track.artists.first?.name ?? ""
         self.track = track.title
         album = track.album?.name
@@ -72,8 +67,7 @@ enum LastFMAPI {
     /// "Lily/1.0", as Lily for Windows names itself; plain "Lily" outside the app, as in ytmcheck, which has no version.
     private static let userAgent = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String).map { "Lily/\($0)" } ?? "Lily"
 
-    /// Adds `api_sig`: the MD5 of every name and value in byte-wise name
-    /// order, then the secret, as Last.fm requires of every signed call.
+    /// Adds `api_sig`: the MD5 of every name and value in byte-wise name order, then the secret, as Last.fm requires.
     static func sign(_ params: inout Params, secret: String) {
         params.sort { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) }
         var md5 = Insecure.MD5()
@@ -86,8 +80,7 @@ enum LastFMAPI {
         params.append(("api_sig", hex))
     }
 
-    /// `application/x-www-form-urlencoded`: unreserved bytes as they are,
-    /// spaces as `+`, the rest escaped.
+    /// `application/x-www-form-urlencoded`: unreserved bytes as they are, spaces as `+`, the rest escaped.
     static func form(_ params: Params) -> Data {
         var body = [UInt8]()
         for (index, (name, value)) in params.enumerated() {
@@ -115,9 +108,8 @@ enum LastFMAPI {
         }
     }
 
-    /// Not through `HTTP.data`, which fails on the status alone: Last.fm's 4xx
-    /// errors carry a code saying whether to retry. The host check and the
-    /// guarded `HTTP.api` session still apply.
+    /// Not through `HTTP.data`, which fails on the status alone: Last.fm's 4xx errors carry a code saying whether to
+    /// retry. The host check and the guarded `HTTP.api` session still apply.
     @concurrent
     static func call(_ method: String, _ params: Params = [], keys: LastFM.Keys) async throws -> JSON {
         var params = params
@@ -146,8 +138,7 @@ enum LastFMAPI {
         if let json, let code = json["error"].int {
             throw failure(code: code, message: json["message"].string ?? "", method: method)
         }
-        // Something other than Last.fm answering, as a gateway's error page,
-        // which would otherwise pass for a scrobble taken.
+        // Something other than Last.fm answering, as a gateway's error page, which would otherwise pass for a scrobble.
         guard let status = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(status) else {
             throw LastFM.Failure.failed("Last.fm answered with an error.")
         }
@@ -158,22 +149,20 @@ enum LastFMAPI {
     static func failure(code: Int, message: String, method: String) -> LastFM.Failure {
         let message = "Last.fm error \(code): \(message)"
         switch code {
-        // An invalid or expired token, so connecting has to start again, or
-        // invalid parameters.
+        // An invalid or expired token, so connecting has to start again, or invalid parameters.
         case 4 where method.hasPrefix("auth."), 15 where method.hasPrefix("auth."), 6:
             return .rejected(message)
         case 9: return .signedOut
         case 14: return .notYetAllowed
         // An unknown or suspended API key, or a secret that doesn't match it.
         case 10, 13, 26: return .invalidKeys
-        // Anything else, 4 on a scrobble among them, is about the account or
-        // Last.fm rather than the play, so the plays wait for later.
+        // Anything else, 4 on a scrobble among them, is about the account or Last.fm rather than the play, so the
+        // plays wait for later.
         default: return .failed(message)
         }
     }
 
-    /// Starts connecting an account: the page where the user allows access,
-    /// and the token to ask for the session with once they have.
+    /// The page where the user allows access, and the token to ask for the session with once they have.
     static func authorise(keys: LastFM.Keys) async throws -> (page: URL, token: String) {
         let reply = try await call("auth.getToken", keys: keys)
         guard let token = reply["token"].string, var page = URLComponents(string: authPage) else {
@@ -184,7 +173,6 @@ enum LastFMAPI {
         return (url, token)
     }
 
-    /// The session for `token`, once the user has allowed access.
     static func session(token: String, keys: LastFM.Keys) async throws -> LastFM.Session {
         let reply = try await call("auth.getSession", [("token", token)], keys: keys)
         guard let name = reply["session", "name"].string, let key = reply["session", "key"].string else {
@@ -199,8 +187,7 @@ enum LastFMAPI {
         _ = try await call("track.updateNowPlaying", params, keys: keys)
     }
 
-    /// Records `plays`, at most a batch, and returns why Last.fm ignored any:
-    /// those will never be taken, so they go like the others.
+    /// At most a batch; returns why Last.fm ignored any, which will never be taken, so they go like the others.
     static func scrobble(_ plays: [LastFM.Play], session: LastFM.Session, keys: LastFM.Keys) async throws -> [String] {
         var params: Params = [("sk", session.key)]
         for (index, play) in plays.enumerated() {
@@ -219,8 +206,7 @@ enum LastFMAPI {
         if let duration = play.duration { params.append(("duration" + suffix, String(duration))) }
     }
 
-    /// Why Last.fm ignored each play of a `track.scrobble` reply. One play
-    /// comes back as an object and more as a list, with the codes as strings.
+    /// One play comes back as an object and more as a list, with the codes as strings.
     static func ignored(_ reply: JSON) -> [String] {
         let plays = reply["scrobbles", "scrobble"]
         return (plays.isObject ? [plays] : plays.array).compactMap { play in

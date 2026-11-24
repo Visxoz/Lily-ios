@@ -2,9 +2,8 @@ import Foundation
 import os
 import YTMCore
 
-/// Streams resolved ahead for the next song, and kept from songs played for
-/// previous or repeat. Stream URLs last about six hours; one older than an
-/// hour is asked for again, unless it is the playing song's and wholly cached.
+/// Streams resolved ahead for the next song, and kept from songs played for previous or repeat. Stream URLs last
+/// about six hours; one older than an hour is asked for again, unless it is the playing song's and wholly cached.
 struct StreamPrefetcher {
     static let freshFor = Duration.seconds(60 * 60)
 
@@ -18,11 +17,9 @@ struct StreamPrefetcher {
     private var streams: [String: Prefetched] = [:]
     /// The playing song's, kept however old, as a replay of a whole file plays from the cache.
     private var playing: (id: String, prefetched: Prefetched)?
-    /// So a song started or queued meanwhile waits on its resolve rather than
-    /// asking again.
+    /// So a song started or queued meanwhile waits on its resolve rather than asking again.
     private var pending: [String: Task<ResolvedStream, any Error>] = [:]
-    /// Bumped by `clear`, so a stream resolved before it, for the old
-    /// quality or account, is never kept again.
+    /// Bumped by `clear`, so a stream resolved before it, for the old quality or account, is never kept again.
     private(set) var epoch = 0
 
     func has(_ id: String, at now: ContinuousClock.Instant = .now) -> Bool {
@@ -38,8 +35,8 @@ struct StreamPrefetcher {
         return kept(id, at: now)
     }
 
-    /// Drops stale streams too. One asked for before a `clear` is not kept.
-    /// Nor is a downloaded file's, as it may be removed before it plays. Returns whether it was kept.
+    /// Drops stale streams too. One asked for before a `clear` is not kept, nor is a downloaded file's, as it may be
+    /// removed before it plays. Returns whether it was kept.
     @discardableResult
     mutating func store(_ id: String, _ prefetched: Prefetched, at now: ContinuousClock.Instant = .now) -> Bool {
         guard prefetched.epoch == epoch, !prefetched.stream.url.isFileURL else { return false }
@@ -84,8 +81,7 @@ struct StreamPrefetcher {
         pending[id]
     }
 
-    /// False, changing nothing, when the task was taken meanwhile or dropped
-    /// by `clear`.
+    /// False, changing nothing, when the task was taken meanwhile or dropped by `clear`.
     mutating func finish(_ id: String, _ task: Task<ResolvedStream, any Error>) -> Bool {
         guard pending[id] == task else { return false }
         pending[id] = nil
@@ -102,29 +98,27 @@ struct StreamPrefetcher {
 }
 
 extension PlayerController {
-    /// Smart Shuffle goes first, as the next song may be one of its
-    /// recommendations. Never waits.
+    /// Smart Shuffle goes first, as the next song may be one of its recommendations. Never waits.
     func prefetchNext() {
         topUpSmartShuffle()
         guard let next = queue.peekNext(repeat: repeatMode) else { return }
         // A downloaded video stays, as its song version may need the network.
         if next.isVideo, localStream(next.id) == nil { swapInSongVersion(next) }
         prefetchLyrics(of: next)
-        // Both sizes the playing song shows, so its artwork and colours are
-        // there on the first frame.
+        // Both sizes the playing song shows, so its artwork and colours are there on the first frame.
         if let art = next.thumbnail {
             Task { await ImagePipeline.shared.image(for: art, pixelEdge: ImagePipeline.playerEdge) }
             Task { await ImagePipeline.shared.image(for: art, pixelEdge: ImagePipeline.smallEdge) }
         }
-        // A known song version resolves in the video's place, unless the video
-        // is playing, as on repeat. One still being looked up resolves too.
+        // A known song version resolves in the video's place, unless the video is playing, as on repeat. One still
+        // being looked up resolves too.
         let replaced = songVersions.knownSong(for: next.id) != nil && current?.id != next.id
         guard !replaced else { return }
         resolveAhead(next)
     }
 
-    /// The stream is kept only if `keep` says so once it lands. `warming` has
-    /// the engine fetch its start too while it is still next.
+    /// The stream is kept only if `keep` says so once it lands. `warming` has the engine fetch its start too while it
+    /// is still next.
     func resolveAhead(
         _ track: Track, warming: Bool = true, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }
     ) {
@@ -132,8 +126,7 @@ extension PlayerController {
         guard localStream(track.id) == nil, heldStream(track.id) == nil,
               gapless.queued?.trackID != track.id || gapless.queuedFailed else { return }
         if let kept = prefetcher.kept(track.id) {
-            // A kept stream may have lost its part file since; the engine skips
-            // a file cached or open.
+            // A kept stream may have lost its part file since; the engine skips a file cached or open.
             if warming, current?.id != track.id { warm(track, kept.stream) }
             return
         }
@@ -153,8 +146,8 @@ extension PlayerController {
         }
     }
 
-    /// Unless `owning`, a pending resolve is waited on but left in place, so
-    /// cancelling the wait, as a skip does to gapless queueing, leaves it running.
+    /// Unless `owning`, a pending resolve is waited on but left in place, so cancelling the wait, as a skip does to
+    /// gapless queueing, leaves it running.
     func streamSource(for id: String, owning: Bool = true) -> @Sendable () async throws -> StreamPrefetcher.Prefetched {
         if let prefetched = localStream(id) ?? heldStream(id) ?? prefetcher.take(id) { return { prefetched } }
         let epoch = prefetcher.epoch
@@ -177,8 +170,8 @@ extension PlayerController {
         id == current?.id && audio.bufferedFraction >= 1 ? prefetcher.held(id) : nil
     }
 
-    /// Only while `track` is still next: the engine warms one song, and a
-    /// stream landing late for another would replace the real next song's.
+    /// Only while `track` is still next: the engine warms one song, and a stream landing late for another would
+    /// replace the real next song's.
     func warm(_ track: Track, _ stream: ResolvedStream) {
         guard queue.peekNext(repeat: repeatMode)?.id == track.id,
               let item = try? audioItem(for: track, stream: stream) else { return }

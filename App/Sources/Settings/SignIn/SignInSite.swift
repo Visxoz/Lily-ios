@@ -1,4 +1,5 @@
 import Foundation
+import YTMCore
 
 /// A site whose own page signs in, and what its cookies hand the app once it has.
 struct SignInSite<Session> {
@@ -69,12 +70,10 @@ private nonisolated enum SpotifyHosts {
 
     static func opensInBrowser(_ url: URL) -> Bool {
         guard url.scheme == "https" || url.scheme == "http", let host = url.host() else { return false }
-        return !host.hasPrefix("accounts.") && !keptDomains.contains { host == $0 || host.hasSuffix("." + $0) }
+        return !host.hasPrefix("accounts.") && !keptDomains.contains { HostAllowlist.isHost(host, within: $0) }
     }
 
     static func isSession(_ cookie: HTTPCookie) -> Bool {
-        let cookieDomain = cookie.domain.trimmingPrefix(".")
-        return cookie.name == "sp_dc" && !cookie.value.isEmpty
-            && (cookieDomain == domain || cookieDomain.hasSuffix("." + domain))
+        cookie.name == "sp_dc" && !cookie.value.isEmpty && HostAllowlist.isHost(cookie.domain.trimmingPrefix("."), within: domain)
     }
 }

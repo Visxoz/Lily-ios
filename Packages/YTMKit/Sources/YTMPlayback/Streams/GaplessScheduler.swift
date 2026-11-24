@@ -3,11 +3,10 @@ import os
 import YTMAudio
 import YTMCore
 
-/// Queues the next song in the engine shortly before the current one ends,
-/// so it follows without a gap, fades in or is mixed in.
+/// Queues the next song in the engine shortly before the current one ends, so it follows without a gap, fades in or
+/// is mixed in.
 struct GaplessScheduler {
-    /// Wall time for the next stream to start downloading and its decoder to open. A blend adds
-    /// its reach, in song time.
+    /// Wall time for the next stream to start downloading and its decoder to open; a blend adds its reach, song time.
     static let leadSeconds = 15.0
 
     struct Queued {
@@ -18,8 +17,8 @@ struct GaplessScheduler {
     }
 
     private(set) var queued: Queued?
-    /// The engine couldn't open the queued stream, so `unqueue` drops it. Only a
-    /// flag, as the event may be late for a song queued since.
+    /// The engine couldn't open the queued stream, so `unqueue` drops it. Only a flag, as the event may be late for a
+    /// song queued since.
     var queuedFailed = false
     /// The song last tried for queueing, so a failure is not retried every tick.
     private(set) var tried: String?
@@ -63,8 +62,8 @@ struct GaplessScheduler {
         tried = nil
     }
 
-    /// As `forget`, but hands the stream back to `prefetcher`. Not for a quality
-    /// change or a Premium retry, which must drop it.
+    /// As `forget`, but hands the stream back to `prefetcher`. Not for a quality change or a Premium retry, which
+    /// must drop it.
     mutating func unqueue(into prefetcher: inout StreamPrefetcher) {
         if let queued, !queuedFailed {
             prefetcher.store(queued.trackID, queued.prefetched)
@@ -84,8 +83,8 @@ extension PlayerController {
         if plan.stale { dropQueuedNext() }
         guard let (nextID, transition) = plan.due, let next else { return }
         gapless.markTried(nextID)
-        // A resolve ahead is only waited on, so a skip that cancels this still
-        // starts the song from it; one handed back keeps its resolve time.
+        // A resolve ahead is only waited on, so a skip that cancels this still starts the song from it; one handed
+        // back keeps its resolve time.
         let source = streamSource(for: nextID, owning: false)
         let generation = playback.generation
         queueing = Task { [weak self] in
@@ -103,8 +102,7 @@ extension PlayerController {
         }
     }
 
-    /// Keeps the stream for later; the next tick queues the song again, with the
-    /// settings as they are then.
+    /// Keeps the stream for later; the next tick queues the song again, with the settings as they are then.
     func dropQueuedNext() {
         queueing?.cancel()
         guard gapless.queued != nil else { return gapless.forget() }

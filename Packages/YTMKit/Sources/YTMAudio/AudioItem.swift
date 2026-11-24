@@ -11,8 +11,8 @@ public struct AudioItem: Sendable {
     public let cacheKey: String
     /// The correction to the reference loudness, turning down or up, applied only while the player normalises.
     public let loudnessDB: Float
-    /// A fresh URL and headers for the same file, asked for when the old URL is refused part way through.
-    /// Told whether the last fresh URL was refused too.
+    /// A fresh URL and headers for the same file, asked for when the old URL is refused part way through. Told
+    /// whether the last fresh URL was refused too.
     public let refresh: @Sendable (_ again: Bool) async throws -> (url: URL, headers: [String: String])
 
     public init(
@@ -43,14 +43,13 @@ public enum AudioEvent: Sendable, Equatable {
     case advanced(id: String)
     /// The last item ended with nothing queued after it.
     case finished
-    /// The item could not play. For the item queued by `setNext`, it was dropped
-    /// and the current one ends with `finished`, so the next loads afresh.
+    /// The item could not play. For the item queued by `setNext`, it was dropped and the current one ends with
+    /// `finished`, so the next loads afresh.
     case failed(id: String, message: String)
-    /// The item's download gave up on a connection that stopped answering; for the item
-    /// queued by `setNext`, it was dropped as for `failed`.
+    /// The item's download gave up on a connection that stopped answering; for the item queued by `setNext`, it was
+    /// dropped as for `failed`.
     case dropped(id: String)
     case buffering(Bool)
-    /// A seek in the current item dropped the next one, which had already
-    /// started following it; queue it again with `setNext`.
+    /// A seek in the current item dropped the next one, which had already started following it; queue it again.
     case nextDropped
 }

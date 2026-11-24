@@ -1,7 +1,6 @@
 import CoreGraphics
 
-/// Sized for a 6.3" portrait screen; wider ones, as iPhone Duo's inner
-/// display is, fit more columns rather than larger cards.
+/// Sized for a 6.3" portrait screen; wider ones, as iPhone Duo's inner display is, fit more columns, not larger cards.
 nonisolated enum Metrics {
     /// A 393 pt screen can't spare the desktop's 24 on both sides.
     static let pagePadding: CGFloat = 16
@@ -20,8 +19,7 @@ nonisolated enum Metrics {
     static let greetingHeight: CGFloat = 48
     static let columnsHeight: CGFloat = 44
 
-    // On a phone there is no hover background, so the artwork takes the card's
-    // whole width and the gap between cards does the spacing.
+    // On a phone there is no hover background, so the artwork takes the card's whole width and the gap spaces them.
     /// The desktop's 188 would fit a single grid column on a phone.
     static let cardWidth: CGFloat = 156
     static let cardGap: CGFloat = 12

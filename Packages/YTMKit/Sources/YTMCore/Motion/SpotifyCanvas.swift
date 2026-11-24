@@ -141,7 +141,8 @@ actor SpotifyCanvas {
             } catch let error as YTMError where [400, 401, 403].contains(error.status) {
                 // A code refused may mean Spotify moved to a newer key, so its script is read again, once.
                 guard let fresh = try await self.config(cellular: cellular, replacing: config) else {
-                    // Refused with a key fresh from the script: an unauthorised one means the cookie no longer signs in.
+                    // Refused with a key fresh from the script: an unauthorised one means the cookie no longer
+                    // signs in.
                     if error.status == 401 { throw Self.notSession }
                     throw YTMError(.refused, "Spotify refused its web player's key.", status: error.status)
                 }

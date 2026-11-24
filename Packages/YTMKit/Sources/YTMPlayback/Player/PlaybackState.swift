@@ -16,20 +16,17 @@ struct PlaybackState {
     var currentPremium = false
     /// A song whose Premium stream failed and plays the free one instead.
     var forceFree: String?
-    /// Where a song is to start: restored from the last launch, sought to
-    /// with nothing loaded or while opened again, or where a Premium retry or
-    /// dropped connection left off. Kept until it sounds, so a load that fails
-    /// starts there again.
+    /// Where a song is to start: restored from the last launch, sought to with nothing loaded or while opened again,
+    /// or where a Premium retry or dropped connection left off. Kept until it sounds, so a failed load starts there.
     var resume: (id: String, position: Double)?
-    /// The generation whose play is already recorded: a free-stream retry
-    /// carrying on a song, so its start is not a second play.
+    /// The generation whose play is already recorded: a free-stream retry carrying on a song, so its start is not a
+    /// second play.
     var playRecorded: UInt64?
     /// A radio is being fetched to carry on from the queue's end.
     var extending = false
     /// The engine's ID for the song, once it has it.
     var itemID: String?
-    /// Where the song is while the engine has none of it: restored, loading
-    /// or stopped.
+    /// Where the song is while the engine has none of it: restored, loading or stopped.
     var heldPosition = 0.0
     /// A song whose connection dropped, and the tries at opening it again.
     var reopen: (id: String, tries: Int)?

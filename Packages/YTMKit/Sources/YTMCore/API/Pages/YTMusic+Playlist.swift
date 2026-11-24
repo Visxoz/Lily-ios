@@ -129,8 +129,7 @@ extension Renderers {
             page.more = .tracks(token: next, seen: seen, fetched: total)
         }
         if page.header != nil {
-            // The header counts the whole playlist when YouTube said how
-            // long it is, else the tracks loaded.
+            // The header counts the whole playlist when YouTube said how long it is, else the tracks loaded.
             let count = max(page.header?.count ?? 0, section.tracks.count)
             page.header?.count = count
             page.header?.meta = Formatting.playlistMeta(count: count, tracks: section.tracks)
@@ -138,8 +137,8 @@ extension Renderers {
         return page
     }
 
-    /// The channel the facepile links to, else the one in the strapline or
-    /// subtitle. YouTube Music's own playlists name none.
+    /// The channel the facepile links to, else the one in the strapline or subtitle. YouTube Music's own playlists
+    /// name none.
     private static func playlistOwner(_ header: JSON) -> String? {
         let facepile = header["facepile", "avatarStackViewModel"]
         guard facepile.exists else {

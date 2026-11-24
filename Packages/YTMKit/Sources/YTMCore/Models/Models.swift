@@ -1,7 +1,6 @@
 import Foundation
 
-// Every model is Sendable and Codable: it crosses actors and is saved as is
-// (session, history, the cached Home feed).
+// Every model is Sendable and Codable: it crosses actors and is saved as is (session, history, the cached Home feed).
 
 public struct ArtistRef: Codable, Hashable, Sendable {
     public var id: String?
@@ -33,8 +32,7 @@ public struct Track: Codable, Hashable, Sendable, Identifiable {
     public var duration: Int?
     public var thumbnail: String?
     public var trackNumber: Int?
-    /// A music video, which may have an audio-only song version YouTube Music
-    /// plays instead.
+    /// A music video, which may have an audio-only song version YouTube Music plays instead.
     public var isVideo: Bool
     /// The entry's own ID in the account's playlist it was read from, which removing or moving it takes. Never
     /// saved, as it means nothing away from that playlist's page.
@@ -78,8 +76,7 @@ public enum CardKind: String, Codable, Hashable, Sendable {
 
 public struct Card: Codable, Hashable, Sendable, Identifiable {
     public var kind: CardKind
-    /// Browse ID of an album or artist, playlist ID, genre params, or the
-    /// video ID of a song.
+    /// Browse ID of an album or artist, playlist ID, genre params, or the video ID of a song.
     public var id: String
     public var title: String
     public var subtitle: String

@@ -6,8 +6,7 @@ public struct RecentSearches: Codable, Sendable {
 
     public private(set) var queries: [String]
 
-    /// Replays `queries` oldest first through `record`, so blanks, repeats
-    /// and more than the limit never get in.
+    /// Replays `queries` oldest first through `record`, so blanks, repeats and more than the limit never get in.
     public init(queries: [String] = []) {
         self.queries = []
         for query in queries.reversed() { record(query) }

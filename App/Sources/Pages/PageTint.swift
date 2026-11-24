@@ -1,8 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// Above the page it carries on, so pulling to refresh opens on the
-/// colour rather than on the bare panel.
+/// Above the page it carries on, so pulling to refresh opens on the colour rather than on the bare panel.
 struct PageTint: View {
     /// Further than a pull can open.
     static let overscroll: CGFloat = 1000
@@ -14,8 +13,8 @@ struct PageTint: View {
 
     @Environment(\.theme) private var theme
 
-    /// Opaque from `edge` to `start`, then gone by `end` on a cosine ease,
-    /// so there is no line where a straight fade would visibly end.
+    /// Opaque from `edge` to `start`, then gone by `end` on a cosine ease, so there is no line where a straight fade
+    /// would visibly end.
     static func fade(from start: Double = 0, to end: Double = 1, edge: UnitPoint = .top) -> LinearGradient {
         let stops = (0...12).map { step in
             let t = Double(step) / 12

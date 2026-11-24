@@ -27,8 +27,8 @@ enum Keychain {
         let query = query(key)
         var status: OSStatus
         if let data {
-            // Readable after first unlock, so songs resolve on the lock screen, and
-            // never restored to another device from a backup.
+            // Readable after first unlock, so songs resolve on the lock screen, and never restored to another device
+            // from a backup.
             let update: [CFString: Any] = [kSecValueData: data, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
             status = SecItemUpdate(query as CFDictionary, update as CFDictionary)
             if status == errSecItemNotFound { status = SecItemAdd(query.merging(update) { $1 } as CFDictionary, nil) }

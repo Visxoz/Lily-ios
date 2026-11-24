@@ -1,9 +1,8 @@
 import Foundation
 import os
 
-/// Asks in ranges, as googlevideo throttles large ones, and on a refusal carries on from
-/// the same byte at a fresh URL for the same file. The ranges follow `readPosition`, so a seek
-/// ahead is fetched next and the gaps after.
+/// Asks in ranges, as googlevideo throttles large ones, and on a refusal carries on from the same byte at a fresh URL
+/// for the same file. The ranges follow `readPosition`, so a seek ahead is fetched next and the gaps after.
 final class StreamLoader {
     static let rangeLength: Int64 = 1 << 20
     private static let maxRetries = 4
@@ -19,8 +18,7 @@ final class StreamLoader {
 
     /// Its descriptor follows the file as a finished part becomes the cached file.
     let reader: FileHandle
-    /// Where the reader wants bytes from, which the download fetches first: 0, or a seek point
-    /// past the bytes held from the start.
+    /// Where the reader wants bytes from, which the download fetches first: 0, or a seek point past the bytes held.
     var readPosition: Int64 = 0
     private var held: HeldBlocks
     private(set) var isComplete: Bool
@@ -70,7 +68,6 @@ final class StreamLoader {
     /// Bytes on disk from the start of the file.
     var available: Int64 { held.runEnd(from: 0) }
 
-    /// The end of the bytes on disk unbroken from `offset`.
     func runEnd(from offset: Int64) -> Int64 {
         held.runEnd(from: offset)
     }
@@ -161,8 +158,7 @@ final class StreamLoader {
                 if let failure = error as? AudioFailure {
                     return failure
                 }
-                // A range that broke off after some bytes still got somewhere,
-                // so only a stretch with nothing arriving gives up.
+                // A range that broke off after some bytes still got somewhere: only a stretch with nothing gives up.
                 if held.runEnd(from: start) > start {
                     retries = 0
                     drops = 0
@@ -249,8 +245,8 @@ final class StreamLoader {
     private func replay(
         isolation: isolated (any Actor)? = #isolation, from start: Int64, upTo end: Int64, _ onBytes: (Data) -> Void
     ) async -> AudioFailure? {
-        // A loader kept from a download cut short left its reader where that
-        // replay stopped: the decoder reads with pread, which never moves it.
+        // A loader kept from a download cut short left its reader where that replay stopped: the decoder reads with
+        // pread, which never moves it.
         guard (try? reader.seek(toOffset: UInt64(start))) != nil else { return .damaged }
         var offset = start
         while offset < end {
@@ -289,20 +285,18 @@ final class StreamLoader {
         return first["itag"] != nil && ["itag", "clen", "lmt"].allSatisfy { first[$0] == second[$0] }
     }
 
-    /// The wait before retrying after `drops` lost connections in a row, doubling, or nil once
-    /// they have gone on for `rideOut`.
+    /// The wait before retrying after `drops` lost connections in a row, doubling, or nil once past `rideOut`.
     static func rideOutDelay(drops: Int, failingFor: Duration) -> Duration? {
         failingFor < rideOut ? min(retryDelay * (1 << min(drops, 16)), maxRetryDelay) : nil
     }
 
-    /// Whether the connection failed, rather than googlevideo answering with an error or bytes
-    /// that don't fit: URLSession reports an answer's status through `ByteSourceError`.
+    /// Whether the connection failed, rather than googlevideo answering with an error or bytes that don't fit:
+    /// URLSession reports an answer's status through `ByteSourceError`.
     static func isConnection(_ error: any Error) -> Bool {
         (error as? URLError).map { $0.code != .cancelled } ?? false
     }
 
-    /// Why a range failed, without the error itself: a URLError's
-    /// description carries the stream URL.
+    /// Why a range failed, without the error itself: a URLError's description carries the stream URL.
     private static func reason(_ error: any Error) -> String {
         switch error {
         case let error as ByteSourceError: String(describing: error)

@@ -19,8 +19,7 @@ struct JSToken {
     let end: Int
     /// A line break before this token can end a statement that has no semicolon.
     let newlineBefore: Bool
-    /// 1 for a bracket that opens (`(`, `[`, `{` and `` `…${ ``), -1 for
-    /// one that closes, 0 for the rest.
+    /// 1 for a bracket that opens (`(`, `[`, `{` and `` `…${ ``), -1 for one that closes, 0 for the rest.
     var nesting: Int8 = 0
 }
 

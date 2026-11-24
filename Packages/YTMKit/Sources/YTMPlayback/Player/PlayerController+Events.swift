@@ -13,16 +13,15 @@ extension PlayerController {
                 gapless.forget()
                 advanceGapless(to: queued)
             } else {
-                // A song the player no longer had queued crossed over, as the
-                // queue changed at that very moment; play what it says now.
+                // A song the player no longer had queued crossed over, as the queue changed at that very moment;
+                // play what it says now.
                 gapless.forget()
                 next(user: false)
             }
         case .finished:
             next(user: false)
         case .failed(let id, let message):
-            // The queued song failed to open: the current one ends with
-            // `finished`, and the next then loads afresh.
+            // The queued song failed to open: the current one ends with `finished`, and the next then loads afresh.
             if id == gapless.queued?.itemID {
                 gapless.queuedFailed = true
                 // Its stream may be kept too; the song then resolves afresh.
@@ -31,8 +30,8 @@ extension PlayerController {
                 playbackFailed(current?.title ?? "", message)
             }
         case .dropped(let id):
-            // The queued song's stream is kept, unlike for `failed`, so it rides out the drop as it
-            // plays rather than failing to resolve offline.
+            // The queued song's stream is kept, unlike for `failed`, so it rides out the drop as it plays rather than
+            // failing to resolve offline.
             if id == playback.itemID { connectionLost() }
         case .buffering(let stalled):
             playback.stalled = stalled
@@ -43,8 +42,7 @@ extension PlayerController {
         }
     }
 
-    /// Counts as a play, unless it carries on one already recorded, as a
-    /// Premium song retried on the free stream.
+    /// Counts as a play, unless it carries on one already recorded, as a Premium song retried on the free stream.
     private func soundStarted() {
         playback.started = true
         playback.loading = false

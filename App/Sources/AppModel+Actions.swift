@@ -73,8 +73,7 @@ extension AppModel {
         isPlaying(track) ? player.rating : .none
     }
 
-    /// Toggles the rating; `.none` removes either. The player says how it went and skips a
-    /// disliked song that is playing.
+    /// `.none` removes either rating. The player says how it went and skips a disliked song that is playing.
     func rate(_ track: Track, _ requested: Rating) {
         player.rate(requested, track: track)
     }

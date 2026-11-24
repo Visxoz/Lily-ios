@@ -1,7 +1,7 @@
 import Foundation
 
-/// YouTube decides what to send by the client: the web client gets pages,
-/// some apps get plain stream URLs, and the Android app gets timed lyrics.
+/// YouTube decides what to send by the client: the web client gets pages, some apps get plain stream URLs, and the
+/// Android app gets timed lyrics.
 struct ClientProfile: Sendable, Hashable {
     struct Device: Sendable, Hashable {
         let make: String
@@ -21,8 +21,8 @@ struct ClientProfile: Sendable, Hashable {
     let origin: String?
     let device: Device?
     let androidSdkVersion: Int?
-    /// A browser client: it takes the account's cookies and, signed out,
-    /// the consent cookie a browser that dismissed YouTube's banner sends.
+    /// It takes the account's cookies and, signed out, the consent cookie a browser that dismissed YouTube's banner
+    /// sends.
     let isWeb: Bool
 
     func url(_ endpoint: String) -> URL? {
@@ -68,8 +68,7 @@ extension ClientProfile {
     static let browserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 
-    /// Every page, the library and, with Premium, the 256 kbps formats.
-    /// The version is the site's own of November 2026.
+    /// Every page, the library and, with Premium, the 256 kbps formats. The version is the site's own of November 2026.
     static let webRemix = ClientProfile(
         name: "WEB_REMIX", id: "67", version: "1.20261110.04.00", host: "music.youtube.com",
         userAgent: browserUserAgent, origin: "https://music.youtube.com", device: nil,
@@ -83,8 +82,8 @@ extension ClientProfile {
         androidSdkVersion: nil, isWeb: true
     )
 
-    /// YouTube's own website, whose guide holds the account's current
-    /// picture. The version is the site's own of November 2026.
+    /// YouTube's own website, whose guide holds the account's current picture. The version is the site's own of
+    /// November 2026.
     static let web = ClientProfile(
         name: "WEB", id: "1", version: "2.20261112.10.00", host: "www.youtube.com",
         userAgent: browserUserAgent, origin: "https://www.youtube.com", device: nil,
@@ -125,8 +124,8 @@ extension ClientProfile {
         androidSdkVersion: nil, isWeb: false
     )
 
-    /// The plain-URL clients in the order the free path tries them: YouTube
-    /// tends to change one at a time, so a song plays on the next meanwhile.
+    /// In the order the free path tries them: YouTube tends to change one at a time, so a song plays on the next
+    /// meanwhile.
     static let plainStreamClients: [ClientProfile] = [.visionOS, .androidVR, .iOS]
 }
 

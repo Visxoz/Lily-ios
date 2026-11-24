@@ -1,7 +1,6 @@
 import Foundation
 
-/// Downloads go to `.part` files that count only once complete; past the size
-/// cap the least recently played files go first.
+/// Downloads go to `.part` files that count only once complete; past the size cap the least recently played go first.
 final class AudioCache {
     /// Where the cache lives and how large it may grow, in bytes.
     struct Location: Sendable {
@@ -16,8 +15,8 @@ final class AudioCache {
     private var reading: [String: Int] = [:]
     private static let partExtension = "part"
 
-    /// Works on the disk, so it is made on the engine's queue. Trims to the cap,
-    /// which may have shrunk since the last launch.
+    /// Works on the disk, so it is made on the engine's queue. Trims to the cap, which may have shrunk since the last
+    /// launch.
     init(_ location: Location) {
         directory = location.directory
         limit = location.limit
@@ -32,8 +31,8 @@ final class AudioCache {
         URL.cachesDirectory.appending(path: "audio", directoryHint: .isDirectory)
     }
 
-    /// Whether `url` holds a whole copy: there, and of the expected length, as a file
-    /// of another length is another encode.
+    /// Whether `url` holds a whole copy: there, and of the expected length, as a file of another length is another
+    /// encode.
     static func isWhole(_ url: URL, length: Int64) -> Bool {
         guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return false }
         return size > 0 && (length <= 0 || Int64(size) == length)
@@ -58,8 +57,8 @@ final class AudioCache {
 
     func commit(_ part: URL, as key: String) {
         let url = file(for: key)
-        // rename(2) replaces any older file atomically, and readers of the
-        // part keep reading, as their descriptors follow the file.
+        // rename(2) replaces any older file atomically, and readers of the part keep reading, as their descriptors
+        // follow the file.
         guard rename(part.path(percentEncoded: false), url.path(percentEncoded: false)) == 0 else {
             discard(part)
             return
@@ -84,8 +83,7 @@ final class AudioCache {
         completeFiles().reduce(0) { $0 + $1.size }
     }
 
-    /// Removes every complete file. Downloads under way carry on, and files
-    /// still being read stay readable until closed.
+    /// Downloads under way carry on, and files still being read stay readable until closed.
     func clear() {
         removeAll(except: [])
     }

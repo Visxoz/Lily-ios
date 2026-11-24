@@ -10,8 +10,8 @@ struct SpeedDial: View {
 
     private static let columns = 3
     private static let perPage = 9
-    /// Past a phone's width, as on iPhone Duo's inner display, a page this
-    /// wide is as tall as the screen, so the next one shows beside it instead.
+    /// Past a phone's width, as on iPhone Duo's inner display, a page this wide is as tall as the screen, so the next
+    /// one shows beside it instead.
     static let maxPageWidth: CGFloat = 420
 
     /// The die ends the first page, as YouTube's does.

@@ -60,9 +60,9 @@ enum AudioChecks {
         return Entry(song: song, stream: stream, item: item)
     }
 
-    /// Each item's buffers must cover it exactly, frame for frame, and follow
-    /// the one before on the same player timeline, with no gap. From `start`, the seek run's index times are
-    /// rounded, so the switch to the packets listed from the file's start may move the frames once, by a few ms.
+    /// Each item's buffers must cover it exactly, frame for frame, and follow the one before on the same player
+    /// timeline, with no gap. From `start`, the seek run's index times are rounded, so the switch to the packets
+    /// listed from the file's start may move the frames once, by a few ms.
     private static func play(_ entries: [Entry], from start: Double = 0, _ findings: inout Findings) async throws {
         let playback = OfflineEngine(cache: Live.directory.appending(path: "audio", directoryHint: .isDirectory))
         let items = entries.map(\.item)

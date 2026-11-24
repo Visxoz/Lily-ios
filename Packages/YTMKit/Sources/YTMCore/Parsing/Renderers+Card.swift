@@ -52,8 +52,8 @@ extension Renderers {
         )
     }
 
-    /// A mood or genre chip from a `musicNavigationButtonRenderer`'s body;
-    /// other navigation buttons (New releases, Charts) are not genres.
+    /// A mood or genre chip from a `musicNavigationButtonRenderer`'s body; other navigation buttons (New releases,
+    /// Charts) are not genres.
     static func genreCard(_ renderer: JSON) -> Card? {
         let browse = renderer["clickCommand", "browseEndpoint"]
         guard browse["browseId"].string == "FEmusic_moods_and_genres_category",
@@ -85,8 +85,8 @@ extension Renderers {
         let segments = segments(runs).map { (runs: $0, text: text($0)) }
         switch kind {
         case .album:
-            // "Album • Artist • 2024"; artist pages' tiles say only "2024"
-            // or "Album • 2024", and the page's artist stands in.
+            // "Album • Artist • 2024"; artist pages' tiles say only "2024" or "Album • 2024", and the page's
+            // artist stands in.
             let type = segments.lazy.compactMap { AlbumType(label: $0.text) }.first ?? context.albumType
             let year = segments.first { $0.text.count == 4 && Int($0.text) != nil }?.text
             var artists = linkedArtists(runs)

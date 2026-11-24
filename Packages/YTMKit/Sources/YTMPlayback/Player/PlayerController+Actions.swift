@@ -4,8 +4,8 @@ import YTMCore
 
 /// Starting playback from pages, cards and menus, and the radios that carry a queue on.
 extension PlayerController {
-    /// Plays from `index`, or with nil from a random track when shuffling and the
-    /// first when not. `shuffle`, as a Shuffle button, turns shuffle on first.
+    /// Plays from `index`, or with nil from a random track when shuffling and the first when not. `shuffle`, as a
+    /// Shuffle button, turns shuffle on first.
     public func play(_ tracks: [Track], startAt index: Int? = nil, shuffle: Bool = false) {
         guard !tracks.isEmpty else {
             say("Nothing to play here")
@@ -122,19 +122,7 @@ extension PlayerController {
         // Autoplay would otherwise ask for the same radio once this starts.
         playback.extending = true
         startCurrent()
-        let music = music
-        extending = Task { [weak self] in
-            let result = await Result { try await music.radio(videoId: track.id) }
-            guard let self, !Task.isCancelled else { return }
-            playback.extending = false
-            switch result {
-            case .success(let tracks):
-                appendUnique(tracks)
-            case .failure(let error):
-                Logger.playback.warning("radio failed: \(sentence(for: error), privacy: .public)")
-                extendWithRadioIfEnding()
-            }
-        }
+        queueRadio(of: track.id, forAutoplay: false)
     }
 
     /// Into an empty queue, they start playing.
@@ -168,18 +156,26 @@ extension PlayerController {
     func extendWithRadioIfEnding() {
         guard settings.value.autoplay, repeatMode == .off, queue.peekNext(repeat: repeatMode) == nil,
               !playback.extending, let seed = queue.current?.id else { return }
+        queueRadio(of: seed, forAutoplay: true)
+    }
+
+    /// A song's radio that fails falls back on autoplay's. Another queue, or clearing what is up next, cancels it,
+    /// so the radio joins only the queue it is for.
+    private func queueRadio(of seed: String, forAutoplay: Bool) {
         playback.extending = true
         let music = music
         extending = Task { [weak self] in
             let result = await Result { try await music.radio(videoId: seed) }
             guard let self, !Task.isCancelled else { return }
             playback.extending = false
-            // Another queue, or clearing what is up next, cancels it, so the radio joins only the queue it is for.
             switch result {
             case .success(let tracks):
                 appendUnique(tracks)
-            case .failure(let error):
+            case .failure(let error) where forAutoplay:
                 Logger.playback.warning("autoplay radio failed: \(sentence(for: error), privacy: .public)")
+            case .failure(let error):
+                Logger.playback.warning("radio failed: \(sentence(for: error), privacy: .public)")
+                extendWithRadioIfEnding()
             }
         }
     }
@@ -203,8 +199,8 @@ extension PlayerController {
     func continuePlaylist(_ page: Page, whole: (@MainActor @Sendable (Page) -> Void)? = nil) {
         guard case .tracks? = page.more, !page.headerTracks.isEmpty else { return }
         let music = music
-        // Its own task, so another queue, or clearing what is up next, drops
-        // the batches still to come, and nothing else.
+        // Its own task, so another queue, or clearing what is up next, drops the batches still to come, and nothing
+        // else.
         continuing = Task { [weak self] in
             var page = page
             var shown = page.headerTracks.count

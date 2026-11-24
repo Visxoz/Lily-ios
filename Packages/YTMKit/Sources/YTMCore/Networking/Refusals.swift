@@ -2,8 +2,8 @@ import Foundation
 import os
 import Synchronization
 
-/// Signed-in requests YouTube refused in a row, and until when the rest wait,
-/// as it refuses an account's requests in runs.
+/// Signed-in requests YouTube refused in a row, and until when the rest wait, as it refuses an account's requests in
+/// runs.
 final class Refusals: Sendable {
     /// Refusals in a row before signed-in requests pause.
     static let run = 6
@@ -17,20 +17,18 @@ final class Refusals: Sendable {
         self.pause = pause
     }
 
-    /// How long signed-in requests wait after `run` refusals in a row: 5 s at
-    /// `Refusals.run`, doubling up to 40 s.
+    /// 5 s at `Refusals.run` refusals in a row, doubling up to 40 s.
     static func pause(after run: Int) -> Duration? {
         run >= Self.run ? .seconds(5 << min(run - Self.run, 3)) : nil
     }
 
-    /// Waits out a pause in signed-in requests, returning whether there was one.
+    /// Whether there was a pause to wait out.
     func waitForTurn() async -> Bool {
         guard let until = state.withLock({ $0.pausedUntil }), until > .now else { return false }
         try? await Task.sleep(until: until)
         return true
     }
 
-    /// Counts a signed-in request YouTube answered, `refused` or otherwise.
     func answered(refused: Bool) {
         let started: Duration? = state.withLock { state in
             state.run = refused ? state.run + 1 : 0

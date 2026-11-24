@@ -1,8 +1,8 @@
 import Foundation
 @testable import YTMCore
 
-/// Signed out with a throwaway store, so the Mac's own app state is never
-/// touched and everything is fetched afresh, as on a first launch.
+/// Signed out with a throwaway store, so the Mac's own app state is never touched and everything is fetched afresh,
+/// as on a first launch.
 enum Live {
     static let directory = URL.temporaryDirectory.appending(path: "ytmcheck-\(UUID().uuidString)", directoryHint: .isDirectory)
     static let store = FileStore(directory: directory.appending(path: "store", directoryHint: .isDirectory))

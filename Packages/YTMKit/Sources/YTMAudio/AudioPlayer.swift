@@ -3,8 +3,7 @@ import Network
 
 /// Every call returns at once; the work happens on the engine's own queue, in the order called.
 @MainActor public final class AudioPlayer {
-    /// The most silence cut from either side of a blend, so a quiet passage or a hidden track is not
-    /// mistaken for the end.
+    /// The most silence cut from either side of a blend, so a quiet passage or a hidden track is not taken for the end.
     nonisolated static let silenceTrimSeconds = 4.0
 
     /// For one consumer. Events of an item replaced by `play` or `stop` never arrive after the call.
@@ -54,9 +53,9 @@ import Network
         }
     }
 
-    /// The level each item is normalised to: 1 for YouTube's reference loudness, 0.5 for 6 dB under it, or nil
-    /// to play items as they are. Boosts are capped at 3 dB, and a limiter keeps peaks under full scale.
-    /// A change reaches the item playing once the few seconds already scheduled have played.
+    /// The level each item is normalised to: 1 for YouTube's reference loudness, 0.5 for 6 dB under it, or nil to
+    /// play items as they are. Boosts are capped at 3 dB, and a limiter keeps peaks under full scale. A change
+    /// reaches the item playing once the few seconds already scheduled have played.
     public var normalise: Float? = 1 {
         didSet {
             let normalise = normalise
@@ -79,9 +78,11 @@ import Network
     private var session: UInt64 = 0
     private var currentID: String?
 
+    private static let cacheLimitBytes: Int64 = 40 << 20
+
     /// `proxies` is asked for at the first download, off the main actor.
-    public convenience init(cacheLimitBytes: Int64 = 40 << 20, proxies: @escaping @Sendable () -> [ProxyConfiguration] = { [] }) {
-        let cache = AudioCache.Location(directory: AudioCache.defaultDirectory, limit: cacheLimitBytes)
+    public convenience init(proxies: @escaping @Sendable () -> [ProxyConfiguration]) {
+        let cache = AudioCache.Location(directory: AudioCache.defaultDirectory, limit: Self.cacheLimitBytes)
         self.init(output: .device, source: HTTPByteSource(proxies: proxies), cache: cache)
     }
 
@@ -118,8 +119,7 @@ import Network
         engine.send { $0.setNext(item, transition, session: session) }
     }
 
-    /// Fetches the start of an item likely to play next, so a skip to it starts sooner.
-    /// Only one item is warmed at a time: the last asked for.
+    /// Fetches the start of an item likely to play next, so a skip to it starts sooner; only the last is warmed.
     public func warm(_ item: AudioItem) {
         engine.send { $0.warm(item) }
     }
@@ -135,8 +135,8 @@ import Network
         engine.send { $0.resume() }
     }
 
-    /// Pass `keepingOutput` for a change of song: a running output keeps the app awake in the background
-    /// until the next one plays. Otherwise the output stops after a while, so the device can sleep.
+    /// Pass `keepingOutput` for a change of song: a running output keeps the app awake in the background until the
+    /// next one plays. Otherwise the output stops after a while, so the device can sleep.
     public func stop(keepingOutput: Bool = false) {
         session += 1
         currentID = nil

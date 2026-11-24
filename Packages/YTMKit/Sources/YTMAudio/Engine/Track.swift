@@ -27,8 +27,8 @@ final class Track {
     /// The file's first bytes, until there are enough to tell its container.
     private var head = Data()
     private var parsed: Int64 = 0
-    /// Lists packets from a seek point past those listed from the file's start, so a seek ahead plays
-    /// once its own bytes arrive rather than every byte before them.
+    /// Lists packets from a seek point past those listed from the file's start, so a seek ahead plays once its own
+    /// bytes arrive rather than every byte before them.
     private var seekRun: (source: any PacketSource, start: Int64, parsed: Int64)?
     /// A seek run failed to parse, so later seeks wait for the bytes from the start.
     private var runsFail = false
@@ -161,8 +161,8 @@ final class Track {
         return true
     }
 
-    /// Cuts at most `limit` frames, so a long quiet passage or hidden track is not mistaken
-    /// for the end, handing `measure` the `measured` frames before them too. Nil until the file is complete.
+    /// Cuts at most `limit` frames, so a long quiet passage or hidden track is not mistaken for the end, handing
+    /// `measure` the `measured` frames before them too. Nil until the file is complete.
     func soundEnd(limit: Int64, measuring measured: Int64 = 0, _ measure: (Crossfade.Channels, Int) -> Void = { _, _ in }) -> Int64? {
         guard let length else { return nil }
         let cut = max(length - limit, 0)
@@ -211,7 +211,7 @@ final class Track {
     }
 
     /// Decodes from `frame` on a decoder of its own, so playback's stays put, handing `body` each run of frames and
-    /// the frame it starts on until it returns false. False if that decoder can't open or waits on bytes not yet downloaded.
+    /// the frame it starts on until it returns false. False if that decoder can't open or waits on bytes.
     private func scan(from frame: Int64, _ body: (Crossfade.Channels, Int, Int64) -> Bool) -> Bool {
         guard let format = source?.format, let scanner = try? PacketDecoder(source: format, file: loader.reader) else { return false }
         scanner.seek(to: frame)
@@ -228,9 +228,9 @@ final class Track {
         }
     }
 
-    /// Starts a seek run when the decoder seeks past the packets listed from the start and the file's index
-    /// has a point before it, and reads what has arrived of the run. `receive` ends it once the bytes from
-    /// the start catch up, so length, padding and sound end still wait for every byte.
+    /// Starts a seek run when the decoder seeks past the packets listed from the start and the file's index has a
+    /// point before it, and reads what has arrived of the run. `receive` ends it once the bytes from the start catch
+    /// up, so length, padding and sound end still wait for every byte.
     private func aim() {
         guard let source, let decoder else { return }
         if let from = decoder.seekingFrom {

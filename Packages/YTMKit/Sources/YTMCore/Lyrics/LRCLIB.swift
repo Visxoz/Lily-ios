@@ -42,7 +42,6 @@ enum LRCLIB {
         return lyrics(synced: json["syncedLyrics"].string, plain: json["plainLyrics"].string)
     }
 
-    /// The timed lyrics, else the text if there is any.
     static func lyrics(synced: String?, plain: String?) -> Lyrics? {
         if let synced, let lyrics = LRC.lyrics(synced, source: source) { return lyrics }
         guard let plain, !plain.allSatisfy(\.isWhitespace) else { return nil }

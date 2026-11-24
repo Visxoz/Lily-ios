@@ -5,8 +5,8 @@ extension YTMusic {
         // As the account sees it, for whether it is saved.
         let response = try await asAccount(true) { try await self.innerTube.browse(id, authenticated: $0) }.response
         var album = try Renderers.album(response, id: id)
-        // YouTube Music lists some album tracks by their music videos and
-        // cuts long albums short; the album's playlist has the songs and the rest.
+        // YouTube Music lists some album tracks by their music videos and cuts long albums short; the album's
+        // playlist has the songs and the rest.
         if let playlistId = album.playlistId, album.needsPlaylist,
            let songs = try? await playlistTracks(playlistId, limit: album.trackCount, asOwner: false) {
             album.adopt(songs)
@@ -35,8 +35,8 @@ struct AlbumDetails {
         tracks.contains(where: \.isVideo) || (tracks.last?.trackNumber ?? 0) < trackCount
     }
 
-    /// Swaps each music video for the playlist's song of the same title, and adds the
-    /// playlist's tracks beyond the album's, numbered on.
+    /// Swaps each music video for the playlist's song of the same title, and adds the playlist's tracks beyond the
+    /// album's, numbered on.
     mutating func adopt(_ playlist: [Track]) {
         for index in tracks.indices where tracks[index].isVideo {
             guard let song = playlist.first(where: { !$0.isVideo && $0.title == tracks[index].title }) else { continue }
@@ -87,8 +87,8 @@ extension Renderers {
         }
         let subtitle = segments(header["subtitle"].runs)
         let strapline = header["straplineTextOne"].runs
-        // "Album • 2021" with the artists in the strapline, or, in the older
-        // layout, "Album • Artist • 2021", "Album • 2021" or "Album • Artist".
+        // "Album • 2021" with the artists in the strapline, or, in the older layout, "Album • Artist • 2021",
+        // "Album • 2021" or "Album • Artist".
         var yearRuns: [JSON]?
         var artistRuns: [JSON]? = strapline.isEmpty ? nil : strapline
         switch (strapline.isEmpty, subtitle.count) {
@@ -108,8 +108,8 @@ extension Renderers {
         var tracks = trackShelf(in: response)["contents"].array.compactMap { row -> Track? in
             let renderer = row["musicResponsiveListItemRenderer"]
             guard var track = track(renderer, context: context) else { return nil }
-            // A row leaves its artists' column empty when they are the
-            // album's; the plays in the column after it name no one.
+            // A row leaves its artists' column empty when they are the album's; the plays in the column after it
+            // name no one.
             if columnText(renderer["flexColumns"][1]).runs.isEmpty { track.artists = artists }
             return track
         }

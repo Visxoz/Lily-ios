@@ -35,8 +35,8 @@ struct StatementReader {
 
     // MARK: Top level
 
-    /// What it defines, as yt-dlp's solver counts it: declarations, and expression
-    /// statements that are a single assignment. Other statements define nothing.
+    /// What it defines, as yt-dlp's solver counts it: declarations, and expression statements that are a single
+    /// assignment. Other statements define nothing.
     mutating func topLevelStatement(namespace: String) throws -> Statement {
         let start = token.start
         var statement = Statement(range: start..<start)
@@ -103,8 +103,8 @@ struct StatementReader {
         try endStatement()
     }
 
-    /// `a = …`, `a.b[c] = …` or `g.X = …` defines its target's root name, or `g.X` for the
-    /// namespace. A sequence or any other expression defines nothing.
+    /// `a = …`, `a.b[c] = …` or `g.X = …` defines its target's root name, or `g.X` for the namespace. A sequence or
+    /// any other expression defines nothing.
     private mutating func assignment(into statement: inout Statement, namespace: String) throws {
         let root = token
         let rootName = text(root)
@@ -137,8 +137,8 @@ struct StatementReader {
         try endStatement()
     }
 
-    /// Reads an initialiser or assigned value, and whether it is exactly a
-    /// non-async function expression whose body marks it as the scrambler.
+    /// Reads an initialiser or assigned value, and whether it is exactly a non-async function expression whose body
+    /// marks it as the scrambler.
     private mutating func initialFunctionIsScrambler() throws -> Bool {
         guard isWord(token, .function) else {
             try expression(stopAtComma: true, continuing: false)
@@ -209,8 +209,8 @@ struct StatementReader {
         if isPunct(token, ";") { try advance() }
     }
 
-    /// `function [*] [name] (…) {…}`: its name, and whether its body calls
-    /// `X.y("alr", "yes")` as a statement of its own, which marks the URL scrambler.
+    /// `function [*] [name] (…) {…}`: its name, and whether its body calls `X.y("alr", "yes")` as a statement of its
+    /// own, which marks the URL scrambler.
     private mutating func function() throws -> (name: JSToken?, marked: Bool) {
         try advance()
         if isPunct(token, "*") { try advance() }
@@ -239,8 +239,8 @@ struct StatementReader {
         return (name, marked)
     }
 
-    /// The last tokens before a statement's end spell `X.y("alr","yes")`,
-    /// directly in the function's body, not in a nested block.
+    /// The last tokens before a statement's end spell `X.y("alr","yes")`, directly in the function's body, not in a
+    /// nested block.
     private func isMarker(_ recent: RecentTokens) -> Bool {
         func at(_ i: Int, level: Int) -> JSToken? { recent[i].level == level ? recent[i].token : nil }
         let (open, openLevel) = recent[0]
@@ -277,8 +277,8 @@ struct StatementReader {
         return name
     }
 
-    /// Up to a `;`, a `,` with `stopAtComma`, the enclosing bracket closing, or a line break where
-    /// JavaScript inserts a semicolon. `continuing` when its start has been read.
+    /// Up to a `;`, a `,` with `stopAtComma`, the enclosing bracket closing, or a line break where JavaScript inserts
+    /// a semicolon. `continuing` when its start has been read.
     private mutating func expression(stopAtComma: Bool, continuing: Bool) throws {
         var depth = 0
         var previous = continuing ? last : nil
@@ -300,7 +300,6 @@ struct StatementReader {
         return endsExpression(previous) && startsStatement(token)
     }
 
-    /// Consumes an opening bracket and everything up to its partner.
     mutating func skipBalanced() throws {
         guard isOpening(token) else { throw JSTokenizer.malformed }
         var depth = 0
@@ -356,8 +355,8 @@ struct StatementReader {
         }
     }
 
-    /// A token that can't carry on the expression before it across a line
-    /// break, so JavaScript ends the statement there.
+    /// A token that can't carry on the expression before it across a line break, so JavaScript ends the statement
+    /// there.
     private func startsStatement(_ token: JSToken) -> Bool {
         switch token.kind {
         case .number, .string: return true
@@ -367,7 +366,6 @@ struct StatementReader {
         }
     }
 
-    /// `++` or `--`.
     private func isIncrement(_ token: JSToken) -> Bool {
         token.kind == .punctuator && token.end - token.start == 2 && source[token.start + 1] == source[token.start]
             && (source[token.start] == UInt8(ascii: "+") || source[token.start] == UInt8(ascii: "-"))

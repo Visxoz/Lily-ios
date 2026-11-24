@@ -80,8 +80,7 @@ nonisolated struct Theme: Equatable, Sendable {
     var isLight: Bool { look == .light }
     var colorScheme: ColorScheme { isLight ? .light : .dark }
 
-    /// A colour picked for behind white text, such as an artwork's, paled in
-    /// the light look so dark text reads on it.
+    /// A colour picked for behind white text, such as an artwork's, paled in the light look so dark text reads on it.
     func tint(_ colour: RGB) -> Color {
         Color(rgb: isLight ? colour.mixed(with: .white, weight: 0.3) : colour)
     }

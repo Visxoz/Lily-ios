@@ -50,9 +50,8 @@ final class MP4Demuxer: PacketSource {
         return source
     }
 
-    /// Each fragment's start and time from the segment index (ISO 14496-12 8.16.3), whose offsets count
-    /// from its own end. Only an index of fragments is used, and a damaged one is ignored, as only seeks
-    /// ahead need it.
+    /// Each fragment's start and time from the segment index (ISO 14496-12 8.16.3), whose offsets count from its own
+    /// end. Only an index of fragments is used, and a damaged one is ignored, as only seeks ahead need it.
     private func readIndex(_ body: UnsafeRawBufferPointer, end: Int64) {
         guard let rate = format?.sampleRate, seekPoints.isEmpty else { return }
         var reader = ByteReader(body)

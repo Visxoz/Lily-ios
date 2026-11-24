@@ -1,7 +1,7 @@
 import AVFoundation
 
-/// Cuts the codec's padding at both ends, so gapless joins are exact. One decoder serves every codec
-/// AudioToolbox has, Opus and AAC alike.
+/// Cuts the codec's padding at both ends, so gapless joins are exact. One decoder serves every codec AudioToolbox
+/// has, Opus and AAC alike.
 final class PacketDecoder {
     enum Supply: Equatable {
         /// At least one.
@@ -32,8 +32,7 @@ final class PacketDecoder {
     private static let outputCapacity: AVAudioFrameCount = 8_192
     private static let inputPackets: AVAudioPacketCount = 64
 
-    /// A fresh one for every seek: AudioToolbox's Opus decoder drops its
-    /// first 2.5 ms only when new, not after a reset.
+    /// A fresh one for every seek: AudioToolbox's Opus decoder drops its first 2.5 ms only when new, not after a reset.
     private var converter: AVAudioConverter
     private var converterUsed = false
     private let cookie: Data?
@@ -122,9 +121,9 @@ final class PacketDecoder {
     /// The codec frame a pending seek needs its first packet from.
     var seekingFrom: Int64? { seeking?.from }
 
-    /// Carries on in `packets`, which list the file from its start, from the packet `old` would have given
-    /// next. A seek point's index time is rounded, so the frames are counted afresh from `packets`, which
-    /// may move the position by a few milliseconds but keeps the end's trim exact.
+    /// Carries on in `packets`, which list the file from its start, from the packet `old` would have given next. A
+    /// seek point's index time is rounded, so the frames are counted afresh from `packets`, which may move the
+    /// position by a few milliseconds but keeps the end's trim exact.
     func follow(_ packets: PacketIndex, from old: PacketIndex) {
         guard seeking == nil else { return }
         guard nextPacket < old.count, let index = packets.index(ofOffset: old[nextPacket].offset) else {
@@ -206,8 +205,7 @@ final class PacketDecoder {
 
     private func nextBuffer(_ source: SourceState, status: UnsafeMutablePointer<AVAudioConverterInputStatus>) -> AVAudioBuffer? {
         let packets = source.packets
-        // The last packet listed waits for the next or for the end, as only
-        // then is its padding known.
+        // The last packet listed waits for the next or for the end, as only then is its padding known.
         let usable = source.complete ? packets.count : packets.count - 1
         guard nextPacket < usable else {
             status.pointee = source.complete ? .endOfStream : .noDataNow
@@ -225,8 +223,8 @@ final class PacketDecoder {
             let entry = packets[nextPacket + count]
             let start = Int64(entry.offset) - first
             let end = start + Int64(entry.size)
-            // One read takes the batch, so each packet must lie after the
-            // last; a damaged file's may not, and start a batch of their own.
+            // One read takes the batch, so each packet must lie after the last; a damaged file's may not, and start a
+            // batch of their own.
             guard start >= span, first + end <= source.available, end <= Int64(input.byteCapacity) else { break }
             count += 1
             span = Int(end)

@@ -1,8 +1,8 @@
 import Foundation
 
-/// Keeps only the top-level statements the URL scrambler needs, as yt-dlp's solver (github.com/yt-dlp/ejs)
-/// does, so JavaScriptCore loads a few hundred KB, not several MB. Inner scopes aren't tracked, so a
-/// shadowing local keeps extra code: harmless, where a missed dependency breaks.
+/// Keeps only the top-level statements the URL scrambler needs, as yt-dlp's solver (github.com/yt-dlp/ejs) does, so
+/// JavaScriptCore loads a few hundred KB, not several MB. Inner scopes aren't tracked, so a shadowing local keeps
+/// extra code: harmless, where a missed dependency breaks.
 enum PlayerTrimmer {
     enum Key: Hashable {
         case symbol(String)
@@ -10,8 +10,8 @@ enum PlayerTrimmer {
         case namespace(String)
     }
 
-    /// A script that, run as the body of `function (_result) {…}`, sets
-    /// `_result.n` and `_result.sig` to functions that unscramble them.
+    /// A script that, run as the body of `function (_result) {…}`, sets `_result.n` and `_result.sig` to functions
+    /// that unscramble them.
     static func trim(_ source: [UInt8]) throws -> String {
         let layout = YTMError(.parse, "YouTube's player script has an unexpected layout.")
         var reader = try StatementReader(source)
@@ -47,8 +47,7 @@ enum PlayerTrimmer {
         if reader.isPunct(reader.token, ";") { try reader.advance() }
         guard reader.token.kind == .end, let wrapperEnd = reader.last?.end else { throw layout }
 
-        // The first statement is `var window=this;`, which the stubs
-        // replace, though the names it declares still count.
+        // The first statement is `var window=this;`, which the stubs replace, though the names it declares still count.
         var declared: Set<String> = [namespace]
         for statement in statements { declared.formUnion(statement.declares) }
         var definedBy: [Key: [Int]] = [:]
@@ -100,8 +99,8 @@ enum PlayerTrimmer {
         }
     }
 
-    /// Names after a dot, object keys and the names a `var` list declares aren't uses, and `g.X` depends
-    /// only on what defines `g.X`: the player's one long `var` list would otherwise keep everything.
+    /// Names after a dot, object keys and the names a `var` list declares aren't uses, and `g.X` depends only on what
+    /// defines `g.X`: the player's one long `var` list would otherwise keep everything.
     private static func references(
         in statement: StatementReader.Statement, of source: [UInt8], namespace: String, declared: Set<String>
     ) throws -> Set<Key> {
@@ -159,8 +158,8 @@ enum PlayerTrimmer {
 
     """#
 
-    /// Drives the scrambler as yt-dlp's solver does: build a URL object with
-    /// the challenge, run its unscrambling method, and read the result back.
+    /// Drives the scrambler as yt-dlp's solver does: build a URL object with the challenge, run its unscrambling
+    /// method, and read the result back.
     private static func solver(_ name: String) -> String {
         #"(({sig, n}) => { const url = ("# + name
             + #")("https://youtube.com/watch?v=yt-dlp-wins", "s", sig ? encodeURIComponent(sig) : undefined); url.set("n", n); const proto = Object.getPrototypeOf(url); const keys = Object.keys(proto).concat(Object.getOwnPropertyNames(proto)); for (const key of keys) { if (!["constructor", "set", "get", "clone"].includes(key)) { url[key](); break; } } const s = url.get("s"); return { sig: s ? decodeURIComponent(s) : null, n: url.get("n") ?? null }; })"#

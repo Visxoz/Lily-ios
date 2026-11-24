@@ -16,8 +16,8 @@ struct ElementWalker {
         case skip
     }
 
-    /// Reads a header from the front of `bytes`, or returns nil when more
-    /// bytes are needed. With `maxHeaderLength` bytes it never returns nil.
+    /// Reads a header from the front of `bytes`, or returns nil when more bytes are needed. With `maxHeaderLength`
+    /// bytes it never returns nil.
     typealias HeaderReader = (UnsafeRawBufferPointer) throws -> Header?
 
     /// Larger reads than this are a broken file rather than a header.

@@ -3,8 +3,8 @@ import os
 import YTMCore
 
 extension PlayerController {
-    /// Rates `track` (nil for the one playing), or takes the rating back if the
-    /// playing song already had it. Disliking the playing song skips it. Signed in only.
+    /// Rates `track` (nil for the one playing), or takes the rating back if the playing song already had it.
+    /// Disliking the playing song skips it. Signed in only.
     public func rate(_ rating: Rating, track: Track? = nil) {
         guard let track = track ?? current else { return }
         let id = track.id
@@ -50,8 +50,7 @@ extension PlayerController {
         nowPlaying?.showMotion(of: current, settings.value.animatedArt, fetching: !isStopped, again: true)
     }
 
-    /// Only a new song, not one shown again as on repeat or a retry, reloads its
-    /// rating and lyrics.
+    /// Only a new song, not one shown again as on repeat or a retry, reloads its rating and lyrics.
     func present(_ track: Track, at position: Double) {
         let newSong = current?.id != track.id
         current = track
@@ -152,8 +151,7 @@ extension PlayerController {
         }
     }
 
-    /// Remembers a firm Premium answer across launches, so it isn't asked for
-    /// again on the first songs.
+    /// Remembers a firm Premium answer across launches, so it isn't asked for again on the first songs.
     func syncPremiumStatus() {
         let status = chooser.status
         if premiumStatus != status { premiumStatus = status }

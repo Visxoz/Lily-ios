@@ -1,8 +1,7 @@
 import Foundation
 
 extension YTMusic {
-    /// The full discography is asked alongside the page, and stands in for the page's own
-    /// releases when it has more.
+    /// The full discography is asked alongside the page, and stands in for the page's own releases when it has more.
     func artistPage(_ id: String) async throws -> Page {
         async let page = fetchArtist(id)
         async let discography = try? releases(of: id)
@@ -51,8 +50,8 @@ extension YTMusic {
         return releases
     }
 
-    /// The discography's params: every kind of release, newest first, as
-    /// rustypipe's `albums_param(None, Some(AlbumOrder::Recency))`.
+    /// The discography's params: every kind of release, newest first, as rustypipe's
+    /// `albums_param(None, Some(AlbumOrder::Recency))`.
     private static let newestFirst = "ggMIegYQARoCAQI%3D"
 }
 

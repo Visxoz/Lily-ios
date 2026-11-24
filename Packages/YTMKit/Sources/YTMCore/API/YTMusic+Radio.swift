@@ -39,23 +39,20 @@ extension Renderers {
             .array.map { $0["tabRenderer"] }
     }
 
-    /// Fails when there is no queue, which is how YouTube answers for a radio
-    /// it can't make.
+    /// Fails when there is no queue, which is how YouTube answers for a radio it can't make.
     static func queue(in next: JSON) throws -> [Track] {
         guard let panel = watchNextTabs(next).lazy
             .map({ $0["content", "musicQueueRenderer", "content", "playlistPanelRenderer"] })
             .first(where: \.exists)
         else { throw YTMError(.notFound, "YouTube has no radio for this.") }
         return panel["contents"].array.compactMap { item in
-            // Signed in, a song with a music video comes wrapped with it;
-            // the song is the primary one.
+            // Signed in, a song with a music video comes wrapped with it; the song is the primary one.
             let direct = item["playlistPanelVideoRenderer"]
             return queueTrack(direct.exists ? direct : item["playlistPanelVideoWrapperRenderer", "primaryRenderer", "playlistPanelVideoRenderer"])
         }
     }
 
-    /// The byline's first part names the artists and, for songs, the second
-    /// the album.
+    /// The byline's first part names the artists and, for songs, the second the album.
     static func queueTrack(_ renderer: JSON) -> Track? {
         guard let id = renderer["videoId"].string, !id.isEmpty,
               let title = renderer["title"].text, !title.isEmpty
@@ -67,8 +64,7 @@ extension Renderers {
 
         let thumbnails = renderer["thumbnail", "thumbnails"]
         let first = thumbnails[0]
-        // Without a video type, videos show by their wide thumbnails, and an
-        // item without any counts as one.
+        // Without a video type, videos show by their wide thumbnails, and an item without any counts as one.
         let isVideo = isVideo(renderer["navigationEndpoint", "watchEndpoint"])
             ?? !(first.exists && first["width"].int == first["height"].int)
 

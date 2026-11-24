@@ -60,8 +60,8 @@ struct Format: Sendable, Hashable {
         !isDrc && channels.map { $0 <= 2 } ?? true && isDefaultAudio
     }
 
-    /// Opus in WebM, or AAC-LC in MP4: the quotes keep out `mp4a.40.29`, and HE-AAC
-    /// (`mp4a.40.5`, itag 139) is left out.
+    /// Opus in WebM, or AAC-LC in MP4: the quotes keep out `mp4a.40.29`, and HE-AAC (`mp4a.40.5`, itag 139) is left
+    /// out.
     private static func codec(mime: String) -> AudioCodec? {
         if mime.hasPrefix("audio/webm"), mime.contains("opus") { return .opus }
         if mime.hasPrefix("audio/mp4"), mime.contains("\"mp4a.40.2\"") { return .aac }
@@ -69,8 +69,8 @@ struct Format: Sendable, Hashable {
     }
 }
 
-/// Opus before AAC. With `maxKbps`, the best within it, or the lowest when none fits. Scrambled
-/// formats count so the Premium path can pick 774 and 141; the free path takes only a plain URL.
+/// Opus before AAC. With `maxKbps`, the best within it, or the lowest when none fits. Scrambled formats count so the
+/// Premium path can pick 774 and 141; the free path takes only a plain URL.
 func bestAudio(_ formats: [Format], maxKbps: Int?) -> Format? {
     func pick(_ codec: AudioCodec) -> Format? {
         let candidates = formats.filter { format in

@@ -1,8 +1,8 @@
 import Foundation
 @testable import YTMCore
 
-/// Each plain-URL client is checked on its own, so a client YouTube has broken
-/// shows even while the next one covers for it.
+/// Each plain-URL client is checked on its own, so a client YouTube has broken shows even while the next one covers
+/// for it.
 enum StreamChecks {
     static func run(_ report: Report) async {
         for song in Live.songs + [Live.musicVideo] {

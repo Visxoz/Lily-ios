@@ -1,8 +1,8 @@
 import AudioToolbox
 import Foundation
 
-/// Opus in WebM, as YouTube's 249, 250, 251 and Premium 774 come. Elements of unknown size,
-/// as a live encoder writes, are stepped into like any other.
+/// Opus in WebM, as YouTube's 249, 250, 251 and Premium 774 come. Elements of unknown size, as a live encoder writes,
+/// are stepped into like any other.
 final class WebMDemuxer: PacketSource {
     private(set) var format: SourceFormat?
     private(set) var packets = PacketIndex()
@@ -248,8 +248,8 @@ enum EBML {
     static let block: UInt32 = 0xA1
     static let discardPadding: UInt32 = 0x75A2
 
-    /// An element's ID, kept with its length marker as Matroska writes IDs,
-    /// and its size, whose bits all set means unknown.
+    /// An element's ID, kept with its length marker as Matroska writes IDs, and its size, whose bits all set means
+    /// unknown.
     static func header(_ bytes: UnsafeRawBufferPointer) throws -> ElementWalker.Header? {
         guard let first = bytes.first else { return nil }
         let idLength = first.leadingZeroBitCount + 1

@@ -11,8 +11,8 @@ public enum StoreFile: String, Sendable {
     case library
 }
 
-/// JSON files in Application Support/Lily/. Writes run in order on one
-/// serial queue, atomically, and one overtaken by a newer save is skipped.
+/// JSON files in Application Support/Lily/. Writes run in order on one serial queue, atomically, and one overtaken
+/// by a newer save is skipped.
 public final class FileStore: Sendable {
     public static let shared = FileStore(
         directory: URL.applicationSupportDirectory.appending(path: "Lily", directoryHint: .isDirectory)

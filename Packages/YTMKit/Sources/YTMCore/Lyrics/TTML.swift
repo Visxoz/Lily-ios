@@ -2,7 +2,6 @@ import Foundation
 
 /// Apple Music's TTML, as lrc.red serves it, word timed or line timed.
 enum TTML {
-    /// Nil when the XML doesn't parse or holds no lines.
     static func lyrics(_ data: Data, source: String) -> Lyrics? {
         let reader = Reader()
         // External entities stay unresolved by default, so a document can't reach outside itself.

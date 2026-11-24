@@ -4,8 +4,7 @@ public enum RepeatMode: String, Codable, CaseIterable, Sendable {
     case off, all, one
 }
 
-/// Smart shuffle mixes recommended songs in; it is a kind of shuffle, so it
-/// goes off with it.
+/// Smart shuffle mixes recommended songs in; it is a kind of shuffle, so it goes off with it.
 public enum ShuffleMode: String, Codable, CaseIterable, Sendable {
     case off, on, smart
 }
@@ -116,8 +115,8 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public init() {}
 
-    /// Reads each setting on its own, so an unreadable one resets alone rather
-    /// than taking an opt-out such as `youtubeHistory` with it.
+    /// Reads each setting on its own, so an unreadable one resets alone rather than taking an opt-out such as
+    /// `youtubeHistory` with it.
     public init(from decoder: any Decoder) throws {
         self.init()
         let file = try decoder.container(keyedBy: CodingKeys.self)

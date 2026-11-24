@@ -1,8 +1,8 @@
 import SwiftUI
 import YTMPlayback
 
-/// Folding the half-open phone seeks (`FoldScrub`), with a tick for each seek.
-/// Only held like a book: stood like a laptop, the phone rests on a desk.
+/// Folding the half-open phone seeks (`FoldScrub`), with a tick for each seek. Only held like a book: stood like a
+/// laptop, the phone rests on a desk.
 struct FoldToScrub: ViewModifier {
     let isSideBySide: Bool
 

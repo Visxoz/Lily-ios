@@ -1,11 +1,9 @@
 import Foundation
 
-/// A read-only view into a parsed InnerTube response. Every step is optional,
-/// so an item in an odd shape reads as missing rather than failing the page.
-/// Lookups stay on `NSDictionary`/`NSArray`, as a Swift cast copies each step.
+/// A read-only view into a parsed InnerTube response. Every step is optional, so an item in an odd shape reads as
+/// missing rather than failing the page. Lookups stay on `NSDictionary`/`NSArray`, as a Swift cast copies each step.
 struct JSON: @unchecked Sendable {
-    // `@unchecked`: the wrapped Foundation containers are immutable once
-    // parsed and never handed out mutably.
+    // `@unchecked`: the wrapped Foundation containers are immutable once parsed and never handed out mutably.
     let raw: Any?
 
     init(_ raw: Any?) {
@@ -56,8 +54,7 @@ struct JSON: @unchecked Sendable {
     /// An array's last element, without wrapping the rest.
     var last: JSON { JSON((raw as? NSArray)?.lastObject) }
 
-    /// The value of a one-key object, whatever the key: InnerTube wraps
-    /// items as `{"someRenderer": {...}}`.
+    /// The value of a one-key object, whatever the key: InnerTube wraps items as `{"someRenderer": {...}}`.
     var onlyValue: (key: String, value: JSON)? {
         guard let dict = raw as? NSDictionary, dict.count == 1,
               let key = dict.keyEnumerator().nextObject() as? String else { return nil }

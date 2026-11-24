@@ -1,8 +1,8 @@
 import Foundation
 import YTMCore
 
-// ytmcheck: YTMCore and YTMAudio against live YouTube, signed out. Run with
-// `swift run ytmcheck <command>`; exits non-zero when a check fails.
+// ytmcheck: YTMCore and YTMAudio against live YouTube, signed out. Run with `swift run ytmcheck <command>`; exits
+// non-zero when a check fails.
 
 /// In the order `all` runs them.
 let groups: [(name: String, run: @MainActor (Report) async -> Void)] = [

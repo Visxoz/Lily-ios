@@ -1,8 +1,8 @@
 import SwiftUI
 import YTMCore
 
-/// The app, not this row, waits while access is allowed on Last.fm's page, so
-/// leaving Settings doesn't stop it. A build without the API keys has no button.
+/// The app, not this row, waits while access is allowed on Last.fm's page, so leaving Settings doesn't stop it. A
+/// build without the API keys has no button.
 struct LastFMRow: View {
     private enum Phase: Equatable {
         /// Reading the Keychain.
@@ -18,8 +18,7 @@ struct LastFMRow: View {
 
     var body: some View {
         SettingRow(label: "Last.fm", detail: detail) { control }
-            // Read again as a wait starts or ends, which it may do while the
-            // row is gone.
+            // Read again as a wait starts or ends, which it may do while the row is gone.
             .task(id: app.isConnectingLastFM) { await refresh() }
     }
 

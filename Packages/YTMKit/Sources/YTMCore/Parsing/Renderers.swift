@@ -1,7 +1,7 @@
 import Foundation
 
-/// The parsers every page shares. Each returns nil for an item it can't read,
-/// so an odd item is skipped and never fails the page.
+/// The parsers every page shares. Each returns nil for an item it can't read, so an odd item is skipped and never
+/// fails the page.
 enum Renderers {
     enum Item {
         case track(Track)
@@ -48,8 +48,7 @@ struct ItemContext: Sendable {
     /// The kind an unlabelled album tile is, as on an artist's singles shelf.
     var albumType: AlbumType = .album
     var subtitles: CardSubtitles = .composed
-    /// Home: only official music videos count as videos, as uploads have no
-    /// song version to look up.
+    /// Home: only official music videos count as videos, as uploads have no song version to look up.
     var musicVideosOnly = false
     /// The account's own playlist: each row keeps its entry ID, which edits take.
     var entries = false
@@ -149,8 +148,8 @@ extension Renderers {
         return .browse(id: id, params: params)
     }
 
-    /// Whether the music video type is a video (OMV, UGC…) rather than a song
-    /// (ATV) or podcast episode; nil when missing, except on Home, which counts only OMV.
+    /// Whether the music video type is a video (OMV, UGC…) rather than a song (ATV) or podcast episode; nil when
+    /// missing, except on Home, which counts only OMV.
     static func isVideo(_ watchEndpoint: JSON, context: ItemContext = ItemContext()) -> Bool? {
         let type = watchEndpoint["watchEndpointMusicSupportedConfigs", "watchEndpointMusicConfig", "musicVideoType"].string
         if context.musicVideosOnly { return type == "MUSIC_VIDEO_TYPE_OMV" }
@@ -168,8 +167,7 @@ extension Renderers {
 // MARK: - Runs
 
 extension Renderers {
-    /// Text runs split at YouTube's " • " separators: "Song • A & B • 3:45"
-    /// gives three segments.
+    /// Text runs split at YouTube's " • " separators: "Song • A & B • 3:45" gives three segments.
     static func segments(_ runs: [JSON]) -> [[JSON]] {
         var segments: [[JSON]] = [[]]
         for run in runs {
@@ -196,8 +194,8 @@ extension Renderers {
         }
     }
 
-    /// Artists named without links, as uploads' are: the first non-label
-    /// segment's even runs, as the odd ones are separators (", ", " & ").
+    /// Artists named without links, as uploads' are: the first non-label segment's even runs, as the odd ones are
+    /// separators (", ", " & ").
     static func unlinkedArtists(_ segments: [[JSON]]) -> [ArtistRef] {
         guard let segment = segments.first(where: { !typeLabels.contains(text($0)) }) else { return [] }
         return segment.enumerated().compactMap { index, run in

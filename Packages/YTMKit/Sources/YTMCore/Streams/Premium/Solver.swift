@@ -1,9 +1,9 @@
 import Foundation
 import JavaScriptCore
 
-/// Each solve gets a throwaway context, so nothing of YouTube's code stays in memory between songs.
-/// The limits are checked only between JavaScript steps, so one native call (a huge `repeat` or `fill`)
-/// can overshoot them: JavaScriptCore has no heap limit, and iOS gives an app no separate process.
+/// Each solve gets a throwaway context, so nothing of YouTube's code stays in memory between songs. The limits are
+/// checked only between JavaScript steps, so one native call (a huge `repeat` or `fill`) can overshoot them:
+/// JavaScriptCore has no heap limit, and iOS gives an app no separate process.
 enum Solver {
     struct Solution: Sendable, Equatable {
         let n: String?
@@ -11,8 +11,7 @@ enum Solver {
     }
 
     static let timeLimit: Duration = .seconds(2)
-    /// A solve needs about 2 MB; the cap is on the whole app's footprint,
-    /// which other work can grow meanwhile, hence the room.
+    /// A solve needs about 2 MB; the cap is on the whole app's footprint, which other work can grow meanwhile.
     static let memoryLimit: UInt64 = 64 << 20
     /// How often, in seconds, the limits are checked while a script runs.
     fileprivate static let checkInterval = 0.05
@@ -60,8 +59,8 @@ enum Solver {
     }
 }
 
-/// The watchdog's C API is only in JavaScriptCore's private header, so it is looked up at run time;
-/// without it nothing is solved, as a runaway player could never be stopped.
+/// The watchdog's C API is only in JavaScriptCore's private header, so it is looked up at run time; without it nothing
+/// is solved, as a runaway player could never be stopped.
 private final class Limits {
     private typealias ShouldTerminate = @convention(c) (JSContextRef?, UnsafeMutableRawPointer?) -> Bool
     private typealias SetLimit = @convention(c) (JSContextGroupRef?, Double, ShouldTerminate?, UnsafeMutableRawPointer?) -> Void
@@ -80,8 +79,8 @@ private final class Limits {
         setLimit = unsafeBitCast(symbol, to: SetLimit.self)
     }
 
-    /// The watchdog calls back once per limit set, so each check that lets the script carry on sets the
-    /// next. Unretained: `self` outlives every script the context runs, and the callback runs only within one.
+    /// The watchdog calls back once per limit set, so each check that lets the script carry on sets the next.
+    /// Unretained: `self` outlives every script the context runs, and the callback runs only within one.
     func arm(_ group: JSContextGroupRef?) {
         setLimit(group, Solver.checkInterval, { context, info in
             guard let context, let info else { return true }

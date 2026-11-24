@@ -40,8 +40,7 @@ extension PlayerController {
         }
     }
 
-    /// Moves to `seconds` into the song, kept short of its very end. With
-    /// nothing loaded yet, or while it is opened again, it starts there.
+    /// Kept short of the song's very end. With nothing loaded yet, or while it is opened again, it starts there.
     public func seek(to seconds: Double) {
         guard let current else { return }
         let length = playback.duration
@@ -102,8 +101,8 @@ extension PlayerController {
         let pending = playback.extending ? extending : nil
         autoplay?.cancel()
         autoplay = Task { [weak self] in
-            // The radio queued as this queue's last song started may still be
-            // loading; it is waited for rather than asked for a second time.
+            // The radio queued as this queue's last song started may still be loading; it is waited for rather than
+            // asked for a second time.
             if let pending {
                 await pending.value
                 guard let self, !Task.isCancelled, playback.generation == generation else { return }
@@ -113,8 +112,8 @@ extension PlayerController {
                 }
             }
             let result = await Result { try await music.radio(videoId: seed) }
-            // The playback generation, not the queue's revision: the radio
-            // queued as the last song started may have just extended it.
+            // The playback generation, not the queue's revision: the radio queued as the last song started may have
+            // just extended it.
             guard let self, !Task.isCancelled, playback.generation == generation else { return }
             switch result {
             case .success(let tracks): appendUnique(tracks)
@@ -148,8 +147,7 @@ extension PlayerController {
         playback.duration = track.seconds
         playback.requestedAt = .now
         playback.currentPremium = false
-        // A skip to the song queued in the engine plays its stream, unless
-        // that is a Premium one being retried on the free path.
+        // A skip to the song queued in the engine plays its stream, unless that is a Premium one being retried free.
         if gapless.queued?.trackID == track.id, playback.forceFree != track.id {
             gapless.unqueue(into: &prefetcher)
         } else {
@@ -158,16 +156,16 @@ extension PlayerController {
         for task in [resolving, queueing, autoplay, reopenWait] { task?.cancel() }
         // Before the stop, which forgets how much of the song the engine holds.
         let held = heldStream(track.id)
-        // The output runs on while the stream resolves, so iOS keeps the app
-        // running, and the system's Now Playing, through a slow fetch.
+        // The output runs on while the stream resolves, so iOS keeps the app running, and the system's Now Playing,
+        // through a slow fetch.
         audio.stop(keepingOutput: true)
         playback.itemID = nil
         let resume = playback.resume.flatMap { $0.id == track.id ? $0.position : nil } ?? 0
         present(track, at: resume)
         updateBuffering()
         publishPlayback()
-        // A stream resolved ahead needs no await, so the song loads on this
-        // turn and the quality badge never shows empty in between.
+        // A stream resolved ahead needs no await, so the song loads on this turn and the quality badge never shows
+        // empty in between.
         if let prefetched = localStream(track.id) ?? held ?? prefetcher.take(track.id) {
             load(track, prefetched)
             return
@@ -178,8 +176,8 @@ extension PlayerController {
         let generation = playback.generation
         resolving = Task { [weak self] in
             async let resolved = Result { try await source() }
-            // The session starts while the stream resolves off the main actor, not after it. Not
-            // offline, where a song not downloaded fails and would only silence other apps.
+            // The session starts while the stream resolves off the main actor, not after it. Not offline, where a
+            // song not downloaded fails and would only silence other apps.
             if let self, isPlaying, downloads.online != false { activateAudioSession() }
             let result = await resolved
             guard let self, !Task.isCancelled, playback.generation == generation else { return }
@@ -200,8 +198,7 @@ extension PlayerController {
             playback.itemID = item.id
             activateAudioSession()
             audio.play(item, from: start, paused: !isPlaying)
-            // Kept with when it was resolved, so previous, a jump back or
-            // repeat one plays it again without asking.
+            // Kept with when it was resolved, so previous, a jump back or repeat one plays it again without asking.
             prefetcher.storePlaying(track.id, prefetched)
         } catch {
             playbackFailed(track.title, error.message)
@@ -213,8 +210,8 @@ extension PlayerController {
         return resume.position
     }
 
-    /// Opens the song again where it stopped, a few times while the connection
-    /// is gone, then stops on it, so Play carries on.
+    /// Opens the song again where it stopped, a few times while the connection is gone, then stops on it, so Play
+    /// carries on.
     func connectionLost() {
         guard let id = queue.current?.id else { return }
         Logger.playback.warning("lost the connection")
@@ -253,8 +250,8 @@ extension PlayerController {
         }
     }
 
-    /// A Premium stream or a downloaded file gets one retry on the free stream
-    /// without counting a second play; otherwise the next song plays, until a few in a row fail.
+    /// A Premium stream or a downloaded file gets one retry on the free stream without counting a second play;
+    /// otherwise the next song plays, until a few in a row fail.
     func playbackFailed(_ title: String, _ message: String) {
         Logger.playback.warning("playback failed: \(message, privacy: .public)")
         if let id = queue.current?.id { prefetcher.remove(id) }
@@ -279,16 +276,16 @@ extension PlayerController {
         }
     }
 
-    /// The system's media services restarted, taking the audio graph with
-    /// them. The position is read first, as the rebuild stops the sound.
+    /// The system's media services restarted, taking the audio graph with them. The position is read first, as the
+    /// rebuild stops the sound.
     func mediaServicesReset() {
         let position = enginePosition
         audio.rebuild()
         if !isStopped { restartCurrent(from: position) }
     }
 
-    /// Reloads the current song from where it got to, or `position`, without
-    /// counting a second play; at the very end it starts over.
+    /// Reloads the current song from where it got to, or `position`, without counting a second play; at the very
+    /// end it starts over.
     private func restartCurrent(from position: Double? = nil) {
         guard let id = queue.current?.id else { return }
         let position = position ?? enginePosition

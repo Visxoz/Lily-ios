@@ -1,12 +1,11 @@
 import Foundation
 
-/// Low and Normal cap the bitrate for metered connections; High takes the
-/// best YouTube offers, 256 kbps Opus with Premium.
+/// Low and Normal cap the bitrate for metered connections; High takes the best YouTube offers, 256 kbps Opus with
+/// Premium.
 public enum AudioQuality: String, Codable, CaseIterable, Hashable, Sendable {
     case low, normal, high
 
-    /// The highest bitrate wanted, or nil for the best there is. YouTube's
-    /// Opus streams come at about 50, 70 and 130 kbps.
+    /// Nil for the best there is. YouTube's Opus streams come at about 50, 70 and 130 kbps.
     public var maxKbps: Int? {
         switch self {
         case .low: 64
@@ -34,8 +33,7 @@ public struct ResolvedStream: Codable, Hashable, Sendable {
     public var duration: Double?
     /// YouTube's loudness measure in dB, for normalising.
     public var loudnessDb: Double?
-    /// A Premium format (774 or 141). Free formats the web client gives a
-    /// Premium account are not.
+    /// A Premium format (774 or 141). Free formats the web client gives a Premium account are not.
     public var isPremium: Bool
     /// The plain-URL client it came from, if one, so a refresh it refuses too can ask it last.
     public var client: String?

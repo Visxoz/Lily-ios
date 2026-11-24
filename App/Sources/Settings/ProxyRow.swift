@@ -1,8 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// The user's own proxy. Every session takes the one saved as it is made, so a change
-/// applies from Lily's next start.
+/// The user's own proxy. Every session takes the one saved as it is made, so a change applies from Lily's next start.
 struct ProxyRow: View {
     @Environment(\.theme) private var theme
     /// Nil while the Keychain is read.

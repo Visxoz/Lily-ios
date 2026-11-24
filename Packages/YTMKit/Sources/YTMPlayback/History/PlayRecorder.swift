@@ -17,10 +17,9 @@ import YTMCore
         self.lastFM = lastFM
     }
 
-    /// `reportToYouTube` adds the song to the account's history, so its
-    /// recommendations and Listen again follow what plays here too, then
-    /// reports the time heard. Gapless, repeat and restarting start a play
-    /// without stopping, so the last one's time goes first.
+    /// `reportToYouTube` adds the song to the account's history, so its recommendations and Listen again follow what
+    /// plays here too, then reports the time heard. Gapless, repeat and restarting start a play without stopping, so
+    /// the last one's time goes first.
     func record(_ track: Track, reportToYouTube: Bool, paused: Bool) {
         flushWatch(.last, paused: paused, reporting: reportToYouTube)
         history.record(track)
@@ -45,8 +44,8 @@ import YTMCore
         }
     }
 
-    /// Lets the song into Speed dial, then scrobbles it, once enough of its
-    /// `length` seconds has been heard, and sends its watch time when due.
+    /// Lets the song into Speed dial, then scrobbles it, once enough of its `length` seconds has been heard, and
+    /// sends its watch time when due.
     func heard(position: Double, length: Double, speed: Double, reporting: Bool) {
         watch?.tick(position: position, speed: speed, at: .now)
         flushWatch(.due, paused: false, reporting: reporting)

@@ -1,5 +1,5 @@
-/// googlevideo's first answer for a rarely played song can take over half a second, so the
-/// likely next item's start is fetched early into the part file its download carries on from.
+/// googlevideo's first answer for a rarely played song can take over half a second, so the likely next item's start
+/// is fetched early into the part file its download carries on from.
 extension PlaybackEngine {
     struct Warmed {
         let item: AudioItem
@@ -17,8 +17,8 @@ extension PlaybackEngine {
         warmed = Warmed(item: item, loader: loader, task: Task { [self] in await loader.warm(source: source) })
     }
 
-    /// Keeps a dropped next item's download as the warm-up, so reopening it carries on from
-    /// disk. An existing warm-up, for the item now likely next, wins.
+    /// Keeps a dropped next item's download as the warm-up, so reopening it carries on from disk. An existing
+    /// warm-up, for the item now likely next, wins.
     func keepWarm(_ track: Track) {
         let task = track.download
         track.cancel()

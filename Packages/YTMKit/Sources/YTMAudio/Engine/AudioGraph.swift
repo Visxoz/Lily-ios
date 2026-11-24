@@ -28,8 +28,8 @@ final class AudioGraph {
     func connectOutput() {
         let rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
         let format = AVAudioFormat(standardFormatWithSampleRate: rate > 0 ? rate : 48_000, channels: 2)
-        // Plain nodes at a standard format: the engine has no reason to refuse. At 1x the varispeed
-        // stays out of the path, so the sound is exactly the decoder's.
+        // Plain nodes at a standard format: the engine has no reason to refuse. At 1x the varispeed stays out of the
+        // path, so the sound is exactly the decoder's.
         if speed == 1 {
             _ = connect(mixer, to: sound, format: format)
         } else {
@@ -46,8 +46,8 @@ final class AudioGraph {
         return true
     }
 
-    /// iOS 26 has only the raising form. It is safe with what arrives here, standard float stereo at a
-    /// positive rate, but raises if anything other than a mixer input changes while the engine runs.
+    /// iOS 26 has only the raising form. It is safe with what arrives here, standard float stereo at a positive rate,
+    /// but raises if anything other than a mixer input changes while the engine runs.
     private func connect(_ node: AVAudioNode, to next: AVAudioNode, format: AVAudioFormat?) -> Bool {
         guard #available(iOS 27, *) else {
             // After a device change the engine may already have been restarted; the seek that follows starts it again.
@@ -58,8 +58,8 @@ final class AudioGraph {
         return (try? engine.connectNode(node, to: next, fromBus: 0, toBus: 0, format: format)) != nil
     }
 
-    /// False if the player refused. On iOS 26, play() raises unless the player is connected and the
-    /// engine running; the engine can stop between `start` and here when the system takes the output.
+    /// False if the player refused. On iOS 26, play() raises unless the player is connected and the engine running;
+    /// the engine can stop between `start` and here when the system takes the output.
     func play() -> Bool {
         guard #available(iOS 27, *) else {
             guard engine.isRunning else { return false }

@@ -15,8 +15,7 @@ struct SearchScreen: View {
 
     var body: some View {
         @Bindable var app = app
-        // The results stay in the tree under the dropdown, so cancelling a
-        // search shows them again in place, scrolled where they were.
+        // The results stay in the tree under the dropdown, so cancelling a search shows them again where they were.
         ZStack {
             if let shown {
                 PageScreen(route: .search(shown))
@@ -52,8 +51,7 @@ struct SearchScreen: View {
         query.isEmpty || !typed
     }
 
-    /// The query to suggest for, or nil when none is wanted; each change
-    /// restarts the wait, dropping the request for the last keystroke.
+    /// The query to suggest for, or nil when none is wanted; each change restarts the wait, dropping the last request.
     private var suggestKey: String? {
         guard app.isSearching, !showsRecent else { return nil }
         let trimmed = query.trimmingCharacters(in: .whitespaces)

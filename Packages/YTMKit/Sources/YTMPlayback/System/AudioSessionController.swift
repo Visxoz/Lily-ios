@@ -1,8 +1,8 @@
 import AVFoundation
 import os
 
-/// Unplugging the device playing pauses, unless Settings says to carry on; a device
-/// plugged in plays on, and the engine follows the new output itself.
+/// Unplugging the device playing pauses, unless Settings says to carry on; a device plugged in plays on, and the
+/// engine follows the new output itself.
 @MainActor final class AudioSessionController {
     #if os(iOS)
     private var isActive = false
@@ -22,8 +22,8 @@ import os
             observers = [
                 center.addObserver(of: session, for: .didBecomeInactive) { [weak self, weak player] message in
                     guard let self else { return }
-                    // However the system took the session, the next play must ask
-                    // for it again; only an interruption pauses the player.
+                    // However the system took the session, the next play must ask for it again; only an
+                    // interruption pauses the player.
                     isActive = false
                     guard let player, case .systemInterruption = message.deactivationResult else { return }
                     interrupted(player)
@@ -87,8 +87,8 @@ import os
     func activate() {
         guard !isActive else { return }
         do {
-            // The default route sharing, not long-form audio's, under which
-            // headphone presses (AirPods squeezes) never reached the app.
+            // The default route sharing, not long-form audio's, under which headphone presses (AirPods squeezes)
+            // never reached the app.
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
             isActive = true

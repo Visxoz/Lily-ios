@@ -2,9 +2,8 @@ import Foundation
 import os
 import YTMCore
 
-/// A play's watch-time pings, as the web player sends them: the stretches heard, on YouTube's
-/// schedule, on pausing and as the play ends. Apart from `Scrobbler`, whose listening ends once
-/// a play scrobbles.
+/// A play's watch-time pings, as the web player sends them: the stretches heard, on YouTube's schedule, on pausing
+/// and as the play ends. Apart from `Scrobbler`, whose listening ends once a play scrobbles.
 struct WatchReport {
     enum Flush {
         /// On the web player's schedule.

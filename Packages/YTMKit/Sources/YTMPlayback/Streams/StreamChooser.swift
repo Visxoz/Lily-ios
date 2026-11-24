@@ -16,14 +16,13 @@ public enum PremiumStatus: Sendable {
 }
 
 struct PremiumCounters {
-    /// Songs in a row without Premium formats before an unknown account counts
-    /// as without it, as some songs simply have no Premium version.
+    /// Songs in a row without Premium formats before an unknown account counts as without it, as some songs simply
+    /// have no Premium version.
     static let notPremiumAfter = 3
-    /// The same for a known Premium account: only a long run of uploads
-    /// reaches it, and a lapsed subscription soon does.
+    /// The same for a known Premium account: only a long run of uploads reaches it, and a lapsed subscription soon
+    /// does.
     static let lapsedAfter = 20
-    /// Cool-off after Premium keeps failing, and between background checks
-    /// of an account taken as without Premium.
+    /// Cool-off after Premium keeps failing, and between background checks of an account taken as without Premium.
     static let backoff = Duration.seconds(10 * 60)
     static let maxErrors = 3
 
@@ -33,12 +32,11 @@ struct PremiumCounters {
     /// Premium requests in a row that failed outright.
     private var errors = 0
     private var pausedUntil: ContinuousClock.Instant?
-    /// A run of music videos, which never have Premium formats, can mistake a
-    /// Premium account for one, hence the recheck. Unset: checked on the first song.
+    /// A run of music videos, which never have Premium formats, can mistake a Premium account for one, hence the
+    /// recheck. Unset: checked on the first song.
     var recheckAt: ContinuousClock.Instant?
 
-    /// `known` says the account has been served Premium formats before, and
-    /// `none` that it was last taken as without Premium.
+    /// `known`: the account has been served Premium formats before; `none`: it was last taken as without Premium.
     init(known: Bool, none: Bool) {
         status = known ? .premium : none ? .notPremium : .unknown
     }
@@ -79,8 +77,8 @@ struct PremiumCounters {
     }
 }
 
-/// Chooses between the Premium and the free stream for a song. Safe to call
-/// from anywhere: the counters' lock is never held across an await.
+/// Chooses between the Premium and the free stream for a song. Safe to call from anywhere: the counters' lock is
+/// never held across an await.
 final class StreamChooser: Sendable {
     private let music: any MusicService
     private let counters = Mutex(PremiumCounters(known: false, none: false))
@@ -99,9 +97,8 @@ final class StreamChooser: Sendable {
         seed(known: false, none: false)
     }
 
-    /// `wantPremium` means signed in at High quality. Downloads pass `counting` false: a
-    /// playlist of music videos, which have no Premium formats, says nothing of the account.
-    /// With `reopening`, a song opened again after a drop, its failures say nothing of Premium either.
+    /// `wantPremium` means signed in at High quality. Downloads pass `counting` false: a playlist of music videos,
+    /// which have no Premium formats, says nothing of the account. Nor do failures of a song `reopening` after a drop.
     @concurrent
     func resolve(
         videoId: String, wantPremium: Bool, signedIn: Bool, quality: AudioQuality, counting: Bool = true, reopening: Bool = false
@@ -110,19 +107,18 @@ final class StreamChooser: Sendable {
             if !counters.withLock({ $0.skipped(at: .now) }) {
                 if let stream = try await premium(videoId, counting: counting, reopening: reopening) { return stream }
             } else if counting, counters.withLock({ $0.takeRecheck(at: .now) }) {
-                // Checked off the playback path: this song plays the free
-                // stream at once, and the next one gets Premium if it is back.
+                // Checked off the playback path: this song plays the free stream at once, and the next one gets
+                // Premium if it is back.
                 Task { [self] in await recheck(videoId) }
             }
         }
         return try await free(videoId, signedIn: signedIn, quality: quality)
     }
 
-    /// Asks the path that gave the stream, so it comes back as the same file: a free stream, web-client
-    /// ones too, is asked of the plain-URL clients in format `itag`, so one googlevideo refuses still
-    /// plays. `cutOff` names the client whose fresh URL was refused too, asked last from now on.
-    /// Counts nothing towards the Premium counters, as the song already counted when first resolved,
-    /// but has the player checked sooner.
+    /// Asks the path that gave the stream, so it comes back as the same file: a free stream, web-client ones too, is
+    /// asked of the plain-URL clients in format `itag`, so one googlevideo refuses still plays. `cutOff` names the
+    /// client whose fresh URL was refused too, asked last from now on. Counts nothing towards the Premium counters,
+    /// as the song already counted when first resolved, but has the player checked sooner.
     @concurrent
     func refresh(
         videoId: String, wasPremium: Bool, itag: Int, cutOff: String?, signedIn: Bool, quality: AudioQuality
@@ -137,8 +133,8 @@ final class StreamChooser: Sendable {
         return stream
     }
 
-    /// Nil to play the free stream. A known Premium account takes any format
-    /// from the same answer, which saves asking the free clients.
+    /// Nil to play the free stream. A known Premium account takes any format from the same answer, which saves asking
+    /// the free clients.
     private func premium(_ videoId: String, counting: Bool, reopening: Bool) async throws -> ResolvedStream? {
         let known = status == .premium
         do {
@@ -177,9 +173,9 @@ final class StreamChooser: Sendable {
         }
     }
 
-    /// YTMCore retries a bot-checked visitor ID itself. Signed in, falls back to
-    /// the web client's scrambled URLs through the Premium solver, Premium or not.
-    /// `itag` holds the plain-URL clients to that format, but not the web client.
+    /// YTMCore retries a bot-checked visitor ID itself. Signed in, falls back to the web client's scrambled URLs
+    /// through the Premium solver, Premium or not. `itag` holds the plain-URL clients, not the web client, to that
+    /// format.
     private func free(_ videoId: String, signedIn: Bool, quality: AudioQuality, itag: Int? = nil) async throws -> ResolvedStream {
         do {
             return try await music.stream(videoId: videoId, quality: quality, itag: itag)

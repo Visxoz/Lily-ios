@@ -1,8 +1,7 @@
 import Foundation
 import YTMCore
 
-/// Only time played through counts towards a play or a scrobble, so seeks
-/// and stalls add nothing.
+/// Only time played through counts towards a play or a scrobble, so seeks and stalls add nothing.
 struct Scrobbler {
     private struct Listening {
         let track: Track
@@ -15,21 +14,18 @@ struct Scrobbler {
 
     private var playing: Listening?
 
-    /// Forward by no more than the song time `elapsed` plays at `speed`, so a
-    /// seek adds nothing while a delayed tick loses nothing, as the sound plays
-    /// on its own thread.
+    /// Forward by no more than the song time `elapsed` plays at `speed`, so a seek adds nothing while a delayed tick
+    /// loses nothing, as the sound plays on its own thread.
     static func playedThrough(moved: Double, elapsed: Duration, speed: Double) -> Double {
         moved > 0 && moved <= (elapsed + PlayerController.tick).seconds * speed ? moved : 0
     }
 
-    /// Speed dial's rule: 30 seconds, or half of a song under a minute; an
-    /// unknown length needs the full 30.
+    /// Speed dial's rule: 30 seconds, or half of a song under a minute; an unknown length needs the full 30.
     static func playCounts(heard: Double, length: Double) -> Bool {
         heard >= (length > 0 ? min(30, length / 2) : 30)
     }
 
-    /// Last.fm's rule: the song is over 30 seconds, and half of it or four
-    /// minutes has played.
+    /// Last.fm's rule: the song is over 30 seconds, and half of it or four minutes has played.
     static func counts(heard: Double, length: Double) -> Bool {
         length > 30 && heard >= min(length / 2, 240)
     }
@@ -38,9 +34,8 @@ struct Scrobbler {
         playing = Listening(track: track, startedAt: date)
     }
 
-    /// `heard` is the song once its play counts for Speed dial, `scrobble` the
-    /// play once it counts for Last.fm, each only that once. Last.fm's rule is
-    /// never met before Speed dial's, so ending the listening there loses nothing.
+    /// `heard` is the song once its play counts for Speed dial, `scrobble` the play once it counts for Last.fm, each
+    /// only that once. Last.fm's rule is never met before Speed dial's, so ending the listening there loses nothing.
     mutating func heard(
         position: Double, length: Double, speed: Double, at now: ContinuousClock.Instant = .now
     ) -> (heard: Track?, scrobble: (track: Track, startedAt: Date)?) {

@@ -1,8 +1,7 @@
 import Foundation
 
 extension YTMusic {
-    /// A "More" page, each list followed to its end. Asked as the account,
-    /// since Home's shelves are its own.
+    /// A "More" page, each list followed to its end. Asked as the account, since Home's shelves are its own.
     func browsePage(_ id: String, params: String?) async throws -> Page {
         let response = try await innerTube.browse(id, params: params)
         let title = response["header"].onlyValue?.value["title"].text ?? ""
@@ -22,8 +21,8 @@ extension YTMusic {
         return Page(header: title.isEmpty ? nil : PageHeader(title: title), sections: sections)
     }
 
-    /// Hands `take` each batch after the list's first as it arrives, so its
-    /// JSON is freed before the next is asked for; a failed batch ends it.
+    /// Hands `take` each batch after the list's first as it arrives, so its JSON is freed before the next is asked
+    /// for; a failed batch ends it.
     func following(_ list: JSON, authenticated: Bool, _ take: ([JSON]) -> Void) async throws {
         var token = Renderers.continuation(list)
         var batches = 0

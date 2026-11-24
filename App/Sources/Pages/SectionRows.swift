@@ -1,8 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// The views are siblings in the page's lazy stack, so a long track list is
-/// built only as it scrolls in.
+/// The views are siblings in the page's lazy stack, so a long track list is built only as it scrolls in.
 struct SectionRows: View {
     let section: YTMCore.Section
     /// The page's width inside its padding.

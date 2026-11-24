@@ -23,8 +23,7 @@ public enum Formatting {
         n == 1 ? "1 song" : "\(n) songs"
     }
 
-    /// The tracks' total length as "1 hr 5 min" or "42 min", rounded up to
-    /// the minute; nil when none has a length.
+    /// The tracks' total length as "1 hr 5 min" or "42 min", rounded up to the minute; nil when none has a length.
     static func totalTime(_ tracks: [Track]) -> String? {
         let total = tracks.reduce(0) { $0 + ($1.duration ?? 0) }
         guard total > 0 else { return nil }
@@ -32,8 +31,8 @@ public enum Formatting {
         return minutes >= 60 ? "\(minutes / 60) hr \(minutes % 60) min" : "\(minutes) min"
     }
 
-    /// A playlist header's "120 songs • 6 hr 2 min": `count` when YouTube
-    /// gave the whole list's, else the tracks loaded.
+    /// A playlist header's "120 songs • 6 hr 2 min": `count` when YouTube gave the whole list's, else the tracks
+    /// loaded.
     static func playlistMeta(count: Int?, tracks: [Track]) -> String {
         ([songs(count ?? tracks.count)] + [totalTime(tracks)].compactMap(\.self)).joined(separator: " • ")
     }

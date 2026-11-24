@@ -2,11 +2,8 @@ import SwiftUI
 import YTMCore
 import YTMPlayback
 
-/// The two pages scroll natively, so a swipe follows the finger and can't be
-/// lost to the zoom's own close. A regular width, iPhone Duo's inner display,
-/// has room for both at once, as the desktop's player and panel are; stood
-/// half open, the artwork or lyrics face the room from the upright half and
-/// every control sits on the flat one.
+/// The two pages scroll natively, so a swipe follows the finger and can't be lost to the zoom's own close. iPhone
+/// Duo's inner display has room for both at once; stood half open, the artwork or lyrics take the upright half.
 struct NowPlayingScreen: View {
     static let padding: CGFloat = 24
 
@@ -75,8 +72,7 @@ struct NowPlayingScreen: View {
             }
             .animation(MotionArtworkView.fade, value: tallClip?.id)
         }
-        // On the panel, or stood lyrics, a pull down goes back to the artwork
-        // rather than closing the screen.
+        // On the panel, or stood lyrics, a pull down goes back to the artwork rather than closing the screen.
         .interactiveDismissDisabled((page == .panel && layout != .sideBySide) || (layout == .stand && lyricsShown))
         // In the look's own scheme, not the dark one over the clip.
         .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0).preferredColorScheme(app.theme.colorScheme) }
@@ -85,8 +81,7 @@ struct NowPlayingScreen: View {
             app.nowPlayingShown = false
             app.player.showsLyrics = false
         }
-        // Set here rather than as the lyrics appear, as opening or closing the
-        // phone swaps one lyrics view for another in no set order.
+        // Set here, not as the lyrics appear, as opening or closing the phone swaps lyrics views in no set order.
         .onChange(of: lyricsShown, initial: true) { app.player.showsLyrics = $1 }
         .modifier(FoldToScrub(isSideBySide: layout == .sideBySide))
     }
@@ -96,8 +91,8 @@ struct NowPlayingScreen: View {
         return sizeClass == .regular && shape.isStood ? .stand : .pager
     }
 
-    /// The player's, from its first frame (before an Apple clip lands), so the screen opens laid out for it; on a regular
-    /// width only once measured, or the pager guessed at first would start it only to fade it out.
+    /// The player's, from its first frame, so the screen opens laid out for it; on a regular width only once measured,
+    /// or the pager guessed at first would start it only to fade it out.
     private var tallClip: MotionClip? {
         layout == .pager && (shape.measured || sizeClass == .compact) && !reduceMotion ? app.player.motionClip : nil
     }
@@ -113,8 +108,7 @@ struct NowPlayingScreen: View {
     private func pager(_ track: Track) -> some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Each page hidden from VoiceOver while off screen,
-                // so it reads one set of controls.
+                // Each page hidden from VoiceOver while off screen, so it reads one set of controls.
                 artworkPage(track, open: show)
                     .containerRelativeFrame(.vertical)
                     .accessibilityHidden(page != .artwork)
@@ -128,15 +122,13 @@ struct NowPlayingScreen: View {
             .background(PagerBounceOff())
         }
         .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
-        // The page counts as shown once past halfway, so a swipe
-        // down from the panel stays one page until it settles.
+        // The page counts as shown once past halfway, so a swipe down from the panel stays one page until it settles.
         .scrollPosition(id: $page, anchor: .center)
         // Off the artwork page, not merely touched or dragged by the zoom's close, which leaves the pager still.
         .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { paging = $1 }
         .scrollIndicators(.hidden)
     }
 
-    /// Either side of the fold, where there is one.
     @available(iOS 27.1, *)
     private func sideBySide(_ track: Track) -> some View {
         ArrangementView {
@@ -227,9 +219,8 @@ struct NowPlayingScreen: View {
     }
 }
 
-/// Stops the pager bouncing, so a swipe down at the artwork goes straight to
-/// the zoom's close; `scrollBounceBehavior` can't while content overflows. Its
-/// nearest scroll view is the pager, never the queue, which needs its bounce.
+/// Stops the pager bouncing, so a swipe down at the artwork goes straight to the zoom's close; `scrollBounceBehavior`
+/// can't while content overflows. Its nearest scroll view is the pager, never the queue, which needs its bounce.
 // shortcut: relies on SwiftUI's ScrollView being a UIScrollView; drop it once SwiftUI can turn the bounce off.
 private struct PagerBounceOff: UIViewRepresentable {
     func makeUIView(context: Context) -> Probe {
@@ -274,8 +265,7 @@ private struct CompactControls: View {
     }
 }
 
-/// The menu leaves out rating, which is beside the title, and queueing, which
-/// has no use for the song playing.
+/// The menu leaves out rating, which is beside the title, and queueing, of no use for the song playing.
 private struct NowPlayingTopBar: View {
     let track: Track
     var overClip = false
@@ -388,8 +378,7 @@ private struct TallMotion: View {
     }
 }
 
-/// The artwork's colours where they sit in it, as a blurred copy would show
-/// them without the cost of blurring.
+/// The artwork's colours where they sit in it, as a blurred copy would show them without the cost of blurring.
 private struct NowPlayingBackground: View {
     private static let edge = ArtworkPalette.meshEdge
     private static let points = (0..<edge * edge).map { cell in

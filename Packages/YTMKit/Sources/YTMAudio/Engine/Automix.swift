@@ -168,7 +168,6 @@ enum Automix {
             frames += count
         }
 
-        /// The first `frames` measured.
         func analysis(frames: Int) -> Analysis {
             let frames = min(frames, self.frames)
             let hops = min(frames / hop, all.count - 1)

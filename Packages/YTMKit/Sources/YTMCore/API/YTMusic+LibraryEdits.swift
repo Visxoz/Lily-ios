@@ -98,8 +98,7 @@ extension YTMusic {
         try Self.performed(try await edit(subscribed ? "subscription/subscribe" : "subscription/unsubscribe", channels))
     }
 
-    /// A refused edit, such as one to a full playlist, still answers 200, so
-    /// each reply's status is checked.
+    /// A refused edit, such as one to a full playlist, still answers 200, so each reply's status is checked.
     private func editPlaylist(_ playlistId: String, actions: [[String: String]]) async throws {
         let playlistId = try Self.youtubeId(playlistId)
         for start in stride(from: 0, to: actions.count, by: Self.perRequest) {

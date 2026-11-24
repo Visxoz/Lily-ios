@@ -1,18 +1,18 @@
 import Foundation
 
-/// Just enough JavaScript grammar to step over strings, nested template literals, regular
-/// expressions and comments without mistaking what is inside them for code.
+/// Just enough JavaScript grammar to step over strings, nested template literals, regular expressions and comments
+/// without mistaking what is inside them for code.
 struct JSTokenizer {
     let source: [UInt8]
     private var offset: Int
     private let limit: Int
-    /// One entry per open `{`: true for a template's `${`, whose `}`
-    /// carries on the template rather than closing a block.
+    /// One entry per open `{`: true for a template's `${`, whose `}` carries on the template rather than closing a
+    /// block.
     private var braces: [Bool] = []
     /// The token before, which tells a regular expression from a division.
     private var previous: JSToken?
 
-    /// Tokenizes `source[range]`, which must start between two tokens.
+    /// `range` must start between two tokens.
     init(_ source: [UInt8], range: Range<Int>? = nil) {
         self.source = source
         offset = range?.lowerBound ?? 0
@@ -151,8 +151,8 @@ struct JSTokenizer {
         throw Self.malformed
     }
 
-    /// Digits, letters, `_` and `.` in any order, which covers every
-    /// numeric literal, with a sign after a decimal exponent.
+    /// Digits, letters, `_` and `.` in any order, which covers every numeric literal, with a sign after a decimal
+    /// exponent.
     private mutating func number() {
         let radix = source[offset] == UInt8(ascii: "0") && "xXbBoO".utf8.contains(byte(offset + 1))
         offset += 1

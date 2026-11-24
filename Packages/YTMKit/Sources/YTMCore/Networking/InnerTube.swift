@@ -5,15 +5,14 @@ final class InnerTube: Sendable {
     private let visitor: VisitorData
     private let refusals = Refusals()
 
-    /// English, so parsers can read YouTube's labels ("Song", "1.2M"); the
-    /// country picks charts and catalogue.
+    /// English, so parsers can read YouTube's labels ("Song", "1.2M"); the country picks charts and catalogue.
     static let language = "en"
     static let country = "US"
 
     static let retries = 2
 
-    /// The consent cookie a browser that dismissed YouTube's banner sends,
-    /// so signed-out web requests from Europe get pages, not the banner.
+    /// The consent cookie a browser that dismissed YouTube's banner sends, so signed-out web requests from Europe get
+    /// pages, not the banner.
     static let consentCookie = "SOCS=CAISAiAD"
 
     init(auth: GoogleAuth, store: FileStore) {
@@ -21,10 +20,9 @@ final class InnerTube: Sendable {
         visitor = VisitorData(store: store, request: VisitorData.request)
     }
 
-    /// Keys `body` gives in `context.client` override the client's own.
-    /// `authenticated` only affects web clients; `visitorData` tries an ID
-    /// before keeping it. Requests with a fallback of their own pass `retries: 0`. With `watchesSession`,
-    /// signed-in requests wait out refusal pauses, take in Set-Cookies and notice a lost session.
+    /// Keys `body` gives in `context.client` override the client's own. `authenticated` only affects web clients;
+    /// `visitorData` tries an ID before keeping it. Requests with a fallback of their own pass `retries: 0`. With
+    /// `watchesSession`, signed-in requests wait out refusal pauses, take in Set-Cookies and notice a lost session.
     @concurrent
     func post(
         _ endpoint: String, body: [String: Any] = [:], client: ClientProfile = .webRemix,
@@ -90,13 +88,11 @@ final class InnerTube: Sendable {
         try await visitor.value()
     }
 
-    /// A visitor ID to try in place of `refused`, not kept yet. Callers asking
-    /// together share one fetch.
+    /// Not kept yet. Callers asking together share one fetch.
     func candidateVisitorData(replacing refused: String) async throws -> String {
         try await visitor.candidate(replacing: refused)
     }
 
-    /// Keeps `candidate`, which worked where `refused` failed.
     func adoptVisitorData(_ candidate: String, replacing refused: String) async {
         await visitor.adopt(candidate, replacing: refused)
     }
@@ -106,9 +102,8 @@ final class InnerTube: Sendable {
     }
 }
 
-/// Saved so a launch needs no fetch, and replaced in the background once a day
-/// old. A fresh ID only replaces the saved one once it has worked where the
-/// saved one failed: both failing points at the song, not the ID.
+/// Saved so a launch needs no fetch, and replaced in the background once a day old. A fresh ID only replaces the saved
+/// one once it has worked where the saved one failed: both failing points at the song, not the ID.
 actor VisitorData {
     private struct Saved: Codable, Sendable {
         let value: String
@@ -120,7 +115,7 @@ actor VisitorData {
     private let request: @Sendable () async throws -> String
     /// Checked, as it goes into a header.
     private lazy var saved: Saved? = store.load(Saved.self, from: .visitor).flatMap { Self.isUsable($0.value) ? $0 : nil }
-    /// The fetch in flight, which every caller arriving meanwhile awaits.
+    /// Every caller arriving meanwhile awaits it.
     private var fetching: Task<String, any Error>?
     /// Bumped by `forget`.
     private var generation = 0
@@ -130,8 +125,7 @@ actor VisitorData {
         self.request = request
     }
 
-    /// A day-old saved ID is still sent while a new one is fetched behind it,
-    /// so no request waits on the refresh.
+    /// A day-old saved ID is still sent while a new one is fetched behind it, so no request waits on the refresh.
     func value() async throws -> String {
         guard let saved else { return try await fetchAndKeep() }
         if !Self.isFresh(saved), fetching == nil {
@@ -142,8 +136,8 @@ actor VisitorData {
 
     /// Replaces a day-old ID; a failed fetch leaves it in use.
     private func refresh() async throws {
-        // Requests arriving before the first refresh starts each queue one;
-        // those behind a finished refresh have nothing to do.
+        // Requests arriving before the first refresh starts each queue one; those behind a finished one have nothing
+        // to do.
         guard saved.map(Self.isFresh) != true else { return }
         _ = try await fetchAndKeep()
     }
@@ -156,15 +150,13 @@ actor VisitorData {
         return value
     }
 
-    /// An ID to try in place of `refused`: the saved one if another caller
-    /// has replaced it already, else a new one, not kept.
+    /// The saved one if another caller has replaced `refused` already, else a new one, not kept.
     func candidate(replacing refused: String) async throws -> String {
         if let saved, saved.value != refused { return saved.value }
         return try await fetch()
     }
 
-    /// Keeps `candidate` in place of `refused`, unless another caller has
-    /// replaced it already or `forget` dropped it.
+    /// Unless another caller has replaced `refused` already or `forget` dropped it.
     func adopt(_ candidate: String, replacing refused: String) {
         guard saved?.value == refused else { return }
         keep(candidate)
@@ -198,8 +190,8 @@ actor VisitorData {
         -saved.fetched.timeIntervalSinceNow < maxAge
     }
 
-    /// Falls back to the home page when the endpoint answers in another shape.
-    /// A refusal fails at once: the page, on the same host, would be refused too.
+    /// Falls back to the home page when the endpoint answers in another shape. A refusal fails at once: the page, on
+    /// the same host, would be refused too.
     static func request() async throws -> String {
         let client = ClientProfile.webRemix
         guard let url = client.url("visitor_id"), let home = URL(string: "https://music.youtube.com/") else {
@@ -235,8 +227,7 @@ actor VisitorData {
         return isUsable(value) ? value : nil
     }
 
-    /// Sent as a header with every request, so it must be one: base64url
-    /// and percent escapes only.
+    /// Sent as a header with every request, so it must be one: base64url and percent escapes only.
     private static func isUsable(_ value: String) -> Bool {
         !value.isEmpty && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "_-%=".contains($0)) }
     }

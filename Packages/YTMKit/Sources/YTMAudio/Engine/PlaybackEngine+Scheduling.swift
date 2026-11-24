@@ -113,8 +113,7 @@ extension PlaybackEngine {
         level.map { min(gain * $0, maxBoost) } ?? 1
     }
 
-    /// Ramps from where the last buffer ended, so a change of normalisation reaches the
-    /// item playing without a click.
+    /// Ramps from where the last buffer ended, so a change of normalisation reaches the item playing without a click.
     private func gainRamp(_ track: Track, frames: Int) -> Crossfade.Ramp {
         let gain = Self.normalised(track.loudnessGain, by: normalise)
         return Crossfade.Ramp(from: track.gain ?? gain, to: gain, length: frames)
@@ -131,8 +130,8 @@ extension PlaybackEngine {
         return (buffer, UnsafePointer(out))
     }
 
-    /// Cuts at most `silenceTrimSeconds` of trailing silence so the blend ends where
-    /// the music does. A next item of another rate follows with a gap instead.
+    /// Cuts at most `silenceTrimSeconds` of trailing silence so the blend ends where the music does. A next item of
+    /// another rate follows with a gap instead.
     private func planFade() {
         guard plan == nil, let next, next.leadTrimmed, let track = producing,
               let rate = track.sampleRate, next.sampleRate == rate, track.length != nil else { return }
@@ -236,8 +235,7 @@ extension PlaybackEngine {
         }
     }
 
-    /// The item has played out; a next that could not follow on (another rate, or still
-    /// opening) starts afresh.
+    /// The item has played out; a next that could not follow on (another rate, or still opening) starts afresh.
     private func ended() {
         guard let track = producing else { return }
         if let failure = track.failure {
@@ -271,8 +269,7 @@ extension PlaybackEngine {
         failure == .dropped ? .dropped(id: track.item.id) : .failed(id: track.item.id, message: failure.message)
     }
 
-    /// A silent item's failure may go unanswered by the player, so the output still
-    /// sleeps after it.
+    /// A silent item's failure may go unanswered by the player, so the output still sleeps after it.
     func finish() {
         guard let track = producing ?? heard else { return }
         heard = nil

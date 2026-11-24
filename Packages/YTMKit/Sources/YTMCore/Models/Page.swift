@@ -125,14 +125,13 @@ public struct PageHeader: Codable, Hashable, Sendable {
     }
 }
 
-/// What a page still has to fetch after it shows; `YTMusic.loadMore`
-/// fetches one step of it at a time.
+/// What a page still has to fetch after it shows; `YTMusic.loadMore` fetches one step of it at a time.
 public enum Continuation: Codable, Hashable, Sendable {
     /// The rest of a long playlist's tracks. `seen` holds the entry IDs listed so far, so a batch that repeats
     /// them drops them. `fetched` counts the tracks so far, repeats included, against `YTMusic.playlistLimit`.
     case tracks(token: String, seen: Set<String> = [], fetched: Int = 0)
-    /// The Home feed's further shelves, with those read but held back
-    /// until the ones above them in `HomeFeed.shelfOrder` arrive.
+    /// The Home feed's further shelves, with those read but held back until the ones above them in
+    /// `HomeFeed.shelfOrder` arrive.
     case shelves(token: String, pagesLeft: Int, held: [Section])
 }
 
@@ -147,8 +146,7 @@ public struct Page: Codable, Hashable, Sendable {
         self.more = more
     }
 
-    /// What the header's Play and Shuffle buttons queue: the page's track
-    /// list, which comes first.
+    /// What the header's Play and Shuffle buttons queue: the page's track list, which comes first.
     public var headerTracks: [Track] {
         guard header != nil, case .tracks(let s)? = sections.first else { return [] }
         return s.tracks

@@ -17,8 +17,7 @@ struct Equaliser {
     private(set) var filters = InlineArray<10, EqualiserBands.Peak>(repeating: EqualiserBands.Peak(centre: 0, gain: 0, rate: 0))
     /// Each channel's z1 and z2 for each band. Kept through a change of gains, as zeroing it mid-song would click.
     private(set) var memory = InlineArray<40, Float>(repeating: 0)
-    /// Lowers the whole signal by the peak of the combined boost, so the bands cannot push the music past full
-    /// scale.
+    /// Lowers the whole signal by the combined boost's peak, so the bands cannot push the music past full scale.
     private(set) var preamp: Float = 1
     /// Frames the filters still run once glided to flat, so what rings in their memory dies away rather than
     /// being cut off with a click.

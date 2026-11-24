@@ -1,8 +1,7 @@
 import Foundation
 
 extension YTMusic {
-    /// The account's history, so plays on other devices show too; only the
-    /// first page YouTube sends.
+    /// The account's history, so plays on other devices show too; only the first page YouTube sends.
     @concurrent
     func historyPage() async throws -> Page {
         try await requireSignIn("Sign in to see your YouTube Music history.")

@@ -22,16 +22,15 @@ extension YTMusic {
         }
     }
 
-    /// Leaves `more` set while there is another step. A step that fails ends
-    /// the page with what arrived; only cancellation throws, so a page left
-    /// mid-load is never taken as whole.
+    /// Leaves `more` set while there is another step. A step that fails ends the page with what arrived; only
+    /// cancellation throws, so a page left mid-load is never taken as whole.
     @concurrent
     public func loadMore(_ page: Page) async throws -> Page {
         try await loadStep(page).page
     }
 
-    /// As `loadMore`; not `whole` once a step failed, so the app keeps the
-    /// page neither as Home nor as the whole playlist.
+    /// As `loadMore`; not `whole` once a step failed, so the app keeps the page neither as Home nor as the whole
+    /// playlist.
     @concurrent
     public func loadStep(_ page: Page) async throws -> (page: Page, whole: Bool) {
         var page = page

@@ -4,8 +4,7 @@ import YTMPlayback
 
 struct TrackTitle: View {
     let track: Track
-    /// Small and without the rating and download buttons or the next song, so the
-    /// title has room beside play and next; large under the artwork.
+    /// Small and without the rating and download buttons or the next song, so the title has room beside play and next.
     let compact: Bool
 
     @Environment(AppModel.self) private var app

@@ -1,7 +1,6 @@
 import AVFoundation
 
-/// Runs on its own serial queue, never the main actor, and keeps only a few seconds of
-/// sound in memory, refilled as buffers play.
+/// Runs on its own serial queue, never the main actor, and keeps only a few seconds of sound in memory.
 actor PlaybackEngine {
     /// Stamped with the `play` or `stop` it follows, so the player can drop stale events.
     struct Stamped: Sendable {
@@ -42,7 +41,7 @@ actor PlaybackEngine {
     var producing: Track?
     var next: Track?
     var warmed: Warmed?
-    /// The level items are normalised to, as a gain on YouTube's reference loudness (0.5 is 6 dB under), or nil for none.
+    /// The level items are normalised to, a gain on YouTube's reference loudness (0.5 is 6 dB under); nil for none.
     var normalise: Float? = 1
     var pauseOnUnplug = true
     /// How `next` follows the item heard.
@@ -105,8 +104,7 @@ actor PlaybackEngine {
         self.paused = paused
         graph.setSilenced(paused)
         guard let track = open(item, at: seconds, announcingStart: true) else { return }
-        // Sent after the download's first job, so the output wakes while the
-        // first range is in flight rather than after it.
+        // Sent after the download's first job, so the output wakes while the first range is in flight, not after it.
         if !paused { send { _ = $0.graph.start() } }
         heard = track
         producing = track
@@ -131,8 +129,7 @@ actor PlaybackEngine {
 
     func seek(to seconds: Double, session: UInt64) {
         guard session == self.session, let heard else { return }
-        // A seek lands in the item heard, so a next that already follows it
-        // is dropped, and the controller queues it again.
+        // A seek lands in the item heard, so a next that already follows it is dropped; the controller queues it again.
         if let switched = producing, switched !== heard {
             keepWarm(switched)
             emit(.nextDropped)
@@ -168,8 +165,8 @@ actor PlaybackEngine {
         pauseToken += 1
         graph.setSilenced(false)
         if heard != nil, !graph.engine.isRunning {
-            // The output stopped while paused, idle or interrupted and took the
-            // player's schedule with it, so it is remade from where the sound stopped.
+            // The output stopped while paused, idle or interrupted and took the player's schedule with it, so it is
+            // remade from where the sound stopped.
             seek(to: clock.position(), session: session)
         } else if !scheduled.isEmpty, !playerRunning {
             startPlayer()
@@ -177,8 +174,8 @@ actor PlaybackEngine {
         updateBuffering()
     }
 
-    /// `keepingOutput` for a change of song: a stopped output lets iOS suspend the app in
-    /// the background while it fetches that song.
+    /// `keepingOutput` for a change of song: a stopped output lets iOS suspend the app in the background while it
+    /// fetches that song.
     func stop(session: UInt64, keepingOutput: Bool = false) {
         self.session = session
         clear()
@@ -200,8 +197,8 @@ actor PlaybackEngine {
         graph.setStereo(crossfeed: crossfeed, widen: widen, mono: mono, balance: balance)
     }
 
-    /// Between two speeds other than 1x the change is live; to or from 1x the output is reconnected,
-    /// so the sound carries on from where it was, as after a device change. Paused, `resume` does that.
+    /// Between two speeds other than 1x the change is live; to or from 1x the output is reconnected, so the sound
+    /// carries on from where it was, as after a device change. Paused, `resume` does that.
     func setSpeed(_ speed: Double) {
         clock.setSpeed(speed)
         guard graph.setSpeed(speed), heard != nil, !paused else { return }
@@ -216,8 +213,8 @@ actor PlaybackEngine {
         cache.clear()
     }
 
-    /// For after a media services reset, when the old graph no longer reaches the device.
-    /// Drops anything playing; the mute, sound settings and speed carry over.
+    /// For after a media services reset, when the old graph no longer reaches the device. Drops anything playing; the
+    /// mute, sound settings and speed carry over.
     func rebuildGraph() {
         clear()
         for observer in observers { NotificationCenter.default.removeObserver(observer) }

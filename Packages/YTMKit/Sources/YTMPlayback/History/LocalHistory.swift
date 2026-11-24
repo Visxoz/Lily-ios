@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import YTMCore
 
-/// History is saved two seconds after the last play, searches at once as they are
-/// tiny. Load both once at launch with `load()` (the player's `start()` does).
+/// History is saved two seconds after the last play, searches at once as they are tiny. Load both once at launch
+/// with `load()` (the player's `start()` does).
 @MainActor @Observable public final class LocalHistory {
     public static let shared = LocalHistory(store: .shared)
 
@@ -62,9 +62,7 @@ import YTMCore
 
     /// Writes plays still waiting, as when the app leaves the foreground.
     func saveNow() {
-        guard saving.isPending else { return }
-        saving.cancel()
-        store.save(history, to: .history)
+        saving.flush { store.save(history, to: .history) }
     }
 
     /// Only the player records plays, as each song's sound starts.

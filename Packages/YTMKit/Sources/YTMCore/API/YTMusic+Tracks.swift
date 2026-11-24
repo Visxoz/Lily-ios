@@ -1,8 +1,7 @@
 import Foundation
 
 extension YTMusic {
-    /// What playing a card queues; for an artist, its top songs without the
-    /// discography the page fetches.
+    /// What playing a card queues; for an artist, its top songs without the discography the page fetches.
     @concurrent
     public func tracks(of card: Card) async throws -> [Track] {
         switch card.kind {
@@ -24,8 +23,7 @@ extension YTMusic {
         try await playlistTracks(playlistId, limit: Self.playlistLimit, asOwner: true, whole: true)
     }
 
-    /// Found by title and artists. Uploads, such as slowed or sped-up edits,
-    /// have none.
+    /// Found by title and artists. Uploads, such as slowed or sped-up edits, have none.
     @concurrent
     public func songVersion(of video: Track) async throws -> Track? {
         guard case .tracks(let found)? = try await search("\(video.title) \(video.artistNames)", .songs) else { return nil }
@@ -40,8 +38,8 @@ extension YTMusic {
         return Renderers.suggestions(in: response)
     }
 
-    /// Only the same title by one of the same artists counts, so an edit is
-    /// never swapped for the original or a namesake by someone else.
+    /// Only the same title by one of the same artists counts, so an edit is never swapped for the original or a
+    /// namesake by someone else.
     static func isSongVersion(of video: Track, _ song: Track) -> Bool {
         func folded(_ title: String) -> String { title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         func same(_ a: ArtistRef, _ b: ArtistRef) -> Bool {

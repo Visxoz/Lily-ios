@@ -1,8 +1,8 @@
 import AVFoundation
 import Synchronization
 
-/// Readable from the main actor at any time without waiting on the engine. Between pins it runs on with
-/// the host clock times the speed, never past the sound scheduled, so a stall holds it still.
+/// Readable from the main actor at any time without waiting on the engine. Between pins it runs on with the host
+/// clock times the speed, never past the sound scheduled, so a stall holds it still.
 final class PlaybackClock: Sendable {
     private struct State {
         /// The position at `since`, or for good while it is not running.

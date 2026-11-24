@@ -1,8 +1,8 @@
 import Foundation
 @testable import YTMCore
 
-/// Signed out there are no Premium formats, but the scrambling is the same,
-/// so this is what breaks when YouTube changes it.
+/// Signed out there are no Premium formats, but the scrambling is the same, so this is what breaks when YouTube
+/// changes it.
 enum PremiumChecks {
     static func run(_ report: Report) async {
         var player: PlayerScript?

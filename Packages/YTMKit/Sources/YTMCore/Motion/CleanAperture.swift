@@ -41,7 +41,8 @@ enum CleanAperture {
                   let tkhd = child("tkhd", of: trak, in: bytes), tkhd.start + 8 < bytes.count
             else { return nil }
             let size = tkhd.start + (bytes[tkhd.start + 8] == 0 ? 84 : 96)
-            // Only upright (the matrix's a, b, c, d before the size) and square-pixelled, where the shown size is the coded one.
+            // Only upright (the matrix's a, b, c, d before the size) and square-pixelled, where the shown size is
+            // the coded one.
             guard size + 8 <= tkhd.end, [size - 36, size - 32, size - 24, size - 20].compactMap({ u32(bytes, $0) }) == [1 << 16, 0, 0, 1 << 16],
                   u32(bytes, size) == width << 16, u32(bytes, size + 4) == height << 16
             else { return nil }

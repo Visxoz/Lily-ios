@@ -59,7 +59,7 @@ final class HTTPByteSource: ByteSource {
 
     /// The host's last two labels, which a redirect may not leave.
     static func domain(of host: String) -> String {
-        host.split(separator: ".").suffix(2).joined(separator: ".")
+        host.lowercased().split(separator: ".").suffix(2).joined(separator: ".")
     }
 }
 
@@ -106,7 +106,8 @@ private final class RangeDelegate: NSObject, URLSessionDataDelegate, Sendable {
         willPerformHTTPRedirection response: HTTPURLResponse,
         newRequest request: URLRequest
     ) async -> URLRequest? {
-        guard let url = request.url, url.scheme == "https", let host = url.host(), let domain,
+        // YTMCore's `HostAllowlist.isHost`, copied, as YTMAudio depends on no other module.
+        guard let url = request.url, url.scheme == "https", let host = url.host()?.lowercased(), let domain,
               host == domain || host.hasSuffix("." + domain) else { return nil }
         return request
     }

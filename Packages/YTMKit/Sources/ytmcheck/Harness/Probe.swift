@@ -2,8 +2,7 @@ import Foundation
 @testable import YTMAudio
 @testable import YTMCore
 
-/// A URL can resolve and still be refused, so the first bytes are fetched and
-/// read by the engine's own demuxer.
+/// A URL can resolve and still be refused, so the first bytes are fetched and read by the engine's own demuxer.
 extension Findings {
     static let probeLength = 64 << 10
 
