@@ -105,6 +105,16 @@ private func carousel(_ title: String, _ items: [String]) -> String {
         #expect(HomeFeed.retryDelay(after: 2) == .milliseconds(600))
     }
 
+    @Test func asksHomeAgainAfterABlipBeforeTheSavedFeed() {
+        let offline = YTMError(.network, "You're offline.")
+        #expect(HomeFeed.asksAgain(after: offline, attempt: 1, elapsed: .zero))
+        #expect(HomeFeed.asksAgain(after: YTMError(.parse, "Odd shape"), attempt: 3, elapsed: .seconds(5)))
+        #expect(!HomeFeed.asksAgain(after: offline, attempt: HomeFeed.attempts, elapsed: .zero), "attempts used up")
+        #expect(!HomeFeed.asksAgain(after: offline, attempt: 1, elapsed: .seconds(20)), "out of time")
+        #expect(!HomeFeed.asksAgain(after: YTMError(status: 503), attempt: 1, elapsed: .zero), "already retried lower down")
+        #expect(!HomeFeed.asksAgain(after: CancellationError(), attempt: 1, elapsed: .zero))
+    }
+
     @Test func showsListenAgainAsSpeedDial() throws {
         let listenAgain = #"{"musicCarouselShelfRenderer":{"header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Listen again","navigationEndpoint":{"browseEndpoint":{"browseId":"FEmusic_listen_again"}}}]}}},"contents":[\#(mixTile)]}}"#
         let page = try json(#"{"continuationContents":{"sectionListContinuation":{"contents":[\#(listenAgain),\#(carousel("Mixed for you", [mixTile]))]}}}"#)

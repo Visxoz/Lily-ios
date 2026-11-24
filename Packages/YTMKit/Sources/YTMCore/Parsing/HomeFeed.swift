@@ -19,8 +19,8 @@ enum HomeFeed {
     ]
     /// Of `shelfOrder`, the song lists; the rest are carousels, but Speed dial.
     static let songShelves: Set = ["Quick picks", "Trending songs for you"]
-    /// The latest plays mixed into YouTube's Speed dial, which seldom has
-    /// them, one after every `recentEvery` of its own picks, so they never lead it.
+    /// The latest plays mixed into YouTube's Speed dial, which seldom has them, one after every `recentEvery` of its
+    /// own picks, so they never lead it.
     static let recentPlays = 5
     static let recentEvery = 3
     /// Plays that make Speed dial when the feed has none: a first page beside the die.
@@ -29,14 +29,21 @@ enum HomeFeed {
         "musicCarouselShelfRenderer", "musicImmersiveCarouselShelfRenderer", "musicShelfRenderer", "gridRenderer",
     ]
 
-    /// YouTube refuses a share of signed-in feed requests in bursts with "400:
-    /// invalid argument", then answers the same request a moment later.
+    /// YouTube refuses a share of signed-in feed requests in bursts with "400: invalid argument", then answers the
+    /// same request a moment later.
     static func isRefusal(_ error: any Error) -> Bool {
         (error as? YTMError)?.status == 400
     }
 
     static func retryDelay(after attempt: Int) -> Duration {
         .milliseconds(300 * attempt)
+    }
+
+    /// Whether a failed Home is asked again rather than given up for the saved feed: a dropped connection or an odd
+    /// answer, while under `attempts` and 20 seconds, as a timeout's own retries can take most of a minute.
+    static func asksAgain(after error: any Error, attempt: Int, elapsed: Duration) -> Bool {
+        guard let error = error as? YTMError, [.network, .parse].contains(error.kind) else { return false }
+        return attempt < attempts && elapsed < .seconds(20)
     }
 
     static func firstPage(_ response: JSON) throws -> (sections: [Section], next: String?) {
@@ -80,9 +87,9 @@ enum HomeFeed {
         return speedDialTitles.contains(shelf.title)
     }
 
-    /// YouTube orders shelves differently each load, so each in `shelfOrder`
-    /// is held until all above it arrive and Home never moves what's shown.
-    /// Once `done`, only `shelfOrder`'s shelves are kept, or the whole feed if none came.
+    /// YouTube orders shelves differently each load, so each in `shelfOrder` is held until all above it arrive and
+    /// Home never moves what's shown. Once `done`, only `shelfOrder`'s shelves are kept, or the whole feed if none
+    /// came.
     static func release(_ held: inout [Section], after shown: [Section], done: Bool) -> [Section] {
         var out: [Section] = []
         if done, shown.isEmpty, !held.contains(where: { shelfOrder.contains($0.title) }) {
@@ -110,15 +117,15 @@ enum HomeFeed {
         shelfOrder.allSatisfy { title in sections.contains { $0.title == title } }
     }
 
-    /// A whole feed, such as the saved one, as `release` shows it; one saved
-    /// by an earlier version has Listen again under that name.
+    /// A whole feed, such as the saved one, as `release` shows it; one saved by an earlier version has Listen again
+    /// under that name.
     static func arranged(_ sections: [Section]) -> [Section] {
         var held = sections.map(asSpeedDial)
         return release(&held, after: [], done: true)
     }
 
-    /// Mixes up to `recentPlays` of `recent` into Speed dial, keeping its length,
-    /// skipping ones it has, which stay where they are; with no Speed dial, makes one of `recentShelf`.
+    /// Mixes up to `recentPlays` of `recent` into Speed dial, keeping its length, skipping ones it has, which stay
+    /// where they are; with no Speed dial, makes one of `recentShelf`.
     static func addingRecent(_ sections: [Section], recent: [Track]) -> [Section] {
         var sections = sections
         guard let index = sections.firstIndex(where: { if case .cards(let s) = $0 { s.layout == .speedDial } else { false } }),
@@ -140,8 +147,8 @@ enum HomeFeed {
         return sections
     }
 
-    /// YouTube can send Trending songs for you as a copy of Quick picks, so a
-    /// track list drops songs an earlier one has, and goes if none are left.
+    /// YouTube can send Trending songs for you as a copy of Quick picks, so a track list drops songs an earlier one
+    /// has, and goes if none are left.
     static func withoutRepeats(_ sections: [Section]) -> [Section] {
         var seen: Set<String> = []
         return sections.compactMap { section in
@@ -161,8 +168,8 @@ enum HomeFeed {
 }
 
 extension Page {
-    /// Applied as Home shows rather than as it loads, so a Home from the cache
-    /// or the disk has what played since too, and repeats no list's songs.
+    /// Applied as Home shows rather than as it loads, so a Home from the cache or the disk has what played since too,
+    /// and repeats no list's songs.
     public func withRecentPlays(_ recent: [Track]) -> Page {
         Page(header: header, sections: HomeFeed.addingRecent(HomeFeed.withoutRepeats(sections), recent: recent), more: more)
     }

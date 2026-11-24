@@ -34,6 +34,8 @@ final class AppModel {
     static let toastFor: Duration = .seconds(5)
     /// After the launch's first page has had the network.
     static let renewSignInAfter: Duration = .seconds(10)
+    /// After Home's first page, so downloads and their daily sync don't share the network with its other pages and art.
+    static let downloadsAfterHome: Duration = .seconds(4)
     /// Less often than an open YouTube tab, as a cookie found stale is renewed when YouTube answers signed out.
     static let renewSignInEvery: Duration = .seconds(60 * 60)
     /// The least time between cookie checks, after one that didn't find the cookie rejected.
@@ -49,8 +51,7 @@ final class AppModel {
 
     var tab: AppTab = .home
     var sheet: AppSheet? {
-        // Closing Now Playing under its picker doesn't write the picker's
-        // binding back, so it would reopen with the next Now Playing.
+        // Closing Now Playing under its picker doesn't write the picker's binding back, so it would reopen with it.
         didSet { if sheet != .nowPlaying, nowPlayingPicker != nil { nowPlayingPicker = nil } }
     }
     /// Now Playing is on screen or still zooming away, while pages fill past their edges (`PastEdges`).
@@ -65,17 +66,14 @@ final class AppModel {
     /// A stored sign-in cookie counts, so pages load without waiting for YouTube to confirm it.
     private(set) var isSignedIn = false
     private(set) var account: Account?
-    /// Bumped whenever the account changes, so results asked for by the last account are
-    /// dropped. Zero until the stored sign-in has been read, before which pages don't load, bar
-    /// Home's launch request, which the first load of Home takes over under the generation it is in.
+    /// Bumped whenever the account changes, so the last account's results are dropped. Zero until the stored sign-in
+    /// is read, before which only Home's launch request loads, taken over by Home's first load in its generation.
     private(set) var accountGeneration = 0
 
     private(set) var theme: Theme
-    /// Playlist IDs pinned to the top of Library's playlists, kept apart from the settings so only the views
-    /// showing pins redraw as they change.
+    /// Pinned playlist IDs, kept apart from the settings so only the views showing pins redraw as they change.
     private(set) var pinned: [String] = []
-    /// Counts the playlists put in Library's cached pages, so a Library page on screen, as under Now Playing,
-    /// shows one at once.
+    /// Counts playlists put in Library's cached pages, so a Library page on screen, as under Now Playing, shows one.
     var playlistsAdded = 0
     private(set) var artwork: ArtworkColours?
     private(set) var toast: Toast?
@@ -104,24 +102,24 @@ final class AppModel {
     @ObservationIgnored private var downloadTime = UIBackgroundTaskIdentifier.invalid
     @ObservationIgnored private var artworkTrim: Task<Void, Never>?
 
-    init(api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared) {
+    init() {
+        let api = YTMusic.shared
+        // Detached, as the main actor builds the first frame before any task of its own runs, and first, so setting
+        // up the audio session and remote commands below doesn't hold the request back.
+        homeAhead = Task.detached(priority: .userInitiated) { [api] in try await api.page(.home) }
         self.api = api
-        self.settings = settings
-        self.history = history
+        settings = .shared
+        history = .shared
         audio = AudioPlayer { Proxy.configurations }
         player = PlayerController(api: api, settings: settings, history: history, audio: audio)
         theme = Theme(settings: settings.value, artworkAccent: nil)
-        // Detached, as the main actor builds the first frame before any task of its own runs.
-        homeAhead = Task.detached(priority: .userInitiated) { [api] in try await api.page(.home) }
-        // Read here, for the app's life: a view's task would be cancelled by a scene teardown,
-        // ending the one-consumer stream.
+        // Here, for the app's life: a view's task would end with a scene teardown, and the one-consumer stream with it.
         Task { [weak self, toasts = player.toasts] in
             for await message in toasts { self?.showToast(message) }
         }
     }
 
-    /// Signed in, Home's feed is asked for at once and the launch's other requests wait for it
-    /// (two seconds at most), so they don't slow it.
+    /// Signed in, Home's feed is asked for at once and the launch's other requests wait for it (two seconds at most).
     func start() async {
         await LyricsHub.useCheck { await LyricsPassCheck.run() }
         isSignedIn = await api.auth.isSignedIn
@@ -142,7 +140,11 @@ final class AppModel {
         if isSignedIn { Task { await showLastRun() } }
         Task { await ImagePipeline.preconnect() }
         let homeSettled = Task { await Self.settled(home, within: .seconds(2)) }
-        await player.start { await homeSettled.value }
+        await player.start(
+            after: { await homeSettled.value },
+            // Signed out, Home is the charts, with no more pages behind them.
+            downloadsAfter: { [wait = isSignedIn ? Self.downloadsAfterHome : .zero] in try? await Task.sleep(for: wait) }
+        )
         await homeSettled.value
         await refreshAccount()
     }
@@ -171,7 +173,6 @@ final class AppModel {
         }
     }
 
-    /// Pins a playlist after those pinned already, or unpins it.
     func togglePin(_ card: Card) {
         var pinned = settings.value.pinned
         if pinned.contains(card.id) { pinned.removeAll { $0 == card.id } } else { pinned.append(card.id) }
@@ -188,8 +189,7 @@ final class AppModel {
         }
     }
 
-    /// The colours are sampled from the small copy, else any other in memory, as the palette reads
-    /// only 16 pixels square, so they never wait for or draw down the large one.
+    /// Sampled from the small copy, else any other in memory, as the palette reads only 16 pixels square.
     func followArtwork(of url: String?) async {
         // Without artwork, the last song's colour would linger.
         guard let url else {
@@ -227,8 +227,7 @@ final class AppModel {
         if let found, settings.value.account != found { settings.value.account = found }
     }
 
-    /// Once YouTube answers a signed-in request as signed out: checks the cookie, as the session
-    /// can end at any time, and drops a dead one.
+    /// Once YouTube answers a signed-in request as signed out: checks the cookie, as a session can end at any time.
     private func checkSignIn() async {
         // An answer to a request sent before the cookie was removed.
         guard isSignedIn else { return }
@@ -252,16 +251,14 @@ final class AppModel {
         try? await Task.sleep(for: Self.signInRecheckAfter)
     }
 
-    /// Drops everything the last account loaded. `quietly`, as for a sign-in YouTube rejected,
-    /// skips announcing it and switching to Library or Home.
+    /// Drops everything the last account loaded. `quietly`, as for a rejected sign-in, skips the toast and tab switch.
     func accountChanged(quietly: Bool = false) async {
         await api.forgetVisitorData()
         isSignedIn = await api.auth.isSignedIn
         account = nil
         // It may be another account's.
         settings.value.account = nil
-        // Together with the bump, so no page asked for by the last account
-        // lands in the cache once it is cleared.
+        // Together with the bump, so no page the last account asked for lands in the cache once it is cleared.
         pageCache.removeAll()
         // A request the last account made must not be shared with the next.
         pageLoads.values.forEach { $0.cancel() }
@@ -335,8 +332,7 @@ final class AppModel {
     }
 
     /// Shrinks the artwork cache in the background, keeping the playing song's: after `trimArtworkAfter` while music
-    /// plays on, so a quick look elsewhere doesn't cost Back its art, and at once otherwise, as a suspended app runs
-    /// no timer to do it later.
+    /// plays, so a quick look elsewhere keeps Back's art, else at once, as a suspended app runs no timer.
     func hideArtwork(_ hidden: Bool) {
         artworkTrim?.cancel()
         artworkTrim = nil

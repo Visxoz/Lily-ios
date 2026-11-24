@@ -13,12 +13,10 @@ public struct MotionClip: Sendable {
     public let frame: CGImage
 }
 
-/// Call `start()` once at launch. A result that arrives after the player has
-/// moved on is dropped. The position is never observed: read `currentTime`
-/// from a `TimelineView`. Everything else that changes is observable.
+/// Call `start()` once at launch. A result that arrives after the player has moved on is dropped. The position is
+/// never observed: read `currentTime` from a `TimelineView`. Everything else that changes is observable.
 @MainActor @Observable public final class PlayerController {
-    /// How often the sound is checked while playing, for gapless queueing,
-    /// scrobbling and Now Playing's position.
+    /// How often the sound is checked while playing, for gapless queueing, scrobbling and Now Playing's position.
     nonisolated static let tick = Duration.milliseconds(250)
     static let maxConsecutiveFailures = 3
 
@@ -28,8 +26,7 @@ public struct MotionClip: Sendable {
     public internal(set) var current: Track?
     /// The song's 3:4 moving art once its first frame is had, so Now Playing opens laid out for it.
     public internal(set) var motionClip: MotionClip?
-    /// Whether the player means to play, through loading and stalls: the
-    /// play button.
+    /// Whether the player means to play, through loading and stalls: the play button.
     public internal(set) var isPlaying = false {
         didSet { if isPlaying != oldValue { updateTicking() } }
     }
@@ -51,15 +48,13 @@ public struct MotionClip: Sendable {
     public internal(set) var stream: ResolvedStream?
     /// Whether the account plays Premium streams, as found so far.
     public internal(set) var premiumStatus = PremiumStatus.unknown
-    /// Bumped when the account's library changes from here, so the app can
-    /// load cached library pages afresh.
+    /// Bumped when the account's library changes from here, so the app can load cached library pages afresh.
     public internal(set) var libraryRevision = 0
-    /// The last seek, so views that pull `currentTime` only while playing
-    /// still catch one made while paused.
+    /// The last seek, so views that pull `currentTime` only while playing still catch one made while paused.
     public internal(set) var lastSeek = Seek(count: 0, to: 0)
 
-    /// Messages for the user. One consumer, which must live as long as the
-    /// player: cancelling the loop that reads it ends the stream for good.
+    /// Messages for the user. One consumer, which must live as long as the player: cancelling the loop that reads
+    /// it ends the stream for good.
     public nonisolated let toasts: AsyncStream<String>
 
     /// Where the song has got to, in seconds. Cheap; not observed.
@@ -67,8 +62,7 @@ public struct MotionClip: Sendable {
         playback.itemID != nil ? audio.currentTime : playback.heldPosition
     }
 
-    /// How far the song has downloaded from where it plays, from 0 to 1. Not observed, so
-    /// pull it as `currentTime` is.
+    /// How far the song has downloaded from where it plays, from 0 to 1. Not observed, so pull it as `currentTime` is.
     public var bufferedFraction: Double {
         playback.itemID != nil ? audio.bufferedFraction : 0
     }
@@ -118,8 +112,7 @@ public struct MotionClip: Sendable {
     @ObservationIgnored var resolving: Task<Void, Never>?
     /// The next song's stream being resolved to queue it in the engine.
     @ObservationIgnored var queueing: Task<Void, Never>?
-    /// A radio carrying the queue on: the one after a song a radio started
-    /// from, or the one queued as the last song starts.
+    /// A radio carrying the queue on: the one after a song a radio started from, or one queued as the last starts.
     @ObservationIgnored var extending: Task<Void, Never>?
     /// A radio fetched once the queue has played out, to move on to.
     @ObservationIgnored var autoplay: Task<Void, Never>?
@@ -133,14 +126,12 @@ public struct MotionClip: Sendable {
     @ObservationIgnored var reopenWait: Task<Void, Never>?
 
     public convenience init(
-        api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared,
-        lastFM: LastFM = .shared, audio: AudioPlayer = AudioPlayer()
+        api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared, audio: AudioPlayer
     ) {
-        self.init(music: api, settings: settings, history: history, lastFM: lastFM, audio: audio, store: .shared, system: true)
+        self.init(music: api, settings: settings, history: history, lastFM: LastFM.shared, audio: audio, store: .shared, system: true)
     }
 
-    /// `system` hooks up Now Playing, the remote commands and the audio
-    /// session; tests leave them out.
+    /// `system` hooks up Now Playing, the remote commands and the audio session; tests leave them out.
     init(
         music: any MusicService, settings: SettingsStore, history: LocalHistory, lastFM: any Scrobbling,
         audio: any AudioOutput, store: FileStore, system: Bool
@@ -179,10 +170,12 @@ public struct MotionClip: Sendable {
         toastSink.finish()
     }
 
-    /// Shows the last launch's song, paused. Its network work waits until
-    /// `launchLoad` returns, so it doesn't compete with what the launch is
-    /// waiting on. Later calls do nothing.
-    public func start(after launchLoad: @escaping @Sendable () async -> Void = {}) async {
+    /// Shows the last launch's song, paused. Its network work waits until `launchLoad` returns, so it doesn't compete
+    /// with what the launch is waiting on, and downloads wait for `downloadsAfter` too. Later calls do nothing.
+    public func start(
+        after launchLoad: @escaping @Sendable () async -> Void = {},
+        downloadsAfter: @escaping @Sendable () async -> Void = {}
+    ) async {
         guard !hasStarted else { return }
         hasStarted = true
         let (history, store) = (history, store)
@@ -202,6 +195,7 @@ public struct MotionClip: Sendable {
         Task { [weak self] in
             await launchLoad()
             self?.warmUp(restored, rating: rating)
+            await downloadsAfter()
             self?.downloads.release()
         }
     }
@@ -264,8 +258,7 @@ public struct MotionClip: Sendable {
         audioSession?.activate()
     }
 
-    /// Captures the settings and account now, so the work can run, and run
-    /// again, off the main actor.
+    /// Captures the settings and account now, so the work can run, and run again, off the main actor.
     func resolver(for videoId: String) -> @Sendable () async throws -> ResolvedStream {
         let (chooser, quality, signedIn) = (chooser, settings.value.quality, signedIn)
         let wantPremium = signedIn && quality == .high && playback.forceFree != videoId
@@ -279,11 +272,9 @@ public struct MotionClip: Sendable {
         return .init(stream: stream, resolvedAt: .now, epoch: prefetcher.epoch)
     }
 
-    /// Each item has its own ID, so a song queued after itself is told apart.
-    /// A URL googlevideo refuses partway is refreshed only for the same file,
-    /// so the download carries on from the same byte, with the issuing
-    /// client's headers, as googlevideo checks them. The engine can't import
-    /// YTMCore, so every URL, refreshed ones too, passes the allowlist here.
+    /// Each item has its own ID, so a song queued after itself is told apart. A URL googlevideo refuses partway is
+    /// refreshed only for the same file, so the download carries on from the same byte, with the issuing client's
+    /// headers, as googlevideo checks them. The engine can't import YTMCore, so every URL passes the allowlist here.
     func audioItem(for track: Track, stream: ResolvedStream) throws(YTMError) -> AudioItem {
         itemSerial += 1
         return try Self.audioItem(

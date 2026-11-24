@@ -13,16 +13,26 @@ extension YTMusic {
         }
     }
 
-    /// Signed in, the feed's first shelves with `more` fetching the rest;
-    /// signed out, the charts.
+    /// Signed in, the feed's first shelves with `more` fetching the rest; signed out, the charts.
+    /// A dropped connection or an odd answer is asked again for a while, so a blip never brings on the saved feed;
+    /// refusals and server errors are already asked again lower down.
     @concurrent
     func homePage() async throws -> Page {
-        guard await auth.isSignedIn else { return try await publicHome() }
-        return try await personalHome()
+        let start = ContinuousClock.now
+        var attempt = 1
+        while true {
+            do {
+                guard await auth.isSignedIn else { return try await publicHome() }
+                return try await personalHome()
+            } catch where HomeFeed.asksAgain(after: error, attempt: attempt, elapsed: start.duration(to: .now)) {
+                try await Task.sleep(for: .seconds(attempt))
+                attempt += 1
+            }
+        }
     }
 
-    /// For a feed YouTube kept refusing: the last saved feed, else the charts.
-    /// Never kept as Home, so the next visit asks for the feed again.
+    /// For a feed YouTube kept refusing: the last saved feed, else the charts. Never kept as Home, so the next visit
+    /// asks for the feed again.
     @concurrent
     public func homeStandIn() async -> Page? {
         if let saved = await savedHome() { return saved }
@@ -34,8 +44,7 @@ extension YTMusic {
         HomeFeed.nextPage(try await homeFeed(continuation: token))
     }
 
-    /// Arranged as a fresh one is, since one saved by an earlier version may
-    /// hold other shelves or another order.
+    /// Arranged as a fresh one is, since one saved by an earlier version may hold other shelves or another order.
     @concurrent
     private func savedHome() async -> Page? {
         guard let saved = store.load(Page.self, from: .home) else { return nil }
@@ -55,14 +64,12 @@ extension YTMusic {
         store.remove(.library)
     }
 
-    /// Only once whole: a first page alone would stand in later as a shorter,
-    /// different feed.
+    /// Only once whole: a first page alone would stand in later as a shorter, different feed.
     public func saveHome(_ page: Page) {
         store.save(Page(sections: page.sections), to: .home)
     }
 
-    /// Reads on past the first page until a shelf can show, as when Speed
-    /// dial comes later.
+    /// Reads on past the first page until a shelf can show, as when Speed dial comes later.
     private func personalHome() async throws -> Page {
         var (held, next) = try HomeFeed.firstPage(try await homeFeed(continuation: nil))
         var pagesLeft = HomeFeed.continuations
@@ -72,8 +79,7 @@ extension YTMusic {
             do {
                 page = try await homeShelves(token: token)
             } catch {
-                // Left to `loadStep` with the shelves read so far, so the feed
-                // keeps its order.
+                // Left to `loadStep` with the shelves read so far, so the feed keeps its order.
                 try Task.checkCancellation()
                 guard !held.isEmpty else { throw error }
                 return Page(sections: [], more: .shelves(token: token, pagesLeft: pagesLeft, held: held))
@@ -119,8 +125,7 @@ extension YTMusic {
         return Page(sections: sections.compactMap(\.self))
     }
 
-    /// From the trending playlist, as the chart lists come empty; none should
-    /// it fail.
+    /// From the trending playlist, as the chart lists come empty; none should it fail.
     private func trendingTracks(_ charts: Charts) async -> [Track] {
         guard let id = charts.trendingPlaylistId else { return charts.trendingTracks }
         return (try? await playlistTracks(id, limit: Self.trendingLimit, asOwner: false)) ?? []
