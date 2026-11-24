@@ -208,6 +208,71 @@ private func carousel(_ title: String, _ items: [String]) -> String {
         #expect(!HomeFeed.isComplete(Array(all.dropFirst())), "Speed dial may yet come")
     }
 
+    /// A first page's token in YouTube's layout.
+    private func feedToken(shelf: UInt8) -> String {
+        func varint(_ value: Int) -> [UInt8] {
+            var value = value
+            var bytes: [UInt8] = []
+            while value >= 0x80 {
+                bytes.append(UInt8(value & 0x7f) | 0x80)
+                value >>= 7
+            }
+            return bytes + [UInt8(value)]
+        }
+        func field(_ number: Int, _ value: [UInt8]) -> [UInt8] { varint(number << 3 | 2) + varint(value.count) + value }
+        // Fields to step over: varint, fixed32, fixed64.
+        var nested: [UInt8] = [0x18, 0xac, 0x02, 0x25, 1, 2, 3, 4, 0x29, 1, 2, 3, 4, 5, 6, 7, 8]
+        nested += field(11, Array("snapshot_a-c".utf8))
+        nested += field(318_126_543, [0x08, shelf + 1])
+        // URL-safe and unpadded, as YouTube spells this layer.
+        let nestedText = Data(nested).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let inner = [0x08, shelf] + field(15, Array(nestedText.utf8))
+        let browse = field(2, Array("FEmusic_home".utf8)) + field(3, Array(Data(inner).base64EncodedString().utf8))
+        return Data(field(80_226_972, browse)).base64EncodedString().replacingOccurrences(of: "=", with: "%3D")
+    }
+
+    @Test func makesTheLaterPagesTokens() {
+        let token = feedToken(shelf: 3)
+        #expect(token.hasSuffix("%3D"), "padded, as YouTube's are")
+        #expect(HomeFeed.laterTokens(token) == [3, 6, 9, 12].map { feedToken(shelf: $0) })
+        #expect(HomeFeed.laterTokens("not a token") == nil)
+        // Short of the padding, which is optional.
+        for length in 0..<token.count - "%3D".count {
+            #expect(HomeFeed.laterTokens(String(token.prefix(length))) == nil, "cut at \(length)")
+        }
+        #expect(HomeFeed.laterTokens(feedToken(shelf: 0)) == nil, "no page length")
+        #expect(HomeFeed.laterTokens(feedToken(shelf: 40)) == nil, "past one byte")
+    }
+
+    @Test func addsABatchUpToWhereItGoesWrong() throws {
+        typealias Answer = Result<HomeFeed.Shelves, any Error>
+        func page(_ title: String, _ next: String?) -> Answer { .success(([shelf(title, [title])], next)) }
+        let refused = Answer.failure(YTMError(.http, "Invalid argument", status: 400))
+        func read(_ answers: [Answer]) throws -> String {
+            let batch = try HomeFeed.batch(["t1", "t2", "t3", "t4"], answers)
+            return "\(batch.sections.map(\.title).joined(separator: " ")), next \(batch.next ?? "none"), \(batch.pages) pages"
+        }
+
+        let all = [page("a", "t2"), page("b", "t3"), page("c", "t4"), page("d", "t5")]
+        #expect(try read(all) == "a b c d, next t5, 4 pages", "read on from the last")
+        let ended = [page("a", "t2"), page("b", nil), page("", nil), page("", nil)]
+        #expect(try read(ended) == "a b, next none, 2 pages", "the feed ended")
+        let failed = [page("a", "t2"), page("b", "t3"), refused, page("d", nil)]
+        #expect(try read(failed) == "a b, next t3, 2 pages", "the failed page read again")
+        let elsewhere = [page("a", "other"), page("wrong", "t3"), page("wrong", "t4"), page("wrong", nil)]
+        #expect(try read(elsewhere) == "a, next other, 1 pages", "made tokens that lead elsewhere are dropped")
+        #expect(throws: YTMError.self) { try read([refused, page("b", "t3"), page("c", "t4"), page("d", nil)]) }
+
+        let tokens = ["t1", "t2", "t3", "t4"]
+        #expect(!HomeFeed.isCutShort(tokens, [nil, refused, nil, nil]), "the first may yet lead on")
+        #expect(!HomeFeed.isCutShort(tokens, [page("a", "t2"), nil, page("c", "t4"), nil]))
+        #expect(HomeFeed.isCutShort(tokens, [page("a", "t2"), refused, nil, nil]), "the pages after a failed one are wasted")
+        #expect(HomeFeed.isCutShort(tokens, [page("a", nil), nil, nil, nil]), "the feed ended")
+        #expect(!HomeFeed.isCutShort(tokens, [page("a", "t2"), page("b", "t3"), page("c", "t4"), page("d", nil)]), "the last may end")
+    }
+
     @Test func keepsARenamedFeedWholeOnceItEnds() {
         var held = [shelf("Neu", ["n"]), shelf("Alt", ["o"])]
         #expect(HomeFeed.release(&held, after: [], done: false).isEmpty, "nothing yet: Speed dial may come")

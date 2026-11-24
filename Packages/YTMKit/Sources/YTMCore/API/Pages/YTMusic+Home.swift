@@ -39,9 +39,37 @@ extension YTMusic {
         return try? await publicHome()
     }
 
+    /// The next page; after the first, the next `HomeFeed.atOnce` together, their tokens made from the first's.
     @concurrent
-    func homeShelves(token: String) async throws -> (sections: [Section], next: String?) {
-        HomeFeed.nextPage(try await homeFeed(continuation: token))
+    func homeShelves(token: String, pagesLeft: Int) async throws -> HomeFeed.Pages {
+        // Only the first page's token gives the page length.
+        guard pagesLeft == HomeFeed.continuations, let tokens = HomeFeed.laterTokens(token) else {
+            let page = HomeFeed.nextPage(try await homeFeed(continuation: token))
+            return (page.sections, page.next, 1)
+        }
+        let answers = await withTaskGroup(of: (Int, Result<HomeFeed.Shelves, any Error>).self) { group in
+            for (index, token) in tokens.enumerated() {
+                // The first is YouTube's own token, so it gets every attempt.
+                let attempts = index == 0 ? HomeFeed.attempts : HomeFeed.madePageAttempts
+                group.addTask {
+                    do {
+                        return (index, .success(HomeFeed.nextPage(try await self.homeFeed(continuation: token, attempts: attempts))))
+                    } catch {
+                        return (index, .failure(error))
+                    }
+                }
+            }
+            var answers = [Result<HomeFeed.Shelves, any Error>?](repeating: nil, count: tokens.count)
+            for await (index, answer) in group {
+                answers[index] = answer
+                // The pages after it would be thrown away, so they stop.
+                if HomeFeed.isCutShort(tokens, answers) { group.cancelAll() }
+            }
+            return answers.compactMap(\.self)
+        }
+        // Else a later page cut short by cancellation would read as one to fetch again.
+        try Task.checkCancellation()
+        return try HomeFeed.batch(tokens, answers)
     }
 
     /// Arranged as a fresh one is, since one saved by an earlier version may hold other shelves or another order.
@@ -75,9 +103,9 @@ extension YTMusic {
         var pagesLeft = HomeFeed.continuations
         var sections = HomeFeed.release(&held, after: [], done: next == nil)
         while sections.isEmpty, let token = next, pagesLeft > 0 {
-            let page: (sections: [Section], next: String?)
+            let page: HomeFeed.Pages
             do {
-                page = try await homeShelves(token: token)
+                page = try await homeShelves(token: token, pagesLeft: pagesLeft)
             } catch {
                 // Left to `loadStep` with the shelves read so far, so the feed keeps its order.
                 try Task.checkCancellation()
@@ -86,8 +114,8 @@ extension YTMusic {
             }
             held += page.sections
             next = page.next
-            pagesLeft -= 1
-            sections = HomeFeed.release(&held, after: [], done: next == nil || pagesLeft == 0)
+            pagesLeft -= page.pages
+            sections = HomeFeed.release(&held, after: [], done: next == nil || pagesLeft <= 0)
         }
         guard !sections.isEmpty else { throw YTMError(.parse, "YouTube sent an empty Home feed.") }
         if let next, pagesLeft > 0, !HomeFeed.isComplete(sections) {
@@ -96,14 +124,14 @@ extension YTMusic {
         return Page(sections: sections)
     }
 
-    /// Asked again while YouTube refuses it, up to `HomeFeed.attempts` times.
-    private func homeFeed(continuation token: String?) async throws -> JSON {
+    /// Asked again while YouTube refuses it, up to `attempts` times.
+    private func homeFeed(continuation token: String?, attempts: Int = HomeFeed.attempts) async throws -> JSON {
         var attempt = 1
         while true {
             do {
                 if let token { return try await innerTube.continuation(token) }
                 return try await innerTube.browse("FEmusic_home")
-            } catch where HomeFeed.isRefusal(error) && attempt < HomeFeed.attempts {
+            } catch where HomeFeed.isRefusal(error) && attempt < attempts {
                 try await Task.sleep(for: HomeFeed.retryDelay(after: attempt))
                 attempt += 1
             }

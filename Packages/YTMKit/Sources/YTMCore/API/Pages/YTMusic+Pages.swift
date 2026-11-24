@@ -49,18 +49,20 @@ extension YTMusic {
         case .shelves(let token, let pagesLeft, var held)?:
             page.more = nil
             var next: String?
+            var pagesRead = 1
             do {
-                let shelves = try await homeShelves(token: token)
+                let shelves = try await homeShelves(token: token, pagesLeft: pagesLeft)
                 held += shelves.sections
                 next = shelves.next
+                pagesRead = shelves.pages
             } catch {
                 try Task.checkCancellation()
                 whole = false
             }
-            let done = next == nil || pagesLeft <= 1
+            let done = next == nil || pagesLeft <= pagesRead
             page.sections += HomeFeed.release(&held, after: page.sections, done: done)
             if let next, !done, !HomeFeed.isComplete(page.sections) {
-                page.more = .shelves(token: next, pagesLeft: pagesLeft - 1, held: held)
+                page.more = .shelves(token: next, pagesLeft: pagesLeft - pagesRead, held: held)
             }
         }
         return (page, whole)

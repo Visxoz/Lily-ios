@@ -46,13 +46,18 @@ enum HomeFeed {
         return attempt < attempts && elapsed < .seconds(20)
     }
 
-    static func firstPage(_ response: JSON) throws -> (sections: [Section], next: String?) {
+    /// A page's shelves and the next page's token.
+    typealias Shelves = (sections: [Section], next: String?)
+    /// Shelves read from one or more pages, and how many.
+    typealias Pages = (sections: [Section], next: String?, pages: Int)
+
+    static func firstPage(_ response: JSON) throws -> Shelves {
         let list = response["contents", "singleColumnBrowseResultsRenderer", "tabs"][0]["tabRenderer", "content", "sectionListRenderer"]
         guard list.exists else { throw YTMError(.parse, "YouTube sent Home in a shape the app doesn't know.") }
         return (shelves(list), Renderers.continuation(list))
     }
 
-    static func nextPage(_ response: JSON) -> (sections: [Section], next: String?) {
+    static func nextPage(_ response: JSON) -> Shelves {
         let list = response["continuationContents", "sectionListContinuation"]
         return (shelves(list), Renderers.continuation(list))
     }
