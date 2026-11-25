@@ -143,7 +143,8 @@ public struct Card: Codable, Hashable, Sendable, Identifiable {
         switch route {
         case .album(let album): (kind, id) = (.album, album)
         case .playlist(let playlist): (kind, id) = (.playlist, playlist)
-        case .artist(let artist): (kind, id) = (.artist, artist)
+        // The artist's own ID, as Library's card and its songs name it, should the route be an alias.
+        case .artist(let artist): (kind, id) = (.artist, header.artistId ?? artist)
         default: return nil
         }
         guard !header.title.isEmpty else { return nil }

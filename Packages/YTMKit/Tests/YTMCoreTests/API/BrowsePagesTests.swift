@@ -458,6 +458,8 @@ private actor Counter {
         header.banner = true
         header.thumbnail = "https://lh3.googleusercontent.com/b=w1440-h600-p-l90-rj"
         #expect(Card(pinning: .artist("UC1"), header)?.thumbnail == header.thumbnail, "a banner keeps its shape")
+        header.artistId = "UC2"
+        #expect(Card(pinning: .artist("UC1"), header)?.artist == ArtistRef(id: "UC2", name: "Currents"), "by its own ID, not an alias")
         #expect(Card(pinning: .library, header) == nil)
         header.title = ""
         #expect(Card(pinning: .playlist("PL1"), header) == nil, "not loaded yet")
