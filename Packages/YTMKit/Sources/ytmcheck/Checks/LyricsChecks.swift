@@ -26,8 +26,7 @@ enum LyricsChecks {
                     findings.expect(lyrics.lineIndex(at: lyrics.starts[middle] + 0.01) == middle, "\(song.title): the line playing isn't found")
                 }
                 let first = lyrics.lines.first { !$0.isEmpty } ?? ""
-                let timing = lyrics.isWordSynced ? "word-synced" : lyrics.isSynced ? "synced" : "plain"
-                findings.note("\(song.title): \(lyrics.lines.count) lines, \(timing), \(lyrics.source); \"\(first.prefix(40))\"")
+                findings.note("\(song.title): \(lyrics.lines.count) lines, \(timing(lyrics)), \(lyrics.source); \"\(first.prefix(40))\"")
             }
             findings.expect(synced > 0, "no song had timed lyrics")
             // lrc.red is one person's site, so its going quiet should show here rather than on the phone.
@@ -36,7 +35,41 @@ enum LyricsChecks {
             findings.expect(community?.isSynced == true, "LRCLIB: no timed lines for \(Live.songs[1].title)")
             try await versions(&findings)
             try await chinese(&findings)
+            try await sites(&findings)
         }
+    }
+
+    /// Each site alone for a random song, as the lyrics above stop at the first good answer. The hub needs the app's
+    /// Cloudflare pass, so isn't asked.
+    private static func sites(_ findings: inout Findings) async throws {
+        guard let song = Live.songs.randomElement() else { return }
+        let track = song.track
+        async let lrcRed = outcome { try await LrcRed.lyrics(for: track) }
+        async let kugou = outcome { try await KuGou.lyrics(for: track) }
+        async let lrclib = outcome { try await LRCLIB.lyrics(for: track) }
+        var video = track
+        video.isVideo = true
+        guard let own = try await Live.api.lyrics(for: video) else { return findings.fail("\(song.title): no YouTube lyrics") }
+        for (site, answer) in [("lrc.red", await lrcRed), ("KuGou", await kugou), ("LRCLIB", await lrclib)] {
+            switch answer {
+            case .failure(let error):
+                findings.fail("\(site): \(error)")
+            case .success(nil):
+                findings.fail("\(site): nothing for \(song.title)")
+            case .success(let lyrics?):
+                findings.expect(LyricsMatch.agrees(own, lyrics), "\(site): \(song.title) taken as another version")
+                findings.note("\(site) alone: \(song.title), \(lyrics.lines.count) lines, \(timing(lyrics))")
+            }
+        }
+    }
+
+    /// A site's failure as its answer, so one failing doesn't hide the others'.
+    private static func outcome(_ fetch: () async throws -> Lyrics?) async -> Result<Lyrics?, any Error> {
+        do { return .success(try await fetch()) } catch { return .failure(error) }
+    }
+
+    private static func timing(_ lyrics: Lyrics) -> String {
+        lyrics.isWordSynced ? "word-synced" : lyrics.isSynced ? "synced" : "plain"
     }
 
     /// YouTube writes 周杰倫's 晴天 in Traditional characters and the other sites file it in Simplified ones, so
