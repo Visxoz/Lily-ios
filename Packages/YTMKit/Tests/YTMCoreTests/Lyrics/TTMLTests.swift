@@ -29,21 +29,33 @@ import Testing
         #expect(read?.isWordSynced == true)
     }
 
-    @Test func ignoresTheHeadsTranslations() {
+    @Test func readsTheHeadsFirstTranslationAndRomanisationByLine() {
         let head = #"""
-            <translations><translation type="replacement" xml:lang="en-US"><text for="L1"><span begin="1.000" end="2.000" xmlns="http://www.w3.org/ns/ttml">Other</span></text></translation></translations><transliterations><transliteration xml:lang="ko-Latn"><text for="L1"><span begin="1.000" end="2.000" xmlns="http://www.w3.org/ns/ttml">Roman</span> <span ttm:role="x-bg" xmlns="http://www.w3.org/ns/ttml"><span begin="2.000" end="2.500">(echo)</span></span></text></transliteration></transliterations>
+            <translations><translation type="replacement" xml:lang="en-US"><text for="L1"><span begin="1.000" end="2.000" xmlns="http://www.w3.org/ns/ttml">Other</span></text><text for="L2">Same</text></translation><translation xml:lang="fr"><text for="L1">Autre</text><text for="L3">Encore</text></translation></translations><transliterations><transliteration xml:lang="ko-Latn"><text for="L1"><span begin="1.000" end="2.000" xmlns="http://www.w3.org/ns/ttml">Roman</span> <span ttm:role="x-bg" xmlns="http://www.w3.org/ns/ttml"><span begin="2.000" end="2.500">(echo)</span></span></text></transliteration></transliterations>
             """#
-        let read = lyrics(#"<p begin="1.000" end="2.000" lrc:key="L1"><span begin="1.000" end="2.000">Lorem</span></p>"#, head: head)
-        #expect(read?.lines == ["Lorem"])
-        #expect(read?.words == [[word("Lorem", 1, 2)]])
+        let body = #"""
+            <p begin="1.000" end="2.000" lrc:key="L1"><span begin="1.000" end="2.000">Lorem</span></p>
+            <p begin="3.000" end="4.000" lrc:key="L2">Same</p>
+            <p begin="5.000" end="6.000" lrc:key="L3">Ipsum</p>
+            """#
+        let read = lyrics(body, head: head)
+        #expect(read?.lines == ["Lorem", "Same", "Ipsum"])
+        #expect(read?.words.first == [word("Lorem", 1, 2)])
+        #expect(read?.translations == ["Other", "", ""], "the same line is left out, and the second language unread")
+        #expect(read?.romanised == ["Roman (echo)", "", ""])
+        let plain = lyrics(body)
+        #expect(plain?.translations == [] && plain?.romanised == [])
     }
 
-    @Test func keepsBackgroundVocalsInlineAndSkipsTranslatedSpans() {
+    @Test func keepsBackgroundVocalsInlineAndTakesTranslatedSpansAside() {
+        let head = #"<translations><translation xml:lang="fr"><text for="L1">Tête</text></translation></translations>"#
         let read = lyrics(#"""
-            <p begin="1.000" end="2.500"><span begin="1.000" end="1.500">Lorem</span> <span ttm:role="x-bg"><span begin="1.400" end="2.000">(Ip-</span><span begin="2.000" end="2.500">sum)</span></span><span ttm:role="x-translation" xml:lang="fr"><span begin="1.000" end="2.000">Autre</span></span><span ttm:role="x-roman">Roma</span></p>
-            """#)
+            <p begin="1.000" end="2.500" lrc:key="L1"><span begin="1.000" end="1.500">Lorem</span> <span ttm:role="x-bg"><span begin="1.400" end="2.000">(Ip-</span><span begin="2.000" end="2.500">sum)</span></span><span ttm:role="x-translation" xml:lang="fr"><span begin="1.000" end="2.000">Autre</span></span><span ttm:role="x-roman">Roma</span></p>
+            """#, head: head)
         #expect(read?.lines == ["Lorem (Ip-sum)"])
         #expect(read?.words == [[word("Lorem ", 1, 1.5), word("(Ip-", 1.4, 2), word("sum)", 2, 2.5)]])
+        #expect(read?.translations == ["Autre"], "the line's own over the head's")
+        #expect(read?.romanised == ["Roma"])
     }
 
     @Test func readsLineTimedDocuments() {

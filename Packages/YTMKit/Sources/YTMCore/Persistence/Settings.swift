@@ -96,6 +96,10 @@ public struct Settings: Codable, Equatable, Sendable {
     public var accent: Accent = .lily
     /// Off metered networks, as downloads, since each clip is several MB.
     public var animatedArt: AnimatedArt = .wifi
+    /// Shows each lyric line's translation beneath it.
+    public var lyricsTranslation = false
+    /// Likewise its romanisation.
+    public var lyricsRomanisation = false
     /// The account has been served Premium formats, so songs without them (music videos) never mark it as not Premium.
     public var premiumAccount = false
     /// The account was taken as without Premium: songs start on the free stream while a background check confirms it.
@@ -151,6 +155,8 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&look, .look)
         file.read(&accent, .accent)
         file.read(&animatedArt, .animatedArt)
+        file.read(&lyricsTranslation, .lyricsTranslation)
+        file.read(&lyricsRomanisation, .lyricsRomanisation)
         file.read(&premiumAccount, .premiumAccount)
         file.read(&noPremium, .noPremium)
         file.read(&downloadQuality, .downloadQuality)

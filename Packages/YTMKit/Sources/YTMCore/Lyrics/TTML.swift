@@ -11,9 +11,26 @@ enum TTML {
         return Lyrics(
             lines: reader.lines,
             starts: reader.timed ? reader.starts : [],
-            words: reader.words.allSatisfy(\.isEmpty) ? [] : reader.words,
+            words: orEmpty(reader.words),
+            translations: orEmpty(reader.extras[Extra.translation.rawValue]),
+            romanised: orEmpty(reader.extras[Extra.romanised.rawValue]),
             source: source
         )
+    }
+
+    /// What a line may carry besides its words; the raw value indexes the reader's lists.
+    private enum Extra: Int, CaseIterable {
+        case translation, romanised
+
+        /// A list with `value` for each extra.
+        static func each<T>(_ value: T) -> [T] {
+            Array(repeating: value, count: allCases.count)
+        }
+    }
+
+    /// Empty unless some line has one.
+    private static func orEmpty<T: Collection>(_ lines: [T]) -> [T] {
+        lines.allSatisfy(\.isEmpty) ? [] : lines
     }
 
     /// A clock value in seconds: "27.395", "1:05.20", "1:02:03.4", "12.3s" or "500ms".
@@ -43,20 +60,38 @@ enum TTML {
             var hasChild = false
         }
 
+        /// An extra being read: a head line's, by its key, or the line's own.
+        private struct Capture {
+            let kind: Extra
+            let key: String?
+            var depth = 1
+        }
+
         var lines: [String] = []
         var starts: [Double] = []
         var words: [[Lyrics.Word]] = []
+        /// Each line's translation and romanisation, by `Extra`.
+        var extras: [[String]] = Extra.each([])
         var timed = false
 
-        // Only <p> in <body> counts: <head> holds translations and romanisations in timed spans of their own.
+        // Only <body>'s <p> is sung; <head> holds the extras by line key.
         private var inBody = false
         private var inLine = false
         private var begin: Double?
+        private var key: String?
         private var lineWords: [Lyrics.Word] = []
         /// Text since the last span boundary, its whitespace collapsed.
         private var pending = ""
         private var spans: [Span] = []
-        /// Depth inside a translation or romanisation span, which isn't sung.
+        /// The head's first translation and romanisation, by line key.
+        private var byKey: [[String: String]] = Extra.each([:])
+        /// The head's translation or romanisation being read.
+        private var section: Extra?
+        /// The line's own translation and romanisation spans.
+        private var inline = Extra.each("")
+        private var capture: Capture?
+        private var captured = ""
+        /// Depth inside what isn't read: another language's extras, or a second of the line's own.
         private var skipped = 0
 
         func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes: [String: String]) {
@@ -64,16 +99,35 @@ enum TTML {
                 skipped += 1
                 return
             }
+            if capture != nil {
+                capture?.depth += 1
+                return
+            }
             switch Self.local(elementName) {
             case "body":
                 inBody = true
+            case "translation" where !inBody:
+                open(.translation)
+            case "transliteration" where !inBody:
+                open(.romanised)
+            case "text" where section != nil:
+                if let section, let key = Self.attribute("for", in: attributes) {
+                    capture = Capture(kind: section, key: key)
+                } else {
+                    skipped = 1
+                }
             case "p" where inBody:
                 inLine = true
                 begin = Self.time("begin", in: attributes)
+                key = Self.attribute("key", in: attributes)
             case "span" where inLine:
-                let role = Self.attribute("role", in: attributes)
-                if role == "x-translation" || role == "x-roman" {
-                    skipped = 1
+                let kind: Extra? = switch Self.attribute("role", in: attributes) {
+                case "x-translation": .translation
+                case "x-roman": .romanised
+                default: nil
+                }
+                if let kind {
+                    if inline[kind.rawValue].isEmpty { capture = Capture(kind: kind, key: nil) } else { skipped = 1 }
                     return
                 }
                 flush()
@@ -89,8 +143,17 @@ enum TTML {
                 skipped -= 1
                 return
             }
+            if let reading = capture {
+                if reading.depth > 1 {
+                    capture?.depth -= 1
+                } else {
+                    endCapture(reading)
+                }
+                return
+            }
             switch Self.local(elementName) {
             case "body": inBody = false
+            case "translation", "transliteration": section = nil
             case "p" where inLine: endLine()
             case "span" where inLine: endSpan()
             default: break
@@ -98,7 +161,30 @@ enum TTML {
         }
 
         func parser(_ parser: XMLParser, foundCharacters string: String) {
-            if inLine, skipped == 0 { Self.append(string, to: &pending) }
+            guard skipped == 0 else { return }
+            if capture != nil {
+                Self.append(string, to: &captured)
+            } else if inLine {
+                Self.append(string, to: &pending)
+            }
+        }
+
+        /// Only the first language's extras are read; the rest are skipped unread.
+        private func open(_ kind: Extra) {
+            if byKey[kind.rawValue].isEmpty { section = kind } else { skipped = 1 }
+        }
+
+        private func endCapture(_ read: Capture) {
+            // `append` leaves at most one space at either end.
+            let text = captured.trimmingCharacters(in: .whitespaces)
+            captured = ""
+            capture = nil
+            let kind = read.kind.rawValue
+            if let key = read.key {
+                if byKey[kind][key] == nil { byKey[kind][key] = text }
+            } else {
+                inline[kind] = text
+            }
         }
 
         /// The innermost timed spans are the words; any other span's text is untimed.
@@ -124,11 +210,20 @@ enum TTML {
             if !text.isEmpty {
                 let start = min(begin ?? .infinity, lineWords.first?.start ?? .infinity)
                 timed = timed || start.isFinite
+                for kind in Extra.allCases {
+                    let i = kind.rawValue
+                    var extra = inline[i]
+                    if extra.isEmpty, let key { extra = byKey[i].removeValue(forKey: key) ?? "" }
+                    // A copy of the line adds nothing.
+                    extras[i].append(extra == text ? "" : extra)
+                }
                 lines.append(text)
                 starts.append(start.isFinite ? start : starts.last ?? 0)
                 words.append(lineWords)
             }
             inLine = false
+            key = nil
+            inline = Extra.each("")
             lineWords = []
             pending = ""
             spans = []

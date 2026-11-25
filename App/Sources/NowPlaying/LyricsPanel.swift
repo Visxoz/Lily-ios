@@ -50,14 +50,31 @@ private struct LyricsLines: View {
     private static let resumeAfter = Duration.seconds(3)
 
     var body: some View {
+        let settings = app.settings.value
+        let romanise = settings.lyricsRomanisation && lyrics.isRomanised
+        let translate = settings.lyricsTranslation && lyrics.hasTranslations
+        VStack(spacing: 0) {
+            if lyrics.isRomanised || lyrics.hasTranslations {
+                LyricsToggles(romanised: lyrics.isRomanised, translated: lyrics.hasTranslations)
+            }
+            lines(romanise: romanise, translate: translate)
+        }
+        // Rows change height as extras show or hide.
+        .onChange(of: romanise) { glide() }
+        .onChange(of: translate) { glide() }
+    }
+
+    private func lines(romanise: Bool, translate: Bool) -> some View {
         let synced = lyrics.isSynced
         let wordSynced = lyrics.isWordSynced
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(lyrics.lines.indices, id: \.self) { index in
                     LyricLine(
                         text: lyrics.lines[index],
                         words: wordSynced && index == current ? lyrics.words[index] : [],
+                        romanised: romanise ? lyrics.romanised[index] : "",
+                        translation: translate ? lyrics.translations[index] : "",
                         lit: !synced || index == current
                     )
                         .onTapGesture { if synced { seek(to: index) } }
@@ -123,6 +140,33 @@ private struct LyricsLines: View {
     }
 }
 
+/// Outside the scroll view, so they don't scroll away.
+private struct LyricsToggles: View {
+    /// Which the lyrics have.
+    let romanised: Bool, translated: Bool
+
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        let settings = app.settings
+        HStack(spacing: 6) {
+            if romanised {
+                Pill(title: "Romanisation", active: settings.value.lyricsRomanisation, compact: true) {
+                    settings.value.lyricsRomanisation.toggle()
+                }
+            }
+            if translated {
+                Pill(title: "Translation", active: settings.value.lyricsTranslation, compact: true) {
+                    settings.value.lyricsTranslation.toggle()
+                }
+            }
+        }
+        .padding(.horizontal, NowPlayingScreen.padding)
+        .padding(.top, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// The line being sung, polled while playing and on a seek, which may come while paused; reported
 /// only when it changes, so the lines redraw once a line rather than every frame.
 private struct LyricClock: View {
@@ -146,35 +190,47 @@ private struct LyricLine: View {
     let text: String
     /// Filled in as sung on the line being sung word by word; empty on the others.
     let words: [Lyrics.Word]
+    /// Each shown beneath the line unless empty.
+    let romanised: String, translation: String
     let lit: Bool
 
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Group {
-            if words.isEmpty {
-                Text(text)
-            } else {
-                let sung = words.reduce(Text(verbatim: "")) { line, word in
-                    let tagged = Text(verbatim: word.text).customAttribute(SungWord(start: word.start, end: word.end))
-                    return Text("\(line)\(tagged)")
+        VStack(alignment: .leading, spacing: 4) {
+            Group {
+                if words.isEmpty {
+                    Text(text)
+                } else {
+                    let sung = words.reduce(Text(verbatim: "")) { line, word in
+                        let tagged = Text(verbatim: word.text).customAttribute(SungWord(start: word.start, end: word.end))
+                        return Text("\(line)\(tagged)")
+                    }
+                    let end = words.reduce(0.0) { max($0, $1.start, $1.end) }
+                    // 30 fps sweeps a word smoothly at half the redraws; capped at `end`, a sung line stops changing through a gap.
+                    Playhead(interval: 1.0 / 30) { time in sung.textRenderer(SungFill(time: min(time, end))) }
+                        .accessibilityLabel(text)
                 }
-                let end = words.reduce(0.0) { max($0, $1.start, $1.end) }
-                // 30 fps sweeps a word smoothly at half the redraws; capped at `end`, a sung line stops changing through a gap.
-                Playhead(interval: 1.0 / 30) { time in sung.textRenderer(SungFill(time: min(time, end))) }
-                    .accessibilityLabel(text)
             }
+            // Swapped at once as a line starts or ends, so its two forms never stand together mid-fade.
+            .transition(.identity)
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(theme.text)
+            if !romanised.isEmpty { extra(romanised) }
+            if !translation.isEmpty { extra(translation) }
         }
-        // Swapped at once as a line starts or ends, so its two forms never stand together mid-fade.
-        .transition(.identity)
-        .font(.system(size: 22, weight: .bold))
-        .foregroundStyle(theme.text)
         .opacity(lit ? 1 : SungFill.dim)
         // A line filling in word by word dims its own unsung words, so it lights at once.
         .animation(words.isEmpty ? Theme.normal : nil, value: lit)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    private func extra(_ text: String) -> some View {
+        Text(verbatim: text)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(theme.textSecondary)
     }
 }
 

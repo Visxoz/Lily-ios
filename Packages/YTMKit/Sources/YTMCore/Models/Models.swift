@@ -146,18 +146,29 @@ public struct Lyrics: Codable, Hashable, Sendable {
     public var starts: [Double]
     /// Each line's words when sung word by word, else empty; a line may still have none.
     public var words: [[Word]]
+    /// Each line's translation, "" where it has none; empty without any.
+    public var translations: [String]
+    /// Each line in Latin letters, likewise.
+    public var romanised: [String]
     /// Where they come from, such as "Source: Musixmatch".
     public var source: String
 
-    public init(lines: [String], starts: [Double] = [], words: [[Word]] = [], source: String = "") {
+    public init(
+        lines: [String], starts: [Double] = [], words: [[Word]] = [], translations: [String] = [],
+        romanised: [String] = [], source: String = ""
+    ) {
         self.lines = lines
         self.starts = starts
         self.words = words
+        self.translations = translations
+        self.romanised = romanised
         self.source = source
     }
 
     public var isSynced: Bool { !starts.isEmpty && starts.count == lines.count }
     public var isWordSynced: Bool { isSynced && words.count == lines.count }
+    public var hasTranslations: Bool { !translations.isEmpty && translations.count == lines.count }
+    public var isRomanised: Bool { !romanised.isEmpty && romanised.count == lines.count }
 
     /// The line playing at `time`, for synced lyrics.
     public func lineIndex(at time: Double) -> Int? {
