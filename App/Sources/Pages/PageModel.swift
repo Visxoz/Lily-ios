@@ -235,4 +235,11 @@ final class PageModel {
 
 extension Route {
     var listsPlaylists: Bool { self == .library || self == .libraryPlaylists }
+    /// Library and its See all pages of cards.
+    var showsPinBadges: Bool {
+        switch self {
+        case .library, .libraryPlaylists, .libraryAlbums, .libraryArtists: true
+        default: false
+        }
+    }
 }

@@ -1,6 +1,11 @@
 import SwiftUI
 import YTMCore
 
+extension EnvironmentValues {
+    /// Pinned cards show a badge: on Library and its See all pages.
+    @Entry var showsPinBadges = false
+}
+
 struct CardView: View {
     let card: Card
     let width: CGFloat
@@ -8,6 +13,7 @@ struct CardView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.showsPinBadges) private var showsPinBadges
 
     /// Carousel and grid cards share one decode, so art already seen in a carousel draws at once.
     static func artPixels(scale: CGFloat) -> Int {
@@ -25,9 +31,12 @@ struct CardView: View {
                 Text(card.title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.text)
-                Text(card.subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(theme.textSecondary)
+                HStack(spacing: 4) {
+                    if showsPinBadges { PinBadge(card: card) }
+                    Text(card.subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.textSecondary)
+                }
             }
             .lineLimit(1)
             .frame(width: width, alignment: .leading)
@@ -35,6 +44,21 @@ struct CardView: View {
         }
         .buttonStyle(PressScale(scale: 0.97))
         .contextMenu { CardMenu(card: card) }
+    }
+}
+
+/// Its own view, so a pin redraws the badge rather than the card.
+private struct PinBadge: View {
+    let card: Card
+
+    @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        if app.isPinned(card) {
+            IconView(icon: .pin, size: 14, colour: theme.accent)
+                .accessibilityLabel("Pinned")
+        }
     }
 }
 

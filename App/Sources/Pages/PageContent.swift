@@ -101,6 +101,7 @@ struct PageContent: View {
             try? await Task.sleep(for: .seconds(Self.arrival))
             arrived = true
         }
+        .environment(\.showsPinBadges, route.showsPinBadges)
         .modifier(PlaylistDialogs(dialog: $dialog, name: $newName, title: page.header?.title ?? "", model: model))
     }
 
@@ -151,6 +152,7 @@ struct PageContent: View {
                 }
                 if let pinned = model?.pinned {
                     SectionRows(section: pinned, width: frame.width - 2 * Metrics.pagePadding)
+                        .environment(\.showsPinBadges, false)
                 }
                 if !isSplit, let header = page.header {
                     headerView(header)
