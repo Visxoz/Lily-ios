@@ -1,7 +1,12 @@
 import CryptoKit
 import Foundation
 
-extension LastFM {
+enum LastFMAPI {
+    typealias Params = [(name: String, value: String)]
+    typealias Play = ScrobbleService.Play
+    typealias Session = ScrobbleService.Session
+    typealias Failure = ScrobbleService.Failure
+
     /// From the `LASTFM_API_KEY` and `LASTFM_API_SECRET` build settings.
     struct Keys: Sendable {
         var apiKey: String
@@ -17,55 +22,8 @@ extension LastFM {
         }()
     }
 
-    /// The key does not expire; the user can revoke it on Last.fm, which `Failure.signedOut` then reports.
-    struct Session: Codable, Sendable {
-        var name: String
-        var key: String
-    }
-
-    struct Play: Codable, Hashable, Sendable {
-        var artist: String
-        var track: String
-        var album: String?
-        /// In seconds.
-        var duration: Int?
-        /// The play's start, in Unix seconds.
-        var timestamp: Int64
-    }
-
-    enum Failure: Error, Equatable {
-        /// The account's access was revoked; it has to connect again.
-        case signedOut
-        case notYetAllowed
-        /// Last.fm will never take the request as it is: invalid parameters, or a token that expired.
-        case rejected(String)
-        /// The built-in keys are unknown, suspended or mismatched. Plays wait, as for `failed`, but connecting stops.
-        case invalidKeys
-        /// Last.fm could not be reached or could not answer; try again later.
-        case failed(String)
-    }
-}
-
-extension LastFM.Play {
-    /// Nil without the artist or title Last.fm refuses a play without.
-    init?(_ track: Track, at start: Date) {
-        // The first artist, as Last.fm's catalogue lists features in the title rather than as artists.
-        artist = track.artists.first?.name ?? ""
-        self.track = track.title
-        album = track.album?.name
-        duration = track.duration
-        timestamp = Int64(start.timeIntervalSince1970)
-        if artist.isEmpty || self.track.isEmpty { return nil }
-    }
-}
-
-enum LastFMAPI {
-    typealias Params = [(name: String, value: String)]
-
     private static let endpoint = URL(string: "https://ws.audioscrobbler.com/2.0/")
     private static let authPage = "https://www.last.fm/api/auth/"
-    /// "Lily/1.0", as Lily for Windows names itself; plain "Lily" outside the app, as in ytmcheck, which has no version.
-    private static let userAgent = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String).map { "Lily/\($0)" } ?? "Lily"
 
     /// Adds `api_sig`: the MD5 of every name and value in byte-wise name order, then the secret, as Last.fm requires.
     static func sign(_ params: inout Params, secret: String) {
@@ -108,10 +66,8 @@ enum LastFMAPI {
         }
     }
 
-    /// Not through `HTTP.data`, which fails on the status alone: Last.fm's 4xx errors carry a code saying whether to
-    /// retry. The host check and the guarded `HTTP.api` session still apply.
     @concurrent
-    static func call(_ method: String, _ params: Params = [], keys: LastFM.Keys) async throws -> JSON {
+    static func call(_ method: String, _ params: Params = [], keys: Keys) async throws -> JSON {
         var params = params
         params.append(("method", method))
         params.append(("api_key", keys.apiKey))
@@ -119,34 +75,24 @@ enum LastFMAPI {
         // Unsigned, as Last.fm leaves it out of the signature.
         params.append(("format", "json"))
 
-        guard let endpoint, HTTP.isAllowed(endpoint) else { throw LastFM.Failure.failed("The app blocked a request to a site it doesn't use.") }
-        var request = URLRequest(url: endpoint, timeoutInterval: 20)
+        guard let endpoint else { throw Failure.failed("Last.fm's address couldn't be read.") }
+        var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.httpBody = form(params)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await HTTP.api.data(for: request)
-        } catch let error as URLError {
-            if error.code == .cancelled { throw CancellationError() }
-            throw LastFM.Failure.failed(YTMError(error).message)
-        }
+        let (data, status) = try await ScrobbleService.fetch(request)
         let json = try? JSON(data: data)
         if let json, let code = json["error"].int {
             throw failure(code: code, message: json["message"].string ?? "", method: method)
         }
         // Something other than Last.fm answering, as a gateway's error page, which would otherwise pass for a scrobble.
-        guard let status = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(status) else {
-            throw LastFM.Failure.failed("Last.fm answered with an error.")
-        }
-        guard let json else { throw LastFM.Failure.failed("Last.fm's answer couldn't be read.") }
+        guard (200..<300).contains(status) else { throw Failure.failed("Last.fm answered with an error.") }
+        guard let json else { throw Failure.failed("Last.fm's answer couldn't be read.") }
         return json
     }
 
-    static func failure(code: Int, message: String, method: String) -> LastFM.Failure {
+    static func failure(code: Int, message: String, method: String) -> Failure {
         let message = "Last.fm error \(code): \(message)"
         switch code {
         // An invalid or expired token, so connecting has to start again, or invalid parameters.
@@ -163,32 +109,31 @@ enum LastFMAPI {
     }
 
     /// The page where the user allows access, and the token to ask for the session with once they have.
-    static func authorise(keys: LastFM.Keys) async throws -> (page: URL, token: String) {
+    static func authorise(keys: Keys) async throws -> (page: URL, token: String) {
         let reply = try await call("auth.getToken", keys: keys)
         guard let token = reply["token"].string, var page = URLComponents(string: authPage) else {
-            throw LastFM.Failure.failed("Last.fm's answer couldn't be read.")
+            throw Failure.failed("Last.fm's answer couldn't be read.")
         }
         page.queryItems = [URLQueryItem(name: "api_key", value: keys.apiKey), URLQueryItem(name: "token", value: token)]
-        guard let url = page.url else { throw LastFM.Failure.failed("Last.fm's answer couldn't be read.") }
+        guard let url = page.url else { throw Failure.failed("Last.fm's answer couldn't be read.") }
         return (url, token)
     }
 
-    static func session(token: String, keys: LastFM.Keys) async throws -> LastFM.Session {
+    static func session(token: String, keys: Keys) async throws -> Session {
         let reply = try await call("auth.getSession", [("token", token)], keys: keys)
         guard let name = reply["session", "name"].string, let key = reply["session", "key"].string else {
-            throw LastFM.Failure.failed("Last.fm's answer couldn't be read.")
+            throw Failure.failed("Last.fm's answer couldn't be read.")
         }
-        return LastFM.Session(name: name, key: key)
+        return Session(name: name, key: key)
     }
 
-    static func nowPlaying(_ play: LastFM.Play, session: LastFM.Session, keys: LastFM.Keys) async throws {
+    static func nowPlaying(_ play: Play, session: Session, keys: Keys) async throws {
         var params: Params = [("sk", session.key)]
         append(play, suffix: "", to: &params)
         _ = try await call("track.updateNowPlaying", params, keys: keys)
     }
 
-    /// At most a batch; returns why Last.fm ignored any, which will never be taken, so they go like the others.
-    static func scrobble(_ plays: [LastFM.Play], session: LastFM.Session, keys: LastFM.Keys) async throws -> [String] {
+    static func scrobble(_ plays: [Play], session: Session, keys: Keys) async throws -> [String] {
         var params: Params = [("sk", session.key)]
         for (index, play) in plays.enumerated() {
             let suffix = "[\(index)]"
@@ -199,7 +144,7 @@ enum LastFMAPI {
     }
 
     /// Each name followed by `suffix`, as `[0]` in a batch.
-    private static func append(_ play: LastFM.Play, suffix: String, to params: inout Params) {
+    private static func append(_ play: Play, suffix: String, to params: inout Params) {
         params.append(("artist" + suffix, play.artist))
         params.append(("track" + suffix, play.track))
         if let album = play.album { params.append(("album" + suffix, album)) }

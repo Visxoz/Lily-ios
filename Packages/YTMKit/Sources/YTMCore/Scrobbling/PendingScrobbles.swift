@@ -1,9 +1,9 @@
-extension LastFM {
-    /// Plays Last.fm has yet to accept, oldest first, kept on disk.
+extension ScrobbleService {
+    /// Plays a service has yet to accept, oldest first, kept on disk.
     struct Pending: Codable, Sendable {
-        /// Most scrobbles Last.fm takes in one request.
+        /// Last.fm's most per request; ListenBrainz takes more.
         static let batchSize = 50
-        /// A fortnight of heavy listening: Last.fm refuses plays more than two weeks old anyway.
+        /// A fortnight of heavy listening, as Last.fm refuses older plays.
         static let limit = 3000
 
         private(set) var plays: [Play] = []
@@ -33,10 +33,9 @@ extension LastFM {
             Array(plays.prefix(one ? 1 : Self.batchSize))
         }
 
-        /// By value rather than position, as the oldest play may have made way for a new one while they were sent.
+        /// Drops `sent` from the front, less any the limit dropped while they were on their way.
         mutating func remove(_ sent: [Play]) {
-            let sent = Set(sent)
-            plays.removeAll { sent.contains($0) }
+            plays.removeFirst(plays.prefix(while: sent.contains).count)
         }
     }
 }

@@ -25,7 +25,7 @@ struct Scrobbler {
         heard >= (length > 0 ? min(30, length / 2) : 30)
     }
 
-    /// Last.fm's rule: the song is over 30 seconds, and half of it or four minutes has played.
+    /// Last.fm's rule, which ListenBrainz shares: the song is over 30 seconds, and half of it or four minutes has played.
     static func counts(heard: Double, length: Double) -> Bool {
         length > 30 && heard >= min(length / 2, 240)
     }
@@ -34,8 +34,9 @@ struct Scrobbler {
         playing = Listening(track: track, startedAt: date)
     }
 
-    /// `heard` is the song once its play counts for Speed dial, `scrobble` the play once it counts for Last.fm, each
-    /// only that once. Last.fm's rule is never met before Speed dial's, so ending the listening there loses nothing.
+    /// `heard` is the song once its play counts for Speed dial, `scrobble` the play once it counts for scrobbling,
+    /// each only that once. Scrobbling's rule is never met before Speed dial's, so ending the listening there loses
+    /// nothing.
     mutating func heard(
         position: Double, length: Double, speed: Double, at now: ContinuousClock.Instant = .now
     ) -> (heard: Track?, scrobble: (track: Track, startedAt: Date)?) {

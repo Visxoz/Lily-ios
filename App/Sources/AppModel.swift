@@ -97,8 +97,8 @@ final class AppModel {
     /// The launch's Home request, which the first load of Home takes over.
     @ObservationIgnored var homeAhead: Task<Page, any Error>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
-    /// The wait for Last.fm access, which outlives Settings.
-    private var lastFMWait: Task<Void, Never>?
+    /// Each scrobbling service's wait to connect, which outlives Settings.
+    private var scrobbleWaits: [ObjectIdentifier: Task<Void, Never>] = [:]
     @ObservationIgnored private var downloadTime = UIBackgroundTaskIdentifier.invalid
     @ObservationIgnored private var artworkTrim: Task<Void, Never>?
 
@@ -284,28 +284,29 @@ final class AppModel {
         await accountChanged(quietly: quietly)
     }
 
-    var isConnectingLastFM: Bool { lastFMWait != nil }
+    func isConnecting(_ service: ScrobbleService) -> Bool { scrobbleWaits[ObjectIdentifier(service)] != nil }
 
-    /// Waits, whatever Settings does, until access is allowed, refused or cancelled.
-    func connectLastFM(open: OpenURLAction) {
-        lastFMWait = Task { [weak self] in
+    /// Waits, whatever Settings does, until `signIn` connects, is refused or is cancelled.
+    func connect(_ service: ScrobbleService, signIn: @escaping @Sendable (ScrobbleService) async throws -> Void) {
+        let id = ObjectIdentifier(service)
+        scrobbleWaits[id]?.cancel()
+        scrobbleWaits[id] = Task { [weak self] in
             let message: String?
             do {
-                try await LastFM.shared.signIn { url in await open(url) }
-                message = await LastFM.shared.username.map { "Scrobbling to Last.fm as \($0)" }
+                try await signIn(service)
+                message = await service.username.map { "Scrobbling to \(service.name) as \($0)" }
             } catch {
                 // Cancelled, the user stopped waiting, which needs no word.
                 message = Task.isCancelled ? nil : sentence(for: error)
             }
             guard let self, !Task.isCancelled else { return }
-            lastFMWait = nil
+            scrobbleWaits[id] = nil
             if let message { showToast(message) }
         }
     }
 
-    func cancelLastFMConnect() {
-        lastFMWait?.cancel()
-        lastFMWait = nil
+    func cancelConnect(_ service: ScrobbleService) {
+        scrobbleWaits.removeValue(forKey: ObjectIdentifier(service))?.cancel()
     }
 
     func showToast(_ message: String) {

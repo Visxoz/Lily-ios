@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import YTMCore
 
-@Suite struct LastFMRequestTests {
+@Suite struct LastFMAPITests {
     @Test func signsParametersInNameOrder() {
         var params: LastFMAPI.Params = [("token", "tok\u{e9}"), ("method", "auth.getSession"), ("api_key", "key")]
         LastFMAPI.sign(&params, secret: "secret")
@@ -51,20 +51,57 @@ import Testing
             id: "v", title: "Song", artists: [ArtistRef(id: nil, name: "A"), ArtistRef(id: nil, name: "B")],
             album: AlbumRef(id: "MPRE", name: "Album"), duration: 200
         )
-        #expect(LastFM.Play(track, at: start) == LastFM.Play(artist: "A", track: "Song", album: "Album", duration: 200, timestamp: 1_700_000_000))
-        #expect(LastFM.Play(Track(id: "v", title: "Song"), at: start) == nil, "no artist")
-        #expect(LastFM.Play(Track(id: "v", title: "", artists: [ArtistRef(id: nil, name: "A")]), at: start) == nil)
+        typealias Play = ScrobbleService.Play
+        #expect(Play(track, at: start) == Play(artist: "A", track: "Song", album: "Album", duration: 200, timestamp: 1_700_000_000))
+        #expect(Play(Track(id: "v", title: "Song"), at: start) == nil, "no artist")
+        #expect(Play(Track(id: "v", title: "", artists: [ArtistRef(id: nil, name: "A")]), at: start) == nil)
+    }
+}
+
+@Suite struct ListenBrainzTests {
+    @Test func describesAListenAsListenBrainzReadsIt() throws {
+        let play = ScrobbleService.Play(artist: "Artist", track: "Track", duration: 185, timestamp: 1_700_000_000)
+        let single = ListenBrainzAPI.Submission(listenType: "single", payload: [.init(play, listenedAt: play.timestamp)])
+        let json = try JSON(data: ListenBrainzAPI.body(single))
+        #expect(json["listen_type"].string == "single")
+        let listen = json["payload"][0]
+        #expect(listen["listened_at"].int == 1_700_000_000)
+        let metadata = listen["track_metadata"]
+        #expect(metadata["artist_name"].string == "Artist")
+        #expect(metadata["track_name"].string == "Track")
+        #expect(!metadata["release_name"].exists, "no album, no key")
+        #expect(metadata["additional_info", "duration_ms"].int == 185_000)
+        #expect(metadata["additional_info", "music_service"].string == "music.youtube.com")
+
+        var short = play
+        short.duration = 0
+        let now = try JSON(data: ListenBrainzAPI.body(.init(listenType: "playing_now", payload: [.init(short, listenedAt: nil)])))
+        #expect(!now["payload"][0]["listened_at"].exists, "playing now has no time")
+        #expect(!now["payload"][0]["track_metadata", "additional_info", "duration_ms"].exists, "no zero length")
+    }
+
+    @Test func readsStatusesAsLilyForWindowsDoes() {
+        #expect(ListenBrainzAPI.failure(status: 401, error: "") == .signedOut)
+        #expect(ListenBrainzAPI.failure(status: 400, error: "x") == .rejected("ListenBrainz answered 400: x"))
+        #expect(ListenBrainzAPI.failure(status: 429, error: "") == .failed("ListenBrainz answered 429: "))
+    }
+
+    @Test func takesOnlyATokenShapedLikeAUUID() {
+        #expect(ListenBrainzAPI.isToken("3f2c9a1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"))
+        #expect(!ListenBrainzAPI.isToken("a\r\nX-Other: b"), "no header injection")
+        #expect(!ListenBrainzAPI.isToken(""))
+        #expect(!ListenBrainzAPI.isToken("tökén"))
     }
 }
 
 @Suite struct PendingScrobblesTests {
-    private func play(_ n: Int) -> LastFM.Play {
-        LastFM.Play(artist: "A", track: String(n), timestamp: Int64(n))
+    private func play(_ n: Int) -> ScrobbleService.Play {
+        ScrobbleService.Play(artist: "A", track: String(n), timestamp: Int64(n))
     }
 
     @Test func keepsPendingPlaysInOrderWithinTheLimit() {
-        let limit = LastFM.Pending.limit, batchSize = LastFM.Pending.batchSize
-        var pending = LastFM.Pending()
+        let limit = ScrobbleService.Pending.limit, batchSize = ScrobbleService.Pending.batchSize
+        var pending = ScrobbleService.Pending()
         for n in 0..<limit + 2 { pending.push(play(n)) }
         #expect(pending.plays.count == limit)
         let batch = pending.batch(one: false)
@@ -88,10 +125,10 @@ import Testing
     }
 
     @Test func survivesASaveAndLoad() throws {
-        var pending = LastFM.Pending()
+        var pending = ScrobbleService.Pending()
         pending.push(play(1))
         pending.hold(for: "a")
-        let loaded = try JSONDecoder().decode(LastFM.Pending.self, from: JSONEncoder().encode(pending))
+        let loaded = try JSONDecoder().decode(ScrobbleService.Pending.self, from: JSONEncoder().encode(pending))
         #expect(loaded.plays == pending.plays && loaded.account == "a")
     }
 }

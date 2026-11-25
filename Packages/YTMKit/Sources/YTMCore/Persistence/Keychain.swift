@@ -2,7 +2,7 @@ import Foundation
 import os
 import Security
 
-/// Secrets (sign-in cookies, the Last.fm session, the user's proxy) as device-only generic passwords.
+/// Secrets (sign-in cookies, the scrobbling sessions, the user's proxy) as device-only generic passwords.
 enum Keychain {
     private static let service = "Lily"
     private static let log = Logger(subsystem: "Lily", category: "Keychain")

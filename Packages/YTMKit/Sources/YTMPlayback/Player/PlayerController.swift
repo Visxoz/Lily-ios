@@ -132,12 +132,15 @@ public struct MotionClip: Sendable {
     public convenience init(
         api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared, audio: AudioPlayer
     ) {
-        self.init(music: api, settings: settings, history: history, lastFM: LastFM.shared, audio: audio, store: .shared, system: true)
+        self.init(
+            music: api, settings: settings, history: history, scrobbling: [ScrobbleService.lastFM, ScrobbleService.listenBrainz],
+            audio: audio, store: .shared, system: true
+        )
     }
 
     /// `system` hooks up Now Playing, the remote commands and the audio session; tests leave them out.
     init(
-        music: any MusicService, settings: SettingsStore, history: LocalHistory, lastFM: any Scrobbling,
+        music: any MusicService, settings: SettingsStore, history: LocalHistory, scrobbling: [any Scrobbling],
         audio: any AudioOutput, store: FileStore, system: Bool
     ) {
         self.music = music
@@ -146,7 +149,7 @@ public struct MotionClip: Sendable {
         self.audio = audio
         self.store = store
         chooser = StreamChooser(music: music)
-        recorder = PlayRecorder(history: history, music: music, lastFM: lastFM)
+        recorder = PlayRecorder(history: history, music: music, scrobbling: scrobbling)
         (toasts, toastSink) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(4))
         downloads = Downloads(music: music, chooser: chooser, settings: settings, history: history, store: store, toasts: toastSink)
         if system {
@@ -159,12 +162,13 @@ public struct MotionClip: Sendable {
                     self?.handle(event)
                 }
             },
-            Task { [weak self, revoked = lastFM.accessRevoked] in
+        ] + scrobbling.map { service in
+            Task { [weak self, name = service.name, revoked = service.accessRevoked] in
                 for await _ in revoked {
-                    self?.say("Last.fm no longer allows access. Connect it again in Settings.")
+                    self?.say("\(name) no longer allows access. Connect it again in Settings.")
                 }
-            },
-        ]
+            }
+        }
     }
 
     isolated deinit {

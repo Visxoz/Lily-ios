@@ -40,7 +40,7 @@ struct StreamRecoveryTests {
         await rig.settle()
         #expect(rig.audio.played.last?.from == 50, "where it was sought to while waiting")
         await rig.soundStarts()
-        #expect(await rig.lastFM.nowPlaying == ["a"], "one play")
+        #expect(await rig.scrobblers[0].nowPlaying == ["a"], "one play")
         #expect(rig.player.playback.reopen == nil && rig.player.playback.resume == nil)
     }
 

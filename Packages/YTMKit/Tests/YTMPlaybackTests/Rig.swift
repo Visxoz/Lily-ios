@@ -18,7 +18,8 @@ final class ObservedChange: Sendable {
 @MainActor struct Rig {
     let music = FakeMusic()
     let audio = FakeAudio()
-    let lastFM = FakeLastFM()
+    /// Two, as Last.fm and ListenBrainz.
+    let scrobblers = [FakeScrobbler(), FakeScrobbler()]
     let store: FileStore
     let settings: SettingsStore
     let history: LocalHistory
@@ -29,7 +30,7 @@ final class ObservedChange: Sendable {
         settings = SettingsStore(store: store)
         history = LocalHistory(store: store)
         player = PlayerController(
-            music: music, settings: settings, history: history, lastFM: lastFM, audio: audio, store: store, system: false
+            music: music, settings: settings, history: history, scrobbling: scrobblers, audio: audio, store: store, system: false
         )
     }
 

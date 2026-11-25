@@ -37,6 +37,29 @@ struct SettingRow<Control: View>: View {
     }
 }
 
+extension View {
+    /// A text field's look in Settings.
+    func settingField() -> some View {
+        modifier(SettingField())
+    }
+}
+
+private struct SettingField: ViewModifier {
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 13))
+            .foregroundStyle(theme.text)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.done)
+            .padding(.horizontal, 14)
+            .frame(height: 32)
+            .background(Capsule().strokeBorder(theme.ink.opacity(0.44), lineWidth: 1))
+    }
+}
+
 struct ToggleRow: View {
     let label: String
     let detail: String

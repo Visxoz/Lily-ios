@@ -41,7 +41,9 @@ struct PlayerControllerTests {
         #expect(rig.player.queue.currentIndex == 1)
         #expect(rig.history.history.tracks.map(\.id) == ["b", "a"])
         #expect(rig.audio.played.count == 1, "nothing loaded afresh")
-        #expect(await rig.lastFM.nowPlaying == ["a", "b"])
+        for scrobbler in rig.scrobblers {
+            #expect(await scrobbler.nowPlaying == ["a", "b"], "each service hears of each play")
+        }
     }
 
     @Test func fadesIntoSongsOfAnotherAlbumWithCrossfadeOn() async throws {
@@ -67,7 +69,7 @@ struct PlayerControllerTests {
         await rig.settle()
         #expect(rig.audio.seeks == [0])
         #expect(rig.player.current?.id == "b")
-        #expect(await rig.lastFM.nowPlaying == ["b", "b"], "starting over is a new play")
+        #expect(await rig.scrobblers[0].nowPlaying == ["b", "b"], "starting over is a new play")
         rig.audio.currentTime = 1
         rig.player.previous()
         await rig.settle()
@@ -93,7 +95,7 @@ struct PlayerControllerTests {
         #expect(rig.player.stream?.isPremium == false)
         #expect(rig.music.calls.contains("stream a"))
         await rig.soundStarts()
-        #expect(await rig.lastFM.nowPlaying == ["a"], "one play")
+        #expect(await rig.scrobblers[0].nowPlaying == ["a"], "one play")
         #expect(rig.music.calls.filter { $0 == "report a" }.count == 1)
         #expect(rig.music.calls.filter { $0 == "suspect" }.count == 1, "the player is checked sooner")
     }

@@ -273,7 +273,8 @@ final class FakeMusic: MusicService {
     }
 }
 
-actor FakeLastFM: Scrobbling {
+actor FakeScrobbler: Scrobbling {
+    nonisolated let name = "Fake"
     nonisolated let accessRevoked = AsyncStream<Void> { _ in }
     private(set) var nowPlaying: [String] = []
     private(set) var scrobbled: [String] = []

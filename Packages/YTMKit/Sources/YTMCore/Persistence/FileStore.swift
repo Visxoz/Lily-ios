@@ -3,7 +3,9 @@ import os
 import Synchronization
 
 public enum StoreFile: String, Sendable {
-    case settings, session, history, searches, home, scrobbles, visitor
+    case settings, session, history, searches, home, visitor
+    /// Plays Last.fm and ListenBrainz have yet to take.
+    case scrobbles, listens
     /// The Premium path's trimmed player script.
     case player
     case downloads

@@ -59,10 +59,11 @@ extension YTMusic: MusicService {
 extension AudioPlayer: AudioOutput {}
 
 protocol Scrobbling: Sendable {
+    var name: String { get }
     /// Yields when the account stops allowing access.
     var accessRevoked: AsyncStream<Void> { get }
     func nowPlaying(_ track: Track) async
     func scrobble(_ track: Track, startedAt: Date) async
 }
 
-extension LastFM: Scrobbling {}
+extension ScrobbleService: Scrobbling {}

@@ -6,15 +6,15 @@ import YTMCore
 @MainActor final class PlayRecorder {
     private let history: LocalHistory
     private let music: any MusicService
-    private let lastFM: any Scrobbling
+    private let scrobbling: [any Scrobbling]
     private var scrobbler = Scrobbler()
     /// Set while the play is reported to YouTube.
     private var watch: WatchReport?
 
-    init(history: LocalHistory, music: any MusicService, lastFM: any Scrobbling) {
+    init(history: LocalHistory, music: any MusicService, scrobbling: [any Scrobbling]) {
         self.history = history
         self.music = music
-        self.lastFM = lastFM
+        self.scrobbling = scrobbling
     }
 
     /// `reportToYouTube` adds the song to the account's history, so its recommendations and Listen again follow what
@@ -24,11 +24,12 @@ import YTMCore
         flushWatch(.last, paused: paused, reporting: reportToYouTube)
         history.record(track)
         scrobbler.start(track)
-        let (music, lastFM) = (music, lastFM)
-        Task {
-            await lastFM.nowPlaying(track)
+        // A task each, so one service's slow answer holds up no other.
+        for service in scrobbling {
+            Task { await service.nowPlaying(track) }
         }
         guard reportToYouTube else { return }
+        let music = music
         let started = ContinuousClock.now
         watch = WatchReport(started: started)
         Task { [weak self] in
@@ -52,9 +53,8 @@ import YTMCore
         let (heard, scrobble) = scrobbler.heard(position: position, length: length, speed: speed)
         if let heard { history.markHeard(heard.id) }
         guard let play = scrobble else { return }
-        let lastFM = lastFM
-        Task {
-            await lastFM.scrobble(play.track, startedAt: play.startedAt)
+        for service in scrobbling {
+            Task { await service.scrobble(play.track, startedAt: play.startedAt) }
         }
     }
 
