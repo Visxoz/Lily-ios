@@ -21,7 +21,9 @@ nonisolated struct Theme: Equatable, Sendable {
     static let fast = Animation.easeOut(duration: 0.12)
     static let normal = Animation.easeOut(duration: 0.22)
 
+    /// Never System, which is resolved to the look it shows.
     let look: Look
+    private let followsSystem: Bool
     /// The accent, already made readable in the look.
     let accent: Color
 
@@ -49,13 +51,14 @@ nonisolated struct Theme: Equatable, Sendable {
     /// Behind Home, a dark take on the accent; Lily's orchid gives #4d2140.
     private let homeTint: RGB
 
-    init(look: Look, accent: RGB) {
+    init(look: Look, accent: RGB, followsSystem: Bool = false) {
         let light = look == .light
         let black = look == .black
         func pick(_ lightHex: UInt32, _ blackHex: UInt32, _ darkHex: UInt32) -> Color {
             Color(rgb: RGB(hex: light ? lightHex : black ? blackHex : darkHex))
         }
         self.look = look
+        self.followsSystem = followsSystem
         self.accent = Color(rgb: accent)
         panel = pick(0xffffff, 0x000000, 0x121212)
         elevated = pick(0xf0f0f0, 0x141414, 0x1f1f1f)
@@ -71,14 +74,20 @@ nonisolated struct Theme: Equatable, Sendable {
         homeTint = accent.mixed(with: .black, weight: 0.36)
     }
 
-    /// `artworkAccent` is the playing artwork's vivid colour, for the accent that follows it.
-    init(settings: Settings, artworkAccent: RGB?) {
+    /// `artworkAccent` is the playing artwork's vivid colour, for the accent that follows it; `system` is the phone's
+    /// appearance, for the System look.
+    init(settings: Settings, artworkAccent: RGB?, system: ColorScheme) {
+        let followsSystem = settings.look == .system
+        let look = followsSystem ? (system == .light ? .light : .black) : settings.look
         let accent = settings.accent.rgb.map(RGB.init(hex:)) ?? artworkAccent ?? Self.lily
-        self.init(look: settings.look, accent: ArtworkPalette.readable(accent, look: settings.look))
+        self.init(look: look, accent: ArtworkPalette.readable(accent, look: look), followsSystem: followsSystem)
     }
 
     var isLight: Bool { look == .light }
+    /// For presentations that set their own scheme, such as the picker over Now Playing's dark clip.
     var colorScheme: ColorScheme { isLight ? .light : .dark }
+    /// The window's scheme: nil under System, so the phone's own shows through.
+    var preferredScheme: ColorScheme? { followsSystem ? nil : colorScheme }
 
     /// A colour picked for behind white text, such as an artwork's, paled in the light look so dark text reads on it.
     func tint(_ colour: RGB) -> Color {

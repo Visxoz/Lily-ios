@@ -15,8 +15,9 @@ public enum Normalise: String, Codable, CaseIterable, Sendable {
     case off, quiet, normal
 }
 
+/// System is Light or Black as the phone's appearance is.
 public enum Look: String, Codable, CaseIterable, Sendable {
-    case dark, light, black
+    case dark, light, black, system
 }
 
 /// Moving art: a song's Spotify Canvas, or its album's Apple Music cover.

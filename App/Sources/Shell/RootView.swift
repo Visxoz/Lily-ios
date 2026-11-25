@@ -40,7 +40,7 @@ struct RootView: View {
             SheetContent(sheet: sheet, transition: transition)
         }
         .environment(\.theme, app.theme)
-        .preferredColorScheme(app.theme.colorScheme)
+        .preferredColorScheme(app.theme.preferredScheme)
         .tint(app.theme.accent)
         .task { await app.followTheme() }
         .task { await app.followMirroredSettings() }
@@ -51,6 +51,7 @@ struct RootView: View {
             }
         }
         .modifier(FollowPlayer())
+        .modifier(FollowAppearance())
         .modifier(HingeCheck())
     }
 
@@ -72,6 +73,16 @@ private struct FollowPlayer: ViewModifier {
             .task(id: app.player.current?.thumbnail) { await app.followArtwork(of: app.player.current?.thumbnail) }
             .onChange(of: app.player.libraryRevision) { app.libraryChanged() }
             .onChange(of: app.player.downloads.isActive) { _, active in app.keepDownloading(active) }
+    }
+}
+
+/// Apart from RootView, so an appearance change re-runs this rather than the whole tab tree.
+private struct FollowAppearance: ViewModifier {
+    @Environment(AppModel.self) private var app
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content.onChange(of: colorScheme, initial: true) { app.appearance = colorScheme }
     }
 }
 

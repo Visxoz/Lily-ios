@@ -71,6 +71,8 @@ final class AppModel {
     private(set) var accountGeneration = 0
 
     private(set) var theme: Theme
+    /// The window's appearance, which is the phone's whenever the System look is on.
+    var appearance = ColorScheme.dark
     /// The account's pins, kept apart from the settings so only the views showing pins redraw as they change.
     private(set) var pinned: [Card] = []
     /// Artists blocked, kept apart from the settings for the same reason.
@@ -116,7 +118,7 @@ final class AppModel {
         history = .shared
         audio = AudioPlayer { Proxy.configurations }
         player = PlayerController(api: api, settings: settings, history: history, audio: audio)
-        theme = Theme(settings: settings.value, artworkAccent: nil)
+        theme = Theme(settings: settings.value, artworkAccent: nil, system: .dark)
         // Here, for the app's life: a view's task would end with a scene teardown, and the one-consumer stream with it.
         Task { [weak self, toasts = player.toasts] in
             for await message in toasts { self?.showToast(message) }
@@ -209,7 +211,7 @@ final class AppModel {
     /// Replaces `theme` only when it changes, so views reading it redraw only then.
     func followTheme() async {
         let changes = Observations { [settings] in
-            Theme(settings: settings.value, artworkAccent: self.artwork?.vivid)
+            Theme(settings: settings.value, artworkAccent: self.artwork?.vivid, system: self.appearance)
         }
         for await theme in changes where theme != self.theme {
             self.theme = theme

@@ -8,7 +8,7 @@ struct AppearanceSettings: View {
         @Bindable var settings = app.settings
         let accent = settings.value.accent
         SettingRow(label: "Theme", stacked: true) {
-            ChoicePills(choices: [(Look.dark, "Dark"), (.light, "Light"), (.black, "Black")], selection: $settings.value.look)
+            ChoicePills(choices: [(Look.dark, "Dark"), (.light, "Light"), (.black, "Black"), (.system, "System")], selection: $settings.value.look)
         }
         SettingRow(
             label: "Accent colour",
