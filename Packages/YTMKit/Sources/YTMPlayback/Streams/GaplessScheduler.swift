@@ -90,8 +90,12 @@ extension PlayerController {
         let generation = playback.generation
         queueing = Task { [weak self] in
             let result = await Result(source)
-            guard let self, !Task.isCancelled, playback.generation == generation,
-                  queue.peekNext(repeat: repeatMode)?.id == nextID else { return }
+            guard let self, playback.generation == generation else { return }
+            guard !Task.isCancelled, queue.peekNext(repeat: repeatMode)?.id == nextID else {
+                // A stream that landed anyway is kept for when the song is next again.
+                if case .success(let prefetched) = result { prefetcher.store(nextID, prefetched) }
+                return
+            }
             do {
                 let prefetched = try result.get()
                 let item = try audioItem(for: next, stream: prefetched.stream)
