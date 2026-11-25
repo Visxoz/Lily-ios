@@ -25,8 +25,8 @@ final class PageModel {
     @ObservationIgnored private var generation = 0
     /// The account the page shown was loaded for.
     @ObservationIgnored private var shownFor: Int?
-    /// The page as YouTube sent it, before recent plays join Home's Speed dial and pins lead Library, so
-    /// further steps, the cache, the saved feed and change checks use YouTube's.
+    /// The page as YouTube sent it, before recent plays join Home's Speed dial, pins lead Library and albums go by
+    /// artist, so further steps, the cache, the saved feed and change checks use YouTube's.
     @ObservationIgnored private var source: Page?
 
     /// Whether the page stands in for Home's feed until the next visit: the saved feed or the charts, or a feed cut
@@ -206,7 +206,7 @@ final class PageModel {
         showsSaved = false
     }
 
-    /// Mixes recent plays into Speed dial and pins into Library; not a new page, so the place stays.
+    /// Mixes recent plays into Speed dial and pins into Library, and orders albums; not a new page, so the place stays.
     func rearrange(in app: AppModel) {
         guard let source, let shown = page else { return }
         let latest = onScreen(source, in: app)
@@ -214,13 +214,14 @@ final class PageModel {
     }
 
     /// Signed in, Home's Speed dial takes in this phone's recent plays heard long enough, as YouTube's seldom has them.
-    /// Library's pins go to `pinned`.
+    /// Library's pins go to `pinned`, and its albums go by artist when chosen.
     private func onScreen(_ page: Page, in app: AppModel) -> Page {
         if route == .library {
             let pins = page.pinnedSection(app.pinned)
             if pins != pinned { pinned = pins }
         }
-        return route == .home && app.isSignedIn ? page.withRecentPlays(app.history.history.heard) : page
+        if route == .home && app.isSignedIn { return page.withRecentPlays(app.history.history.heard) }
+        return route.listsAlbums && app.albumsByArtist ? page.albumsByArtist() : page
     }
 
     private func show(_ page: Page, for app: AppModel, saved: Bool = false) {
@@ -235,6 +236,7 @@ final class PageModel {
 
 extension Route {
     var listsPlaylists: Bool { self == .library || self == .libraryPlaylists }
+    var listsAlbums: Bool { self == .library || self == .libraryAlbums }
     /// Library and its See all pages of cards.
     var showsPinBadges: Bool {
         switch self {

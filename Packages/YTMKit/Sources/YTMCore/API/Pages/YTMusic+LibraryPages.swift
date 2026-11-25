@@ -104,6 +104,36 @@ extension Page {
         let shown = pins.compactMap { pin in listed.first(where: pin.matches) ?? (pin.title.isEmpty ? nil : pin) }
         return Section.cards("Pinned", shown, layout: .carousel)
     }
+
+    /// Each whole list of albums by artist, then title, with those by no one named last. A list cut short keeps
+    /// YouTube's order, since sorting part of it would mislead.
+    public func albumsByArtist() -> Page {
+        var page = self
+        for (at, section) in sections.enumerated() {
+            guard case .cards(var list) = section, list.more == nil, list.cards.contains(where: { $0.kind == .album }) else { continue }
+            list.cards = list.cards.map { (artist: $0.albumArtist, card: $0) }
+                .sorted { a, b in
+                    if a.artist.isEmpty != b.artist.isEmpty { return b.artist.isEmpty }
+                    let order = a.artist.localizedStandardCompare(b.artist)
+                    return order == .orderedSame
+                        ? a.card.title.localizedStandardCompare(b.card.title) == .orderedAscending
+                        : order == .orderedAscending
+                }
+                .map(\.card)
+            page.sections[at] = .cards(list)
+        }
+        return page
+    }
+}
+
+private extension Card {
+    /// From the composed subtitle, "Album • Artist • 2024": what lies between the type, which always leads, and any year.
+    // shortcut: a four-digit artist without a year reads as the year; an artist on Card would tell them apart.
+    var albumArtist: String {
+        var parts = subtitle.components(separatedBy: " • ").dropFirst()
+        if let year = parts.last, Formatting.isYear(year) { parts.removeLast() }
+        return parts.joined(separator: " • ")
+    }
 }
 
 enum LibraryList: CaseIterable {

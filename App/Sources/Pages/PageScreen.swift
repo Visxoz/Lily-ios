@@ -71,8 +71,9 @@ private struct PageBody: View {
         }
         // Completes the page while it is on screen, so Home is saved whole.
         .task(id: model.step) { await model.loadMore(in: app) }
-        // Read only where used: pins lead Library, and a saved queue joins its playlists.
+        // Read only where used: pins lead Library, albums may go by artist, and a saved queue joins its playlists.
         .onChange(of: route == .library ? app.pinned : []) { model.rearrange(in: app) }
+        .onChange(of: route.listsAlbums && app.albumsByArtist) { model.rearrange(in: app) }
         .onChange(of: route.listsPlaylists ? app.playlistsAdded : 0) { model.adoptCached(in: app) }
     }
 }

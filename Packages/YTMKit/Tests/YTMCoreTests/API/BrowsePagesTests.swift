@@ -451,6 +451,26 @@ private actor Counter {
         #expect(page.pinnedSection([Card(kind: .playlist, id: "gone", title: "")]) == nil, "an untitled pin Library doesn't list")
     }
 
+    @Test func ordersWholeListsOfAlbumsByArtist() {
+        func album(_ id: String, _ subtitle: String) -> Card { Card(kind: .album, id: id, title: "Album \(id)", subtitle: subtitle) }
+        let albums = [
+            album("c", "Album • 2015"), album("d", "EP • Tame Impala • 2019"), album("a", "Single • Beck"),
+            album("b", "Album • Tame Impala • 2015"), album("e", "Album • air • 1998"),
+            Card(kind: .playlist, id: "p", title: "Mix", subtitle: "Playlist • Zed"),
+        ]
+        let playlists = ["z", "y"].map { Card(kind: .playlist, id: $0, title: $0) }
+        let page = Page(sections: [
+            Section.cards("Playlists", playlists, layout: .grid), Section.cards("Albums", albums, layout: .grid),
+            Section.cards("Cut short", albums, layout: .grid, more: .libraryAlbums),
+        ].compactMap(\.self))
+        let sorted = page.albumsByArtist().sections.map { section -> [String] in
+            guard case .cards(let list) = section else { return [] }
+            return list.cards.map(\.id)
+        }
+        #expect(sorted[1] == ["e", "a", "b", "d", "p", "c"], "by artist whatever the case, then title, with no artist last; a stray card too")
+        #expect(sorted[0] == ["z", "y"] && sorted[2] == albums.map(\.id), "other lists, and lists cut short, as YouTube sent them")
+    }
+
     @Test func pagesPinAsCards() throws {
         var header = PageHeader(title: "Currents", subtitle: "Tame Impala", thumbnail: "https://lh3.googleusercontent.com/a=w544-h544-l90-rj")
         let album = try #require(Card(pinning: .album("MPREb1"), header))

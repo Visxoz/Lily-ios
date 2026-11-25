@@ -88,7 +88,7 @@ extension Renderers {
             // "Album • Artist • 2024"; artist pages' tiles say only "2024" or "Album • 2024", and the page's
             // artist stands in.
             let type = segments.lazy.compactMap { AlbumType(label: $0.text) }.first ?? context.albumType
-            let year = segments.first { $0.text.count == 4 && Int($0.text) != nil }?.text
+            let year = segments.first { Formatting.isYear($0.text) }?.text
             var artists = linkedArtists(runs)
             if artists.isEmpty {
                 let names = segments.filter { AlbumType(label: $0.text) == nil && $0.text != year && !typeLabels.contains($0.text) }

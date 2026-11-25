@@ -120,6 +120,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var pinsAccount: Account?
     /// Artists whose songs play only when chosen, oldest first; unlike pins, every account's on this phone.
     public var blockedArtists: [ArtistRef] = []
+    /// Library's albums by artist rather than as YouTube Music sorts them.
+    public var albumsByArtist = false
 
     public init() {}
 
@@ -209,6 +211,7 @@ public struct Settings: Codable, Equatable, Sendable {
             pinsAccount = account
         }
         blockedArtists = file.readEach(.blockedArtists)
+        file.read(&albumsByArtist, .albumsByArtist)
     }
 
     /// Older versions had six bands, which are carried over to the ten by interpolating in log-frequency between

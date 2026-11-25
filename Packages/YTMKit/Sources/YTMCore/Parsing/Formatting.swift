@@ -77,6 +77,11 @@ public enum Formatting {
 
     private static let magnitudes: [Substring: Int] = ["k": 3, "m": 6, "b": 9]
 
+    /// A subtitle's "2024".
+    static func isYear(_ text: String) -> Bool {
+        text.count == 4 && Int(text) != nil
+    }
+
     /// The first run of digits in `text`, as in "49 songs" or "2,024".
     static func number(_ text: String) -> Int? {
         let digits = text.drop { !$0.isASCIIDigit }.prefix { $0.isASCIIDigit || $0 == "," }.filter(\.isASCIIDigit)

@@ -75,6 +75,8 @@ final class AppModel {
     private(set) var pinned: [Card] = []
     /// Artists blocked, kept apart from the settings for the same reason.
     private(set) var blocked: [ArtistRef] = []
+    /// Whether Library lists albums by artist, kept apart likewise.
+    private(set) var albumsByArtist = false
     /// Counts playlists put in Library's cached pages, so a Library page on screen, as under Now Playing, shows one.
     var playlistsAdded = 0
     private(set) var artwork: ArtworkColours?
@@ -168,12 +170,15 @@ final class AppModel {
         for await _ in done {}
     }
 
-    /// Replaces `pinned` and `blocked` only when each changes, so views reading them redraw only then.
-    func followPinsAndBlocks() async {
-        let changes = Observations { [settings] in (settings.value.pins(for: self.account), settings.value.blockedArtists) }
-        for await (pinned, blocked) in changes {
+    /// Replaces `pinned`, `blocked` and `albumsByArtist` only when each changes, so views reading them redraw only then.
+    func followMirroredSettings() async {
+        let changes = Observations { [settings] in
+            (settings.value.pins(for: self.account), settings.value.blockedArtists, settings.value.albumsByArtist)
+        }
+        for await (pinned, blocked, albumsByArtist) in changes {
             if pinned != self.pinned { self.pinned = pinned }
             if blocked != self.blocked { self.blocked = blocked }
+            if albumsByArtist != self.albumsByArtist { self.albumsByArtist = albumsByArtist }
         }
     }
 

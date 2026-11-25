@@ -29,6 +29,8 @@ import Testing
         #expect(settings.normalise == .normal && !settings.crossfade && settings.quality == .high)
         #expect(!settings.automix, "off until chosen")
         #expect(!settings.foldToScrub, "off until asked for")
+        #expect(!settings.albumsByArtist, "YouTube's order until chosen")
+        #expect(try decode(#"{"albumsByArtist": true}"#).albumsByArtist)
         #expect(settings.pauseOnUnplug, "on until turned off")
         #expect(settings.animatedArt == .wifi)
         #expect(try decode(#"{"animatedArt": "on"}"#).animatedArt == .on)

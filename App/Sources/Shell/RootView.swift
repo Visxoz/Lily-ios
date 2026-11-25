@@ -43,7 +43,7 @@ struct RootView: View {
         .preferredColorScheme(app.theme.colorScheme)
         .tint(app.theme.accent)
         .task { await app.followTheme() }
-        .task { await app.followPinsAndBlocks() }
+        .task { await app.followMirroredSettings() }
         // NSCache needn't let go of anything when memory runs short, so the artwork Back or a scroll would reuse goes.
         .task {
             for await _ in NotificationCenter.default.notifications(named: UIApplication.didReceiveMemoryWarningNotification) {

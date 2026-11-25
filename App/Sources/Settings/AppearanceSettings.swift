@@ -25,6 +25,11 @@ struct AppearanceSettings: View {
             ChoicePills(choices: [(AnimatedArt.on, "On"), (.wifi, "Wi-Fi only"), (.off, "Off")], selection: $settings.value.animatedArt)
         }
         SpotifyRow()
+        ToggleRow(
+            label: "Albums by artist",
+            detail: "Orders your saved albums by artist, then title, rather than as YouTube Music lists them; Library's row too once it holds them all.",
+            isOn: $settings.value.albumsByArtist
+        )
     }
 }
 
