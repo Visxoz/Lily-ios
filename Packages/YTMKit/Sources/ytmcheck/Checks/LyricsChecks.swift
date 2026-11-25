@@ -35,8 +35,16 @@ enum LyricsChecks {
             findings.expect(community?.isSynced == true, "LRCLIB: no timed lines for \(Live.songs[1].title)")
             try await versions(&findings)
             try await chinese(&findings)
+            try await translated(&findings)
             try await sites(&findings)
         }
+    }
+
+    /// NewJeans' Super Shy as a home tile gives it, without its length, which lrc.red needs for its translation.
+    private static func translated(_ findings: inout Findings) async throws {
+        let tile = Track(id: "0c7zGU2C2mM", title: "Super Shy", artists: [ArtistRef(id: nil, name: "NewJeans")])
+        let lyrics = try await Live.api.lyrics(for: tile)
+        findings.expect(lyrics?.hasTranslations == true, "Super Shy: no translation, from \(lyrics?.source ?? "nowhere")")
     }
 
     /// Each site alone for a random song, as the lyrics above stop at the first good answer. The hub needs the app's

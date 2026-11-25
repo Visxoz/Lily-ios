@@ -4,11 +4,12 @@ extension YTMusic {
     /// YouTube's lyrics, or another site's better ones that agree with them. Nil when there are none.
     /// Only YouTube's failure throws, so the song is asked again rather than shown unchecked.
     @concurrent
-    public func lyrics(for track: Track) async throws -> Lyrics? {
+    public func lyrics(for song: Track) async throws -> Lyrics? {
         // A music video's timing is its own, which other sites' songs needn't share.
-        guard !track.isVideo else { return try await youtubeLyrics(videoId: track.id) }
+        guard !song.isVideo else { return try await youtubeLyrics(videoId: song.id) }
+        let (track, next) = try await withLength(song)
         async let sites = Self.otherSites(for: track)
-        let own = try await youtubeLyrics(videoId: track.id)
+        let own = try await youtubeLyrics(videoId: track.id, next: next)
         let found = await sites
         var apple = found.apple.compactMap { Lyrics.checked($0, against: own) }
         var others = found.others.compactMap { Lyrics.checked($0, against: own) }
@@ -32,6 +33,16 @@ extension YTMusic {
         return Lyrics.chosen(youtube: own, apple: apple, others: others)
     }
 
+    /// The track with its length, which every other site's search and match need but home tiles and quick picks
+    /// don't give, and YouTube's answer for the song when the length had to be read from its queue.
+    private func withLength(_ track: Track) async throws -> (Track, JSON?) {
+        guard track.duration == nil else { return (track, nil) }
+        let next = try await innerTube.next(["videoId": track.id], authenticated: false)
+        var known = track
+        known.duration = (try? Renderers.queue(in: next))?.first { $0.id == track.id }?.duration
+        return (known, next)
+    }
+
     /// The hub's lyrics, and lrc.red's when the hub has no word timing of Apple Music's kind. Neither waits on
     /// YouTube's, so both run alongside them.
     private static func otherSites(for track: Track) async -> LyricsHub.Found {
@@ -50,8 +61,9 @@ extension YTMusic {
     }
 
     /// Timed lines as the Android app is given them, else the web client's block of text. Nil when the song has none.
-    private func youtubeLyrics(videoId: String) async throws -> Lyrics? {
-        let next = try await innerTube.next(["videoId": videoId], authenticated: false)
+    /// `fetched` is YouTube's answer for the song when it was already asked.
+    private func youtubeLyrics(videoId: String, next fetched: JSON? = nil) async throws -> Lyrics? {
+        let next = if let fetched { fetched } else { try await innerTube.next(["videoId": videoId], authenticated: false) }
         guard let browseId = Lyrics.browseId(in: next) else { return nil }
         do {
             // Not retried: the web lyrics are the fallback.
