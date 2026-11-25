@@ -32,7 +32,7 @@ import Testing
             <QrcInfos><LyricInfo LyricCount="1"><Lyric_1 LyricType="1" LyricContent="[ti:Dummy Song]
             [offset:0]
             [0,1500]Dummy Song(0,500) - (500,500)Dummy Artist(1000,500)
-            [1500,1500]Words: (1500,700)Someone(2200,800)
+            [1500,1500]Words: (1500,700)Some "One"(2200,800)
             [10000,2000]Alpha (10000,500)beta(10500,500) (11000,250)it&apos;s(11250,750)
             [12000,1000]晴(12000,500)天(12500,500)
             "/></LyricInfo></QrcInfos>

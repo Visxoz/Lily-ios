@@ -39,10 +39,10 @@ enum Tencent {
     }
 
     /// QQ Music's QRC document, its lyrics in the `LyricContent` attribute, read by hand: an XML parser would join
-    /// the attribute's lines into one.
+    /// the attribute's lines into one. Read to `"/>`, as credits may quote a name unescaped.
     static func qrcContent(_ xml: String) -> String? {
-        guard let open = xml.range(of: "LyricContent=\""), let close = xml[open.upperBound...].firstIndex(of: "\"") else { return nil }
-        return unescaped(xml[open.upperBound..<close])
+        guard let open = xml.range(of: "LyricContent=\""), let close = xml[open.upperBound...].range(of: "\"/>") else { return nil }
+        return unescaped(xml[open.upperBound..<close.lowerBound])
     }
 
     /// The text of a KRC download's base64 `content`, nil unless it unmasks to a zlib stream.
