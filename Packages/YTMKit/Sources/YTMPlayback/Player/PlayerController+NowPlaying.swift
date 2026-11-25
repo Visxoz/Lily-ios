@@ -14,11 +14,7 @@ extension PlayerController {
         if playing {
             ratingGeneration += 1
             self.rating = rating
-            if rating == .dislike {
-                next()
-                // Nothing to skip to: the queue's end, or a repeat of it.
-                if current?.id == id { stop() }
-            }
+            if rating == .dislike { skip(past: id) }
         }
         let music = music
         Task { [weak self] in
