@@ -60,6 +60,26 @@ extension PlayerController {
         prefetchNext()
     }
 
+    /// Takes the artists' songs out of the queue and skips the one playing; one paused stays, as skipping would play.
+    func leaveOutBlocked(_ blocked: [ArtistRef]) {
+        // First, so the skip lands on a song kept.
+        removeEntries { $0.item.isBy(anyOf: blocked) }
+        guard isPlaying, let at = queue.currentIndex, queue.entries[at].item.isBy(anyOf: blocked) else { return }
+        let playing = queue.entries[at]
+        skip(past: playing.item.id)
+        // Its entry, spared while it played.
+        removeEntries { $0.id == playing.id }
+    }
+
+    /// All but the current entry; the queue is left untouched when none match, so its observers aren't woken.
+    private func removeEntries(where drop: (Queue<Track>.Entry) -> Bool) {
+        let (entries, current) = (queue.entries, queue.currentIndex)
+        let matching = entries.indices.filter { $0 != current && drop(entries[$0]) }
+        guard !matching.isEmpty else { return }
+        queue.removeMany(matching)
+        queueEdited()
+    }
+
     /// Drops the song queued in the player should it no longer be next.
     func dropStaleNext() {
         if let queued = gapless.queued, queued.trackID != queue.peekNext(repeat: repeatMode)?.id {

@@ -125,6 +125,7 @@ struct UpNextPanel: View, Equatable {
                 .disabled(current)
             TrackDownloadItem(track: entry.item)
             Button("Copy link") { app.copyLink(entry.item.link) }
+            if let artist = entry.item.artists.first { BlockItem(artist: artist) }
             TrackLibraryMenu(track: entry.item)
         }
     }

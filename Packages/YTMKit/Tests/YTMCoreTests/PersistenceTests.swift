@@ -127,6 +127,27 @@ import Testing
         #expect(settings.pins(for: Account(name: "Lily", handle: "@lily")).count == 2, "the account then signed in's")
     }
 
+    @Test func blocksAnArtistByIDOrName() throws {
+        var settings = Settings()
+        let blocked = settings.toggleBlock(ArtistRef(id: "UC1", name: "Tame Impala"))
+        #expect(blocked && settings.blockedArtists.count == 1)
+        let byName = Track(id: "a", title: "Let It Happen", artists: [ArtistRef(id: nil, name: "tame impala")])
+        let alias = Track(id: "b", title: "Eventually", artists: [ArtistRef(id: "UC2", name: "Tame Impala")])
+        let byID = Track(id: "c", title: "Borderline", artists: [ArtistRef(id: "UC1", name: "Tame Impala & Friends")])
+        let other = Track(id: "d", title: "Elephant", artists: [ArtistRef(id: "UC3", name: "Pond")])
+        #expect(byName.isBy(anyOf: settings.blockedArtists), "a row without an ID")
+        #expect(alias.isBy(anyOf: settings.blockedArtists), "another ID for the same name")
+        #expect(byID.isBy(anyOf: settings.blockedArtists))
+        #expect(!other.isBy(anyOf: settings.blockedArtists))
+        let (kept, index) = [byName, other, byName].removingSongs(by: settings.blockedArtists, sparing: 2)
+        #expect(kept.map(\.id) == ["d", "a"] && index == 1, "bar the one chosen")
+        #expect([byName, other].leavingOut(settings.blockedArtists).map(\.id) == ["d"])
+        let file = #"{"blockedArtists": [{"id": "UC1", "name": "Tame Impala"}, {"id": 3}]}"#
+        #expect(try decode(file).blockedArtists == settings.blockedArtists, "one that won't read loses only itself")
+        let unblocked = !settings.toggleBlock(ArtistRef(id: "UC1", name: "Renamed"))
+        #expect(unblocked && settings.blockedArtists.isEmpty)
+    }
+
     @Test func defaultsToLilysOrchidOnBlack() {
         let settings = Settings()
         #expect(settings.accent == .lily && settings.look == .black)

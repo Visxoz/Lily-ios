@@ -13,10 +13,10 @@ struct SmartShuffleTests {
     @Test func asksForABatchWhenThePoolIsDry() {
         var smart = SmartShuffle()
         var queue = queue(20)
-        let seed = smart.topUp(&queue, recent: [])
+        let seed = smart.topUp(&queue, recent: [], blocked: [])
         #expect(seed != nil)
         #expect(smart.fetching)
-        let result14 = smart.topUp(&queue, recent: [])
+        let result14 = smart.topUp(&queue, recent: [], blocked: [])
         #expect(result14 == nil, "one batch at a time")
         #expect(queue.recommendedIndices.isEmpty)
     }
@@ -24,10 +24,11 @@ struct SmartShuffleTests {
     @Test func placesOneRecommendationAfterEveryThreeOrFourOwnSongsAhead() {
         var smart = SmartShuffle()
         var queue = queue(20)
-        _ = smart.topUp(&queue, recent: ["r0"])
-        let fresh = smart.receive((0..<10).map { song("r\($0)") } + [song("5")], generation: smart.generation)
+        _ = smart.topUp(&queue, recent: ["r0"], blocked: [])
+        let fresh = smart.receive((0..<10).map { song("r\($0)") } + [song("5")], generation: smart.generation, blocked: [])
         #expect(fresh)
-        _ = smart.topUp(&queue, recent: ["r0"])
+        // Blocked after the batch arrived.
+        _ = smart.topUp(&queue, recent: ["r0"], blocked: [ArtistRef(id: "UCr1", name: "Artist r1")])
         let marks = queue.recommendedIndices
         #expect(marks.count >= 2)
         var own = 0
@@ -43,6 +44,7 @@ struct SmartShuffleTests {
         #expect(runs.allSatisfy { (3...4).contains($0) }, "the playing song counts towards the first run")
         #expect(!queue.items.contains { $0.id == "r0" }, "recently played songs are not recommended")
         #expect(queue.items.filter { $0.id == "5" }.count == 1, "nor songs already in the queue")
+        #expect(!queue.items.contains { $0.id == "r1" }, "nor a blocked artist's")
         let lastOwn = queue.items.lastIndex { !$0.id.hasPrefix("r") } ?? 0
         #expect(marks.allSatisfy { $0 < lastOwn }, "never after the last of the user's own")
         let ownAhead = (0..<(marks.last ?? 0)).filter { !queue.isRecommended(at: $0) }.count - 1
@@ -52,10 +54,10 @@ struct SmartShuffleTests {
     @Test func dropsABatchAskedForAnEarlierQueue() {
         var smart = SmartShuffle()
         var queue = queue(20)
-        _ = smart.topUp(&queue, recent: [])
+        _ = smart.topUp(&queue, recent: [], blocked: [])
         let asked = smart.generation
         smart.reset()
-        let result15 = smart.receive([song("r")], generation: asked)
+        let result15 = smart.receive([song("r")], generation: asked, blocked: [])
         #expect(!result15)
         #expect(!smart.fetching)
     }

@@ -73,6 +73,8 @@ final class AppModel {
     private(set) var theme: Theme
     /// The account's pins, kept apart from the settings so only the views showing pins redraw as they change.
     private(set) var pinned: [Card] = []
+    /// Artists blocked, kept apart from the settings for the same reason.
+    private(set) var blocked: [ArtistRef] = []
     /// Counts playlists put in Library's cached pages, so a Library page on screen, as under Now Playing, shows one.
     var playlistsAdded = 0
     private(set) var artwork: ArtworkColours?
@@ -166,11 +168,21 @@ final class AppModel {
         for await _ in done {}
     }
 
-    /// Replaces `pinned` only when it changes, so views reading it redraw only then.
-    func followPinned() async {
-        for await pinned in Observations({ [settings] in settings.value.pins(for: self.account) }) where pinned != self.pinned {
-            self.pinned = pinned
+    /// Replaces `pinned` and `blocked` only when each changes, so views reading them redraw only then.
+    func followPinsAndBlocks() async {
+        let changes = Observations { [settings] in (settings.value.pins(for: self.account), settings.value.blockedArtists) }
+        for await (pinned, blocked) in changes {
+            if pinned != self.pinned { self.pinned = pinned }
+            if blocked != self.blocked { self.blocked = blocked }
         }
+    }
+
+    func isBlocked(_ artist: ArtistRef) -> Bool {
+        blocked.contains(where: artist.matches)
+    }
+
+    func toggleBlock(_ artist: ArtistRef) {
+        showToast(settings.value.toggleBlock(artist) ? "Blocked \(artist.name)" : "Unblocked \(artist.name)")
     }
 
     func isPinned(_ card: Card) -> Bool {

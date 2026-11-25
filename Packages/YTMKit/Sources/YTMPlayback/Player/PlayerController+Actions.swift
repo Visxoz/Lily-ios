@@ -5,11 +5,18 @@ import YTMCore
 /// Starting playback from pages, cards and menus, and the radios that carry a queue on.
 extension PlayerController {
     /// Plays from `index`, or with nil from a random track when shuffling and the first when not. `shuffle`, as a
-    /// Shuffle button, turns shuffle on first.
-    public func play(_ tracks: [Track], startAt index: Int? = nil, shuffle: Bool = false) {
+    /// Shuffle button, turns shuffle on first. Answers whether anything played.
+    @discardableResult
+    public func play(_ tracks: [Track], startAt index: Int? = nil, shuffle: Bool = false) -> Bool {
         guard !tracks.isEmpty else {
             say("Nothing to play here")
-            return
+            return false
+        }
+        // A song chosen plays though its artist is blocked.
+        let (tracks, index) = tracks.removingSongs(by: settings.value.blockedArtists, sparing: index)
+        guard !tracks.isEmpty else {
+            say("Every song here is by an artist you've blocked")
+            return false
         }
         if shuffle, settings.value.shuffle == .off {
             // The queue is replaced next, shuffled, so only the setting changes.
@@ -20,6 +27,7 @@ extension PlayerController {
         let start = index ?? (shuffling ? queue.randomBelow(tracks.count) : 0)
         replaceQueue(with: tracks, start: start, shuffle: shuffling)
         startCurrent()
+        return true
     }
 
     /// The whole section from `index`, or for a `.radio` section the song with a radio after it.
@@ -54,8 +62,7 @@ extension PlayerController {
                     if let local { return local } else { throw error }
                 }
             }, failure: "Couldn't load") { player, found in
-                player.play(found.headerTracks)
-                player.continuePlaylist(found, whole: whole)
+                if player.play(found.headerTracks) { player.continuePlaylist(found, whole: whole) }
             }
         case .artist:
             let music = music
@@ -94,8 +101,7 @@ extension PlayerController {
     public func play(_ page: Page, shuffle: Bool = false) async {
         let tracks = page.headerTracks
         if case .tracks? = page.more, page.header?.playlistId != nil {
-            play(tracks, shuffle: shuffle)
-            continuePlaylist(page)
+            if play(tracks, shuffle: shuffle) { continuePlaylist(page) }
             return
         }
         guard shuffle, let playlist = page.header?.shufflePlaylistId else {
@@ -186,8 +192,9 @@ extension PlayerController {
         appendShuffledIn(tracks.filter { known.insert($0.id).inserted })
     }
 
-    /// While shuffled, among the songs still to play, so one may now be next.
+    /// Leaves out blocked artists' songs. While shuffled, among the songs still to play, so one may now be next.
     private func appendShuffledIn(_ tracks: [Track]) {
+        let tracks = tracks.leavingOut(settings.value.blockedArtists)
         guard !tracks.isEmpty else { return }
         queue.extend(tracks)
         dropStaleNext()
@@ -195,7 +202,7 @@ extension PlayerController {
     }
 
     /// Adds the rest of a long playlist as each batch arrives, then gives `whole` the playlist unless a batch
-    /// failed. Every track is kept, as a playlist may hold a song twice.
+    /// failed. Every track but blocked artists' is kept, as a playlist may hold a song twice.
     func continuePlaylist(_ page: Page, whole: (@MainActor @Sendable (Page) -> Void)? = nil) {
         guard case .tracks? = page.more, !page.headerTracks.isEmpty else { return }
         let music = music

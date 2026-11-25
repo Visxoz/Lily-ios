@@ -31,6 +31,7 @@ struct TrackLinks: View {
         Button("Go to album") { app.openAlbum(of: track) }
             .disabled(track.album == nil)
         Button("Copy link") { app.copyLink(track.link) }
+        if let artist = track.artists.first { BlockItem(artist: artist) }
     }
 }
 
@@ -74,6 +75,18 @@ struct CardMenu: View {
         if let link = card.link {
             Button("Copy link") { app.copyLink(link) }
         }
+        if let artist = card.artist { BlockItem(artist: artist) }
+    }
+}
+
+/// Needs no sign-in, as blocks are kept on the phone.
+struct BlockItem: View {
+    let artist: ArtistRef
+
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        Button(app.isBlocked(artist) ? "Unblock \(artist.name)" : "Block \(artist.name)") { app.toggleBlock(artist) }
     }
 }
 

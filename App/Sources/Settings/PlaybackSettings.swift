@@ -49,6 +49,15 @@ struct PlaybackSettings: View {
             detail: "Keeps playing similar music when the queue ends.",
             isOn: $settings.value.autoplay
         )
+        SettingRow(
+            label: "Blocked artists",
+            detail: "Their songs are left out of what plays unless you pick one yourself. Block an artist from a song's or artist's menu."
+        ) {
+            NavigationLink(value: SettingsPage.blockedArtists) {
+                PillLabel(title: "Manage", small: true)
+            }
+            .buttonStyle(PressScale(scale: 0.96))
+        }
         if app.hasHinge {
             ToggleRow(
                 label: "Fold to scrub",

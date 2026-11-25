@@ -118,8 +118,17 @@ public struct Settings: Codable, Equatable, Sendable {
     public var pinned: [Card] = []
     /// The account the pins were made on; nil for pins no account has claimed yet.
     public var pinsAccount: Account?
+    /// Artists whose songs play only when chosen, oldest first; unlike pins, every account's on this phone.
+    public var blockedArtists: [ArtistRef] = []
 
     public init() {}
+
+    /// Blocks `artist`, or unblocks it, answering whether it is now blocked.
+    public mutating func toggleBlock(_ artist: ArtistRef) -> Bool {
+        let blocking = !blockedArtists.contains(where: artist.matches)
+        if blocking { blockedArtists.append(artist) } else { blockedArtists.removeAll(where: artist.matches) }
+        return blocking
+    }
 
     /// The pins, for the account they were made on only.
     public func pins(for account: Account?) -> [Card] {
@@ -192,14 +201,14 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&smartDownloadCount, .smartDownloadCount) { $0 > 0 }
         file.read(&foldToScrub, .foldToScrub)
         file.read(&account, .account)
-        // One by one, so a pin that won't read loses only itself.
-        pinned = (try? file.decodeIfPresent([Readable<Card>].self, forKey: .pinned))?.compactMap(\.value) ?? []
+        pinned = file.readEach(.pinned)
         file.read(&pinsAccount, .pinsAccount)
         // Older versions pinned playlists alone, by ID, for the account then signed in; Library's cards title them.
         if let ids = try? file.decodeIfPresent([String].self, forKey: .pinned), !ids.isEmpty {
             pinned = ids.map { Card(kind: .playlist, id: $0, title: "") }
             pinsAccount = account
         }
+        blockedArtists = file.readEach(.blockedArtists)
     }
 
     /// Older versions had six bands, which are carried over to the ten by interpolating in log-frequency between
@@ -238,5 +247,10 @@ extension KeyedDecodingContainer {
         if let decoded = try? decodeIfPresent(T.self, forKey: key), valid(decoded) {
             value = decoded
         }
+    }
+
+    /// The key's list read one by one, so an element that won't read loses only itself.
+    func readEach<T: Decodable>(_ key: Key) -> [T] {
+        (try? decodeIfPresent([Readable<T>].self, forKey: key))?.compactMap(\.value) ?? []
     }
 }

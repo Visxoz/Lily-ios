@@ -196,6 +196,14 @@ import YTMCore
             changed()
             refreshIfDue()
         }
+        // Picks by an artist just blocked go now, rather than at the next daily refresh.
+        if old.blockedArtists != new.blockedArtists {
+            let kept = index.smart.leavingOut(new.blockedArtists)
+            if kept.count != index.smart.count {
+                index.smart = kept
+                changed()
+            }
+        }
     }
 
     // MARK: Bringing the files in line

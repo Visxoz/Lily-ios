@@ -113,6 +113,7 @@ extension Renderers {
         // Signed out, YouTube says false whatever the account does.
         if subscription.exists, signedIn { artist.header.subscribed = subscription["subscribed"].bool ?? false }
         artist.header.channelId = subscription["channelId"].string
+        artist.header.artistId = ownId
 
         var context = ItemContext(artists: [ArtistRef(id: ownId, name: name)])
         for wrapped in sectionList(in: response)["contents"].array {

@@ -105,6 +105,8 @@ public struct PageHeader: Codable, Hashable, Sendable {
     public var subscribed: Bool?
     /// The channel subscribing to the artist takes.
     public var channelId: String?
+    /// The artist's own ID, which its songs name; the route's may be an alias of it.
+    public var artistId: String?
 
     public init(
         label: String = "", title: String, subtitle: String = "", meta: String = "",

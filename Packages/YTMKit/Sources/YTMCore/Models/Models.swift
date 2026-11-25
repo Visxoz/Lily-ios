@@ -60,11 +60,41 @@ public struct Track: Codable, Hashable, Sendable, Identifiable {
     public var artistNames: String { ArtistRef.joined(artists) }
     public var firstArtistId: String? { artists.lazy.compactMap(\.id).first }
     public var seconds: Double { Double(duration ?? 0) }
+
+    /// Quick with none to match, the usual case, as this runs over whole queues and batches.
+    public func isBy(anyOf artists: [ArtistRef]) -> Bool {
+        !artists.isEmpty && self.artists.contains { mine in artists.contains(where: mine.matches) }
+    }
 }
 
 extension ArtistRef {
     public static func joined(_ artists: [ArtistRef]) -> String {
         artists.lazy.map(\.name).joined(separator: ", ")
+    }
+
+    /// The same artist by ID or by name, as some rows carry no ID and others an alias or a video uploader's channel.
+    public func matches(_ other: ArtistRef) -> Bool {
+        if let id, id == other.id { return true }
+        return name.caseInsensitiveCompare(other.name) == .orderedSame
+    }
+}
+
+extension [Track] {
+    /// Without `blocked` artists' songs; the same array, uncopied, with none blocked.
+    public func leavingOut(_ blocked: [ArtistRef]) -> [Track] {
+        blocked.isEmpty ? self : filter { !$0.isBy(anyOf: blocked) }
+    }
+
+    /// Leaves out `blocked` artists' songs but the one at `sparing`, answering its new index.
+    public func removingSongs(by blocked: [ArtistRef], sparing: Int?) -> (tracks: [Track], index: Int?) {
+        guard !blocked.isEmpty else { return (self, sparing) }
+        var kept: [Track] = []
+        var index: Int?
+        for (at, track) in enumerated() where at == sparing || !track.isBy(anyOf: blocked) {
+            if at == sparing { index = kept.count }
+            kept.append(track)
+        }
+        return (kept, index)
     }
 }
 
@@ -120,6 +150,11 @@ public struct Card: Codable, Hashable, Sendable, Identifiable {
         // A banner stays wide, as the image pipeline asks for it in its own shape.
         let art = header.banner ? header.thumbnail : header.thumbnail.map { Thumbnail.resized($0, edge: Thumbnail.card) }
         self.init(kind: kind, id: id, title: header.title, subtitle: header.subtitle, thumbnail: art)
+    }
+
+    /// An artist's card as the artist, for blocking.
+    public var artist: ArtistRef? {
+        kind == .artist ? ArtistRef(id: id, name: title) : nil
     }
 
     /// The same song, album, playlist or artist, whichever page's card it is.

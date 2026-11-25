@@ -26,6 +26,7 @@ struct SettingsScreen: View {
             .navigationDestination(for: SettingsPage.self) { page in
                 switch page {
                 case .equaliser: EqualiserScreen()
+                case .blockedArtists: BlockedArtistsScreen()
                 }
             }
             .toolbar {
@@ -91,4 +92,5 @@ private struct SettingsTabs: View {
 
 enum SettingsPage: Hashable {
     case equaliser
+    case blockedArtists
 }

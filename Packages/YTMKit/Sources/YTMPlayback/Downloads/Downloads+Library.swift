@@ -153,7 +153,8 @@ extension Downloads {
     /// Recent plays mixed with radios of the latest few, as YouTube Music's are. Nil, keeping the
     /// last picks, if nothing has played yet or a radio fails.
     private func smartPicks(_ count: Int) async -> [Track]? {
-        let played = history.history.tracks
+        // Before seeding, so no blocked artist's radio is asked for.
+        let played = history.history.tracks.leavingOut(settings.value.blockedArtists)
         guard !played.isEmpty else { return nil }
         let music = music
         let radios = await withTaskGroup(of: [Track]?.self) { group in
@@ -165,7 +166,10 @@ extension Downloads {
             return radios
         }
         guard radios.allSatisfy({ $0 != nil }) else { return nil }
-        return Self.interleave([Array(played.prefix(count))] + radios.compactMap(\.self), count: count)
+        // Read again, as an artist may have been blocked while the radios loaded.
+        let blocked = settings.value.blockedArtists
+        let lists = ([Array(played.prefix(count))] + radios.compactMap(\.self)).map { $0.leavingOut(blocked) }
+        return Self.interleave(lists, count: count)
     }
 
     /// Takes from each list in turn, once per song, up to `count`.
