@@ -150,9 +150,8 @@ struct PageContent: View {
                 if route == .home {
                     Greeting()
                 }
-                if let pinned = model?.pinned {
-                    SectionRows(section: pinned, width: frame.width - 2 * Metrics.pagePadding)
-                        .environment(\.showsPinBadges, false)
+                if route == .library, let model {
+                    PinnedRow(model: model, width: frame.width - 2 * Metrics.pagePadding)
                 }
                 if !isSplit, let header = page.header {
                     headerView(header)
@@ -243,6 +242,19 @@ struct PageContent: View {
     private var bannerPixelWidth: Int? {
         guard page.header?.banner == true, frame.width > 0 else { return nil }
         return Int((frame.width * displayScale).rounded(.up))
+    }
+}
+
+/// Its own view, so a pin or unpin redraws only this row, not the whole page.
+private struct PinnedRow: View {
+    let model: PageModel
+    let width: CGFloat
+
+    var body: some View {
+        if let pinned = model.pinned {
+            SectionRows(section: pinned, width: width)
+                .environment(\.showsPinBadges, false)
+        }
     }
 }
 
