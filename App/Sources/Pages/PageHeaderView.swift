@@ -188,6 +188,7 @@ struct PageHeaderView: View {
             }
             if let link {
                 Menu {
+                    if let model, let card = Card(pinning: model.route, header) { PinItem(card: card) }
                     Button("Copy link") { app.copyLink(link) }
                     if let edit {
                         Button("Rename") { edit(.rename) }

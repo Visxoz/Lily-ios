@@ -1,11 +1,6 @@
 import SwiftUI
 import YTMCore
 
-extension EnvironmentValues {
-    /// Library's pages, whose playlists can be pinned to the top of its playlists.
-    @Entry var pinsPlaylists = false
-}
-
 struct CardView: View {
     let card: Card
     let width: CGFloat
@@ -13,7 +8,6 @@ struct CardView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @Environment(\.displayScale) private var displayScale
-    @Environment(\.pinsPlaylists) private var pinsPlaylists
 
     /// Carousel and grid cards share one decode, so art already seen in a carousel draws at once.
     static func artPixels(scale: CGFloat) -> Int {
@@ -31,16 +25,9 @@ struct CardView: View {
                 Text(card.title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.text)
-                HStack(spacing: 4) {
-                    // Read only where pins show, so other cards never redraw for them.
-                    if pinsPlaylists, app.pinned.contains(card.id) {
-                        IconView(icon: .pin, size: 14, colour: theme.accent)
-                            .accessibilityLabel("Pinned")
-                    }
-                    Text(card.subtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.textSecondary)
-                }
+                Text(card.subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.textSecondary)
             }
             .lineLimit(1)
             .frame(width: width, alignment: .leading)

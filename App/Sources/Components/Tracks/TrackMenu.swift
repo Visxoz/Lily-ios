@@ -51,6 +51,7 @@ struct TrackLibraryMenu: View {
                 Button("Remove rating") { app.rate(track, .none) }
             }
             Button("Save to playlist") { app.addToPlaylist(track) }
+            PinItem(card: Card(song: track))
             if let ownPlaylist {
                 Button("Remove from playlist") { app.removeFromPlaylist(track, in: ownPlaylist) }
             }
@@ -62,19 +63,29 @@ struct CardMenu: View {
     let card: Card
 
     @Environment(AppModel.self) private var app
-    @Environment(\.pinsPlaylists) private var pinsPlaylists
 
     var body: some View {
         if card.kind != .genre {
             Button("Play") { app.play(card) }
             Button("Start radio") { app.startRadio(from: card) }
-        }
-        if pinsPlaylists, card.kind == .playlist, app.isSignedIn {
-            Button(app.pinned.contains(card.id) ? "Unpin" : "Pin to top") { app.togglePin(card) }
+            PinItem(card: card)
         }
         CardDownloadItem(card: card)
         if let link = card.link {
             Button("Copy link") { app.copyLink(link) }
+        }
+    }
+}
+
+struct PinItem: View {
+    let card: Card
+
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        // Pins are the account's, so they wait for it to load.
+        if app.account != nil {
+            Button(app.isPinned(card) ? "Unpin from library" : "Pin to library") { app.togglePin(card) }
         }
     }
 }

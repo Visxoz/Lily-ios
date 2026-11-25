@@ -95,17 +95,14 @@ extension YTMusic {
 }
 
 extension Page {
-    /// Library's playlists with the `pinned` ones first, in the order pinned, then the rest in theirs; a pinned ID
-    /// not among them is passed over. Applied as the page shows, so the cache keeps YouTube's order.
-    public func withPinnedFirst(_ pinned: [String]) -> Page {
-        guard !pinned.isEmpty, let index = sections.firstIndex(where: { if case .cards = $0 { true } else { false } }),
-              case .cards(var section) = sections[index] else { return self }
-        let lead = pinned.flatMap { id in section.cards.filter { $0.id == id } }
-        let pins = Set(pinned)
-        section.cards = lead + section.cards.filter { !pins.contains($0.id) }
-        var page = self
-        page.sections[index] = .cards(section)
-        return page
+    /// Library's Pinned row in pin order, with Library's own card where it lists one; older untitled pins show only
+    /// where Library lists them.
+    public func pinnedSection(_ pins: [Card]) -> Section? {
+        guard !pins.isEmpty else { return nil }
+        var listed: [Card] = []
+        for case .cards(let section) in sections { listed += section.cards }
+        let shown = pins.compactMap { pin in listed.first(where: pin.matches) ?? (pin.title.isEmpty ? nil : pin) }
+        return Section.cards("Pinned", shown, layout: .carousel)
     }
 }
 

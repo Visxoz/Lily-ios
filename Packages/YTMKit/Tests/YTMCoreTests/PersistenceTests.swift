@@ -73,8 +73,58 @@ import Testing
         #expect(old.account == nil && old.pinned.isEmpty, "none in a file from before they were kept")
         var settings = Settings()
         settings.account = Account(name: "Lily", photo: "https://yt3.ggpht.com/a")
-        settings.pinned = ["LM", "PL1"]
+        settings.pinned = [Card(kind: .playlist, id: "LM", title: "Liked music"), Card(kind: .album, id: "MPREb1", title: "Currents")]
         #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings)) == settings)
+    }
+
+    @Test func keepsPinsWithTheAccountTheyWereMadeOn() throws {
+        let lily = Account(name: "Lily", handle: "@lily")
+        var settings = Settings()
+        settings.pinned = [Card(kind: .playlist, id: "PL1", title: "Mix")]
+        #expect(settings.pins(for: lily).isEmpty && settings.pins(for: nil).isEmpty, "unclaimed pins wait for an account")
+        let album = Card(kind: .album, id: "MPREb1", title: "Currents")
+        let pinned = settings.togglePin(album, for: lily)
+        #expect(pinned && settings.pins(for: lily).count == 2, "unclaimed ones go to the first account seen")
+        #expect(settings.pins(for: nil).isEmpty)
+        settings.keepPins(for: Account(name: "Lily renamed", handle: "@lily"))
+        #expect(settings.pins(for: lily).count == 2, "the same account, renamed")
+        #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings)) == settings)
+        let unpinned = !settings.togglePin(album, for: lily)
+        #expect(unpinned && settings.pinned.count == 1)
+        for other in [Account(name: "Lily", handle: "@lily2"), Account(name: "Lily")] {
+            var switched = settings
+            switched.keepPins(for: other)
+            #expect(switched.pinned.isEmpty && switched.pins(for: lily).isEmpty, "another account, though named alike, clears them")
+        }
+        var channelless = Settings()
+        channelless.pinned = settings.pinned
+        channelless.keepPins(for: Account(name: "Lily"))
+        channelless.keepPins(for: Account(name: "Lily"))
+        #expect(channelless.pins(for: Account(name: "Lily")).count == 1, "by name between accounts without channels")
+        channelless.keepPins(for: Account(name: "Other"))
+        #expect(channelless.pinned.isEmpty, "another account without a channel clears them")
+    }
+
+    @Test func pinsFromAnOlderFileSignedOutGoToTheFirstAccount() throws {
+        var settings = try decode(#"{"pinned": ["PL1"]}"#)
+        #expect(settings.pinsAccount == nil && settings.pins(for: nil).isEmpty)
+        settings.keepPins(for: Account(name: "Lily", handle: "@lily"))
+        #expect(settings.pins(for: Account(name: "Lily", handle: "@lily")).count == 1)
+    }
+
+    @Test func aPinThatWontReadLosesOnlyItself() throws {
+        let file = #"{"pinned": [{"kind": "album", "id": "MPREb1", "title": "Currents", "subtitle": ""}, {"kind": "podcast", "id": "x"}], "pinsAccount": {"name": "Lily"}}"#
+        let settings = try decode(file)
+        #expect(settings.pinned.map(\.id) == ["MPREb1"] && settings.pinsAccount?.name == "Lily")
+        var empty = Settings()
+        empty.pinsAccount = Account(name: "Lily")
+        #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(empty)).pinsAccount == empty.pinsAccount, "no pins isn't an older file")
+    }
+
+    @Test func keepsPlaylistsPinnedByAnOlderVersion() throws {
+        let settings = try decode(#"{"pinned": ["LM", "PL1"], "account": {"name": "Lily", "handle": "@lily"}}"#)
+        #expect(settings.pinned == ["LM", "PL1"].map { Card(kind: .playlist, id: $0, title: "") })
+        #expect(settings.pins(for: Account(name: "Lily", handle: "@lily")).count == 2, "the account then signed in's")
     }
 
     @Test func defaultsToLilysOrchidOnBlack() {

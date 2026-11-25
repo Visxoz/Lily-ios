@@ -283,6 +283,7 @@ private struct NowPlayingTopBar: View {
             Menu {
                 if app.isSignedIn {
                     Button("Save to playlist") { app.addToPlaylist(track) }
+                    PinItem(card: Card(song: track))
                 }
                 TrackDownloadItem(track: track)
                 TrackLinks(track: track)

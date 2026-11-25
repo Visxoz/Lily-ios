@@ -99,6 +99,34 @@ public struct Card: Codable, Hashable, Sendable, Identifiable {
         self.track = track
     }
 
+    /// A song card that plays `track`.
+    public init(song track: Track) {
+        self.init(
+            kind: .song, id: track.id, title: track.title, subtitle: track.artistNames,
+            thumbnail: track.thumbnail.map { Thumbnail.resized($0, edge: Thumbnail.card) }, track: track
+        )
+    }
+
+    /// An album, playlist or artist page as a card, for pinning; nil for other pages, or one without a title yet.
+    public init?(pinning route: Route, _ header: PageHeader) {
+        let (kind, id): (CardKind, String)
+        switch route {
+        case .album(let album): (kind, id) = (.album, album)
+        case .playlist(let playlist): (kind, id) = (.playlist, playlist)
+        case .artist(let artist): (kind, id) = (.artist, artist)
+        default: return nil
+        }
+        guard !header.title.isEmpty else { return nil }
+        // A banner stays wide, as the image pipeline asks for it in its own shape.
+        let art = header.banner ? header.thumbnail : header.thumbnail.map { Thumbnail.resized($0, edge: Thumbnail.card) }
+        self.init(kind: kind, id: id, title: header.title, subtitle: header.subtitle, thumbnail: art)
+    }
+
+    /// The same song, album, playlist or artist, whichever page's card it is.
+    public func matches(_ other: Card) -> Bool {
+        kind == other.kind && id == other.id
+    }
+
     /// The page the card opens, if it opens one rather than playing.
     public var route: Route? {
         switch kind {

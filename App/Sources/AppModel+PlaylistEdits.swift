@@ -108,7 +108,7 @@ extension AppModel {
                     let kept = Route.forgetting(route, in: stack.routes)
                     if kept != stack.routes { stack.routes = kept }
                 }
-                if settings.value.pinned.contains(id) { settings.value.pinned.removeAll { $0 == id } }
+                unpin(Card(kind: .playlist, id: id, title: title))
                 editLibraryPlaylist(id) { cards, at in cards.remove(at: at) }
             }
         )

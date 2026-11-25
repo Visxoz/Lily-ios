@@ -114,10 +114,37 @@ public struct Settings: Codable, Equatable, Sendable {
     public var foldToScrub = false
     /// The signed-in account as last loaded, its name and picture shown at once on the next start.
     public var account: Account?
-    /// Playlist IDs pinned to the top of Library's playlists, first pinned first.
-    public var pinned: [String] = []
+    /// Songs, albums, playlists and artists pinned to the top of Library, first pinned first.
+    public var pinned: [Card] = []
+    /// The account the pins were made on; nil for pins no account has claimed yet.
+    public var pinsAccount: Account?
 
     public init() {}
+
+    /// The pins, for the account they were made on only.
+    public func pins(for account: Account?) -> [Card] {
+        guard let account, let owner = pinsAccount, Self.same(owner, account) else { return [] }
+        return pinned
+    }
+
+    /// Claims the pins for `account`, clearing another account's; unclaimed ones go to the first account seen.
+    public mutating func keepPins(for account: Account) {
+        if let owner = pinsAccount, !Self.same(owner, account) { pinned = [] }
+        pinsAccount = account
+    }
+
+    /// Pins or unpins `card` for `account`, answering whether it is now pinned.
+    public mutating func togglePin(_ card: Card, for account: Account) -> Bool {
+        keepPins(for: account)
+        let pinning = !pinned.contains(where: card.matches)
+        if pinning { pinned.append(card) } else { pinned.removeAll(where: card.matches) }
+        return pinning
+    }
+
+    /// By handle, as two accounts of one person may share a name; by name only between accounts without channels.
+    private static func same(_ a: Account, _ b: Account) -> Bool {
+        a.handle == nil && b.handle == nil ? a.name == b.name : a.handle == b.handle
+    }
 
     /// Reads each setting on its own, so an unreadable one resets alone rather than taking an opt-out such as
     /// `youtubeHistory` with it.
@@ -165,7 +192,14 @@ public struct Settings: Codable, Equatable, Sendable {
         file.read(&smartDownloadCount, .smartDownloadCount) { $0 > 0 }
         file.read(&foldToScrub, .foldToScrub)
         file.read(&account, .account)
-        file.read(&pinned, .pinned)
+        // One by one, so a pin that won't read loses only itself.
+        pinned = (try? file.decodeIfPresent([Readable<Card>].self, forKey: .pinned))?.compactMap(\.value) ?? []
+        file.read(&pinsAccount, .pinsAccount)
+        // Older versions pinned playlists alone, by ID, for the account then signed in; Library's cards title them.
+        if let ids = try? file.decodeIfPresent([String].self, forKey: .pinned), !ids.isEmpty {
+            pinned = ids.map { Card(kind: .playlist, id: $0, title: "") }
+            pinsAccount = account
+        }
     }
 
     /// Older versions had six bands, which are carried over to the ten by interpolating in log-frequency between
@@ -186,6 +220,15 @@ public struct Settings: Codable, Equatable, Sendable {
             // Adding 0 turns a rounded -0 into 0.
             return db.rounded() + 0
         }
+    }
+}
+
+/// An element of a list, nil where it won't decode.
+private struct Readable<Value: Decodable>: Decodable {
+    let value: Value?
+
+    init(from decoder: any Decoder) {
+        value = try? decoder.singleValueContainer().decode(Value.self)
     }
 }
 

@@ -101,7 +101,6 @@ struct PageContent: View {
             try? await Task.sleep(for: .seconds(Self.arrival))
             arrived = true
         }
-        .environment(\.pinsPlaylists, route.showsPins)
         .modifier(PlaylistDialogs(dialog: $dialog, name: $newName, title: page.header?.title ?? "", model: model))
     }
 
@@ -149,6 +148,9 @@ struct PageContent: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 if route == .home {
                     Greeting()
+                }
+                if let pinned = model?.pinned {
+                    SectionRows(section: pinned, width: frame.width - 2 * Metrics.pagePadding)
                 }
                 if !isSplit, let header = page.header {
                     headerView(header)

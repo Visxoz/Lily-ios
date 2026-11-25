@@ -436,14 +436,31 @@ private actor Counter {
         #expect(LibraryList(.library) == nil)
     }
 
-    @Test func pinnedPlaylistsLeadInTheOrderPinned() throws {
-        let playlists = ["a", "b", "c", "d"].map { Card(kind: .playlist, id: $0, title: $0) }
-        let albums = Section.cards("Albums", [Card(kind: .album, id: "b", title: "b"), Card(kind: .album, id: "x", title: "x")], layout: .grid)
+    @Test func pinsLeadLibraryInTheOrderPinned() throws {
+        let playlists = ["a", "b"].map { Card(kind: .playlist, id: $0, title: "Listed \($0)") }
+        let albums = Section.cards("Albums", [Card(kind: .album, id: "b", title: "Album b")], layout: .grid)
         let page = Page(sections: [Section.cards("Playlists", playlists, layout: .grid), albums].compactMap(\.self))
-        let pinned = page.withPinnedFirst(["d", "gone", "b"])
-        let lead = try #require(pinned.sections.first.flatMap { if case .cards(let s) = $0 { s } else { nil } })
-        #expect(lead.cards.map(\.id) == ["d", "b", "a", "c"])
-        #expect(pinned.sections.last == page.sections.last, "only the playlists move")
+        let song = Card(kind: .song, id: "v", title: "Song")
+        let pins = [
+            song, Card(kind: .album, id: "b", title: "Pinned b"), Card(kind: .playlist, id: "a", title: "Old name"),
+            Card(kind: .playlist, id: "gone", title: ""),
+        ]
+        guard case .cards(let row) = try #require(page.pinnedSection(pins)) else { throw YTMError(.parse, "not cards") }
+        #expect(row.title == "Pinned" && row.cards.map(\.title) == ["Song", "Album b", "Listed a"], "Library's own card where it lists one")
+        #expect(page.pinnedSection([]) == nil)
+        #expect(page.pinnedSection([Card(kind: .playlist, id: "gone", title: "")]) == nil, "an untitled pin Library doesn't list")
+    }
+
+    @Test func pagesPinAsCards() throws {
+        var header = PageHeader(title: "Currents", subtitle: "Tame Impala", thumbnail: "https://lh3.googleusercontent.com/a=w544-h544-l90-rj")
+        let album = try #require(Card(pinning: .album("MPREb1"), header))
+        #expect(album.kind == .album && album.id == "MPREb1" && album.thumbnail == "https://lh3.googleusercontent.com/a=w240-h240-l90-rj")
+        header.banner = true
+        header.thumbnail = "https://lh3.googleusercontent.com/b=w1440-h600-p-l90-rj"
+        #expect(Card(pinning: .artist("UC1"), header)?.thumbnail == header.thumbnail, "a banner keeps its shape")
+        #expect(Card(pinning: .library, header) == nil)
+        header.title = ""
+        #expect(Card(pinning: .playlist("PL1"), header) == nil, "not loaded yet")
     }
 
     private func likedPage(rows: [String], more: Bool) -> String {

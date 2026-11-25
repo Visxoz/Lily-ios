@@ -71,8 +71,8 @@ final class AppModel {
     private(set) var accountGeneration = 0
 
     private(set) var theme: Theme
-    /// Pinned playlist IDs, kept apart from the settings so only the views showing pins redraw as they change.
-    private(set) var pinned: [String] = []
+    /// The account's pins, kept apart from the settings so only the views showing pins redraw as they change.
+    private(set) var pinned: [Card] = []
     /// Counts playlists put in Library's cached pages, so a Library page on screen, as under Now Playing, shows one.
     var playlistsAdded = 0
     private(set) var artwork: ArtworkColours?
@@ -168,15 +168,25 @@ final class AppModel {
 
     /// Replaces `pinned` only when it changes, so views reading it redraw only then.
     func followPinned() async {
-        for await pinned in Observations({ [settings] in settings.value.pinned }) where pinned != self.pinned {
+        for await pinned in Observations({ [settings] in settings.value.pins(for: self.account) }) where pinned != self.pinned {
             self.pinned = pinned
         }
     }
 
+    func isPinned(_ card: Card) -> Bool {
+        pinned.contains(where: card.matches)
+    }
+
     func togglePin(_ card: Card) {
-        var pinned = settings.value.pinned
-        if pinned.contains(card.id) { pinned.removeAll { $0 == card.id } } else { pinned.append(card.id) }
-        settings.value.pinned = pinned
+        guard let account else { return }
+        let pinning = settings.value.togglePin(card, for: account)
+        showToast(pinning ? "Pinned to your library" : "Unpinned from your library")
+    }
+
+    /// Untouched unless pinned, so the settings' observers aren't woken for nothing.
+    func unpin(_ card: Card) {
+        guard settings.value.pinned.contains(where: card.matches) else { return }
+        settings.value.pinned.removeAll(where: card.matches)
     }
 
     /// Replaces `theme` only when it changes, so views reading it redraw only then.
@@ -222,9 +232,14 @@ final class AppModel {
             return
         }
         guard generation == accountGeneration else { return }
+        // Kept for the next start, with the pins as this account's, written only as they change.
+        if let found {
+            var kept = settings.value
+            kept.account = found
+            kept.keepPins(for: found)
+            if kept != settings.value { settings.value = kept }
+        }
         account = found
-        // Kept for the next start, written only as it changes.
-        if let found, settings.value.account != found { settings.value.account = found }
     }
 
     /// Once YouTube answers a signed-in request as signed out: checks the cookie, as a session can end at any time.
@@ -253,9 +268,10 @@ final class AppModel {
 
     /// Drops everything the last account loaded. `quietly`, as for a rejected sign-in, skips the toast and tab switch.
     func accountChanged(quietly: Bool = false) async {
+        // First, so the last account's pins are gone before anything waits.
+        account = nil
         await api.forgetVisitorData()
         isSignedIn = await api.auth.isSignedIn
-        account = nil
         // It may be another account's.
         settings.value.account = nil
         // Together with the bump, so no page the last account asked for lands in the cache once it is cleared.

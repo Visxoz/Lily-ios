@@ -136,7 +136,7 @@ enum HomeFeed {
         guard let index = sections.firstIndex(where: { if case .cards(let s) = $0 { s.layout == .speedDial } else { false } }),
               case .cards(var shelf) = sections[index]
         else {
-            let cards = recent.prefix(recentShelf).map(card)
+            let cards = recent.prefix(recentShelf).map(Card.init(song:))
             if !cards.isEmpty { sections.insert(.cards(CardSection(title: speedDialTitle, cards: cards, layout: .speedDial)), at: 0) }
             return sections
         }
@@ -146,7 +146,7 @@ enum HomeFeed {
         let fresh = Array(zip(slots, recent.lazy.filter { !picked.contains($0.id) }))
         guard !fresh.isEmpty else { return sections }
         // In ascending order, each lands at its final index; YouTube's last picks drop off.
-        for (slot, track) in fresh { shelf.cards.insert(card(track), at: slot) }
+        for (slot, track) in fresh { shelf.cards.insert(Card(song: track), at: slot) }
         shelf.cards.removeLast(fresh.count)
         sections[index] = .cards(shelf)
         return sections
@@ -162,13 +162,6 @@ enum HomeFeed {
             seen.formUnion(shelf.tracks.map(\.id))
             return shelf.tracks.isEmpty ? nil : .tracks(shelf)
         }
-    }
-
-    private static func card(_ track: Track) -> Card {
-        Card(
-            kind: .song, id: track.id, title: track.title, subtitle: track.artistNames,
-            thumbnail: track.thumbnail.map { Thumbnail.resized($0, edge: Thumbnail.card) }, track: track
-        )
     }
 }
 
