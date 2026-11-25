@@ -17,7 +17,7 @@ struct PageHeaderView: View {
     /// Wider than tall, as iPhone Duo open.
     let isWide: Bool
     let download: DownloadButton?
-    /// The page's address, which a menu at the end of the buttons copies.
+    /// The page's address, which a menu at the end of the buttons copies and shares.
     let link: String?
     /// The page from YouTube, which saves and subscribes; nil for one held on the device.
     let model: PageModel?
@@ -192,7 +192,7 @@ struct PageHeaderView: View {
                         PinItem(card: card)
                         if let artist = card.artist { BlockItem(artist: artist) }
                     }
-                    Button("Copy link") { app.copyLink(link) }
+                    LinkItems(link: link, title: header.title)
                     if let edit {
                         Button("Rename") { edit(.rename) }
                         Divider()

@@ -124,7 +124,7 @@ struct UpNextPanel: View, Equatable {
             Button("Remove from queue") { app.player.removeFromQueue(atOffsets: offsets([entry.id])) }
                 .disabled(current)
             TrackDownloadItem(track: entry.item)
-            Button("Copy link") { app.copyLink(entry.item.link) }
+            LinkItems(link: entry.item.link, title: entry.item.title)
             if let artist = entry.item.artists.first { BlockItem(artist: artist) }
             TrackLibraryMenu(track: entry.item)
         }

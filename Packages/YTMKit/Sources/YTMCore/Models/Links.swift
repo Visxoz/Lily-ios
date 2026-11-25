@@ -1,4 +1,4 @@
-/// Addresses on YouTube Music, for copying. Never fetched, so they don't go through the host allowlist.
+/// Addresses on YouTube Music, for copying and sharing. Never fetched, so they don't go through the host allowlist.
 private func siteLink(_ path: String, _ id: String) -> String {
     "https://music.youtube.com/\(path)\(id)"
 }

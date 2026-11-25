@@ -30,7 +30,7 @@ struct TrackLinks: View {
             .disabled(track.firstArtistId == nil)
         Button("Go to album") { app.openAlbum(of: track) }
             .disabled(track.album == nil)
-        Button("Copy link") { app.copyLink(track.link) }
+        LinkItems(link: track.link, title: track.title)
         if let artist = track.artists.first { BlockItem(artist: artist) }
     }
 }
@@ -72,10 +72,23 @@ struct CardMenu: View {
             PinItem(card: card)
         }
         CardDownloadItem(card: card)
-        if let link = card.link {
-            Button("Copy link") { app.copyLink(link) }
-        }
+        if let link = card.link { LinkItems(link: link, title: card.title) }
         if let artist = card.artist { BlockItem(artist: artist) }
+    }
+}
+
+struct LinkItems: View {
+    let link: String
+    /// Given so the share sheet needn't fetch the page for its title.
+    let title: String
+
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        Button("Copy link") { app.copyLink(link) }
+        if let url = URL(string: link) {
+            ShareLink(item: url, preview: SharePreview(title)) { Text("Share") }
+        }
     }
 }
 
