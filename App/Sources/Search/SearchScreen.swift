@@ -15,19 +15,21 @@ struct SearchScreen: View {
 
     var body: some View {
         @Bindable var app = app
-        // The results stay in the tree under the dropdown, so cancelling a search shows them again where they were.
+        let recents = app.history.searches.queries
+        // The results stay in the tree under the choices, so cancelling a search shows them again where they were.
         ZStack {
             if let shown {
                 PageScreen(route: .search(shown))
                     .id(shown)
                     // Covered by the choices while searching, so VoiceOver skips it.
                     .accessibilityHidden(app.isSearching)
-            } else {
+            } else if recents.isEmpty {
                 SearchPrompt()
             }
-            if app.isSearching {
+            // Before the first search, recent searches fill the page instead of waiting for focus.
+            if app.isSearching || (shown == nil && !recents.isEmpty) {
                 SearchChoices(
-                    choices: showsRecent ? app.history.searches.queries : suggestions,
+                    choices: showsRecent ? recents : suggestions,
                     recent: showsRecent,
                     pick: search
                 )
@@ -109,18 +111,28 @@ private struct SearchChoices: View {
                     }
                     .buttonStyle(.plain)
                     if recent {
-                        IconButton(icon: .close, iconSize: 16) { app.history.removeSearch(choice) }
+                        IconButton(icon: .close, iconSize: 16) { remove(choice) }
                             .accessibilityLabel("Remove \u{201C}\(choice)\u{201D}")
                     }
                 }
                 .listRowBackground(theme.panel)
                 .listRowSeparator(.hidden)
+                .swipeActions(edge: .trailing) {
+                    if recent {
+                        Button("Remove", role: .destructive) { remove(choice) }
+                    }
+                }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(theme.panel)
         .scrollDismissesKeyboard(.immediately)
+    }
+
+    /// Animated, so rows slide out rather than snap.
+    private func remove(_ choice: String) {
+        withAnimation { app.history.removeSearch(choice) }
     }
 }
 
