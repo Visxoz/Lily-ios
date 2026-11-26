@@ -27,17 +27,22 @@ extension YTMusic {
         var token = Renderers.continuation(list)
         var batches = 0
         while let current = token, batches < Self.maxBatches {
-            let response: JSON
-            do {
-                response = try await innerTube.continuation(current, authenticated: authenticated)
-            } catch {
-                try Task.checkCancellation()
-                break
-            }
-            let (batch, next) = Renderers.continuationItems(in: response)
+            guard let (batch, next) = try await nextBatch(current, authenticated: authenticated) else { break }
             take(batch)
             token = next
             batches += 1
+        }
+    }
+
+    /// Nil when the batch failed; only cancellation throws.
+    func nextBatch(
+        _ token: String, endpoint: String = "browse", authenticated: Bool
+    ) async throws -> (items: [JSON], token: String?)? {
+        do {
+            return Renderers.continuationItems(in: try await innerTube.continuation(token, endpoint: endpoint, authenticated: authenticated))
+        } catch {
+            try Task.checkCancellation()
+            return nil
         }
     }
 

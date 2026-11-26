@@ -98,7 +98,8 @@ final class PageModel {
         defer { if generation == self.generation { loadingMore = false } }
         guard let step = try? await app.fetchMore(of: source, for: route), isCurrent(generation, account, in: app) else { return }
         // Saved or subscribed to meanwhile, the page shown has it.
-        show(step.page.keepingLibraryState(of: self.source), for: app, saved: !step.whole)
+        // A kind's search list cut short by a failed step stays, rather than going back to its first batch next visit.
+        show(step.page.keepingLibraryState(of: self.source), for: app, saved: !step.whole && !route.pagesOnScroll)
     }
 
     /// Shows an edit to the page where the reader is, answering what `change` gave. `cachedAt` is when the cache took
@@ -131,7 +132,8 @@ final class PageModel {
         }
         if cached, let kept = app.keptPage(route) {
             if kept.at != shownAt { present(kept.page) }
-            guard !kept.isFresh, let fresh = await app.refreshPage(route, since: kept.at) else { return }
+            // A kind's whole search list would take every step again, for results that barely age.
+            guard !kept.isFresh, !route.pagesOnScroll, let fresh = await app.refreshPage(route, since: kept.at) else { return }
             // Home's shelves differ on every load and Home never moves what is shown, so its fresh feed waits.
             let onScreen = isCurrent(generation, account, in: app)
             let current = onScreen && (route != .home || !app.isSignedIn)
@@ -191,8 +193,10 @@ final class PageModel {
     }
 
     /// Home ages out as pages stop being fresh, as the app stays alive for days; any other page is stale once no
-    /// longer fresh in the cache, unless `returning` with it on screen.
+    /// longer fresh in the cache, unless `returning` with it on screen. A kind's search list never is, as reloading
+    /// would drop the reader back to its first batch.
     private func isStale(in app: AppModel, returning: Bool) -> Bool {
+        if route.pagesOnScroll { return false }
         guard route == .home else { return !returning && app.keptPage(route)?.isFresh != true }
         guard let shownAt else { return false }
         return shownAt.duration(to: .now) >= AppModel.pageFreshFor
@@ -243,5 +247,9 @@ extension Route {
         case .library, .libraryPlaylists, .libraryAlbums, .libraryArtists: true
         default: false
         }
+    }
+    /// One kind's search results run to hundreds of rows, so each step waits for the reader to near the end.
+    var pagesOnScroll: Bool {
+        if case .search(_, _?) = self { true } else { false }
     }
 }

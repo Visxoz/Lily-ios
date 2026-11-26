@@ -162,16 +162,25 @@ struct PageContent: View {
                         // Its own songs are the first section's; any after are YouTube's suggestions.
                         .environment(\.ownPlaylist, index == 0 ? ownPlaylist : nil)
                 }
-                // The rest loads while the page is on screen (`PageScreen`).
+                // The rest loads while the page is on screen (`PageScreen`), or as these scroll in.
                 if let more = page.more {
                     VStack(alignment: .leading, spacing: 0) {
                         if more.isShelves {
                             SectionBones(layouts: model?.shelvesToCome ?? [])
+                        } else if case .cards? = page.sections.first {
+                            GridBones()
                         } else {
                             TrackBones(count: 3, art: true)
                         }
                     }
                     .skeleton()
+                    .task(id: model?.step) {
+                        guard route.pagesOnScroll else { return }
+                        // A step that pushes these off screen cancels this before it asks for the next.
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
+                        await model?.loadMore(in: app)
+                    }
                     // Gone before the shelves fading in over them show; songs pop in, so theirs go at once.
                     .transition(more.isShelves ? .opacity.animation(.linear(duration: 0.18)) : .identity)
                 }
@@ -222,6 +231,8 @@ struct PageContent: View {
     /// Song rows load their own art as they come on screen, so a long playlist's isn't all downloaded at once. The
     /// chips and the top result draw none of this art, or their own, so they are left out.
     private func prefetchArt() async {
+        // Each step would ask again for every card so far; these cards load their own as they scroll in.
+        guard !route.pagesOnScroll else { return }
         // The first screen's own loads go first, so none is asked for twice.
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }

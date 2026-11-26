@@ -5,6 +5,7 @@ struct SearchScreen: View {
     private static let suggestDelay: Duration = .milliseconds(150)
     private static let suggestFrom = 2
     private static let suggestionLimit = 8
+    private static let filters = ["All"] + SearchKind.allCases.map(\.title)
 
     @Environment(AppModel.self) private var app
     @State private var query = ""
@@ -12,6 +13,8 @@ struct SearchScreen: View {
     @State private var typed = false
     @State private var suggestions: [String] = []
     @State private var shown: String?
+    /// An index into `filters`; each new search starts on All, with its top result.
+    @State private var filter = 0
 
     var body: some View {
         @Bindable var app = app
@@ -19,8 +22,14 @@ struct SearchScreen: View {
         // The results stay in the tree under the choices, so cancelling a search shows them again where they were.
         ZStack {
             if let shown {
-                PageScreen(route: .search(shown))
-                    .id(shown)
+                let route = Route.search(shown, filter == 0 ? nil : SearchKind.allCases[filter - 1])
+                PageScreen(route: route)
+                    .id(route)
+                    .safeAreaBar(edge: .top) {
+                        PillGroup(titles: Self.filters, selection: $filter)
+                            .padding(.horizontal, Metrics.pagePadding)
+                            .padding(.vertical, 8)
+                    }
                     // Covered by the choices while searching, so VoiceOver skips it.
                     .accessibilityHidden(app.isSearching)
             } else if recents.isEmpty {
@@ -35,13 +44,27 @@ struct SearchScreen: View {
                 )
             }
         }
-        // Always showing, so the query stays in view over its results.
-        .searchable(text: $query, isPresented: $app.isSearching, placement: .navigationBarDrawer(displayMode: .always), prompt: "What do you want to play?")
-        .onSubmit(of: .search) { search(query) }
+        // Our own bar, as the system's field always takes a row of its own under the account button on iPhone, and
+        // focus doesn't reach a field put in the toolbar.
+        .safeAreaBar(edge: .top) {
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    SearchField(query: $query, isSearching: $app.isSearching) { search(query) }
+                    AccountButton(edge: 44)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+            }
+            .padding(.horizontal, Metrics.pagePadding)
+            .padding(.bottom, 4)
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: app.isSearching) { _, active in
             // Each focus starts with the recent searches, even over the last query.
             typed = false
-            if !active { suggestions = [] }
+            guard !active else { return }
+            suggestions = []
+            // Cancelled, the field names the results under it again.
+            if let shown { query = shown }
         }
         .onChange(of: query) {
             if app.isSearching { typed = true }
@@ -82,7 +105,48 @@ struct SearchScreen: View {
         query = trimmed
         app.history.recordSearch(trimmed)
         app.navigation(for: .search).routes.removeAll()
+        filter = 0
         shown = trimmed
+    }
+}
+
+private struct SearchField: View {
+    @Binding var query: String
+    @Binding var isSearching: Bool
+    let submit: () -> Void
+
+    @Environment(\.theme) private var theme
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            IconView(icon: .search, size: 17, colour: theme.textSecondary)
+            TextField("What do you want to play?", text: $query)
+                .scaledFont(17)
+                .foregroundStyle(theme.text)
+                .focused($focused)
+                .submitLabel(.search)
+                .onSubmit(submit)
+                .accessibilityAddTraits(.isSearchField)
+                .accessibilityAction(.escape) { isSearching = false }
+            if isSearching {
+                // Clears the text first, as the system's field does, then ends the search.
+                IconButton(icon: .close, size: 36, iconSize: 15) {
+                    if query.isEmpty { isSearching = false } else { query = "" }
+                }
+                .accessibilityLabel(query.isEmpty ? "Cancel" : "Clear text")
+            }
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, isSearching ? 4 : 14)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        // The whole capsule focuses the field, not only its line of text.
+        .contentShape(Capsule())
+        .onTapGesture { focused = true }
+        .glassEffect(.regular.interactive(), in: Capsule())
+        // Only focus starts a search: the keyboard going, as a scroll or a sheet sends it, leaves the search open.
+        .onChange(of: focused) { if $1 { isSearching = true } }
+        .onChange(of: isSearching) { focused = $1 }
     }
 }
 

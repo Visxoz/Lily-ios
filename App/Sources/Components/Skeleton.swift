@@ -127,8 +127,12 @@ struct PageSkeleton: View {
                 case .moodsAndGenres:
                     HeaderBones(art: false, label: false)
                     SectionBones(layouts: [.chips])
-                case .search:
+                case .search(_, nil):
                     SectionBones(layouts: [nil])
+                case .search(_, .songs?), .search(_, .videos?):
+                    tracks
+                case .search:
+                    GridBones()
                 case .genre:
                     HeaderBones(art: false)
                     SectionBones(layouts: [.carousel, .carousel])

@@ -135,6 +135,8 @@ public enum Continuation: Codable, Hashable, Sendable {
     /// The Home feed's further shelves, with those read but held back until the ones above them in
     /// `HomeFeed.shelfOrder` arrive.
     case shelves(token: String, pagesLeft: Int, held: [Section])
+    /// The rest of one kind of search result.
+    case search(token: String, stepsLeft: Int)
 }
 
 public struct Page: Codable, Hashable, Sendable {
@@ -157,7 +159,8 @@ public struct Page: Codable, Hashable, Sendable {
 
 public enum Route: Codable, Hashable, Sendable {
     case home, explore, library, history
-    case search(String)
+    /// Every kind's top results, or one kind's full list.
+    case search(String, SearchKind? = nil)
     case album(String)
     case playlist(String)
     case artist(String)

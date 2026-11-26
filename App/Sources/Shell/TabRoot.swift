@@ -22,7 +22,10 @@ struct TabRoot<Content: View>: View {
             content
                 .modifier(MiniPlayerRoom(tab: tab))
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) { AccountButton() }
+                    // Search's sits beside its field, in a bar of its own.
+                    if tab != .search {
+                        ToolbarItem(placement: .topBarTrailing) { AccountButton() }
+                    }
                 }
                 .navigationDestination(for: Route.self) { route in
                     Group {

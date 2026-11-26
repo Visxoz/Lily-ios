@@ -31,6 +31,11 @@ import Testing
     #expect(Route.search("x").link == nil)
 }
 
+@Test func decodesASearchRouteSavedBeforeSearchKinds() throws {
+    let saved = Data(#"{"search":{"_0":"x"}}"#.utf8)
+    #expect(try JSONDecoder().decode(Route.self, from: saved) == .search("x"))
+}
+
 @Test func decodesAPageHeaderSavedBeforeItReadOwnershipAndLibraryState() throws {
     let saved = Data(#"{"label":"Playlist","title":"Road trip","subtitle":"","meta":"12 songs","banner":false}"#.utf8)
     let header = try JSONDecoder().decode(PageHeader.self, from: saved)

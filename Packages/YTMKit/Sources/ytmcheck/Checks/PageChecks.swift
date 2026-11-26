@@ -83,6 +83,26 @@ enum PageChecks {
             }
         }
 
+        await report.check("page search by kind") { findings in
+            // A few steps of each kind show its list goes on; walking one to its end would take dozens of requests.
+            for kind in SearchKind.allCases {
+                var page = try await Live.api.page(.search("daft punk", kind))
+                let count = { (page: Page) in page.tracks("").count + page.cards("").count }
+                let first = count(page)
+                let continues = page.more != nil
+                for _ in 0..<3 where page.more != nil {
+                    let step = try await Live.api.loadStep(page)
+                    findings.expect(step.whole, "search › \(kind): a step failed")
+                    page = step.page
+                }
+                findings.expect(first > 0, "search › \(kind): none")
+                findings.expect(!continues || count(page) > first, "search › \(kind): \(first) at first, none followed")
+                findings.note("\(kind): \(first), then \(count(page))")
+                if kind == .songs { findings.expect(page.tracks("").allSatisfy { !$0.isVideo }, "search › songs: a video among them") }
+                if kind == .videos { findings.expect(page.tracks("").allSatisfy(\.isVideo), "search › videos: a song among them") }
+            }
+        }
+
         await report.check("search suggestions") { findings in
             let suggestions = await Live.api.suggestions(for: "daft pu")
             findings.expect(suggestions.contains { $0.lowercased() == "daft punk" }, "no \"daft punk\" among \(suggestions)")

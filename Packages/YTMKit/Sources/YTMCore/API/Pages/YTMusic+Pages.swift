@@ -8,7 +8,8 @@ extension YTMusic {
         case .explore: try await explorePage()
         case .library: try await libraryPage()
         case .history: try await historyPage()
-        case .search(let query): try await searchPage(query)
+        case .search(let query, nil): try await searchPage(query)
+        case .search(let query, let kind?): try await searchPage(query, kind)
         case .album(let id): try await albumPage(id)
         case .playlist(let id): try await playlistPage(id)
         case .artist(let id): try await artistPage(id)
@@ -46,6 +47,15 @@ extension YTMusic {
                 return (page, false)
             }
             page = Renderers.addingBatch(batch, to: page, seen: seen, fetched: fetched)
+        case .search(let token, let stepsLeft)?:
+            page.more = nil
+            guard !page.sections.isEmpty else { return (page, whole) }
+            guard let (items, next) = try await nextBatch(token, endpoint: "search", authenticated: false) else {
+                return (page, false)
+            }
+            page.sections[0].append(items, context: ItemContext())
+            // An empty batch adds no rows to scroll past, so nothing would ask for the next.
+            if let next, !items.isEmpty, stepsLeft > 1 { page.more = .search(token: next, stepsLeft: stepsLeft - 1) }
         case .shelves(let token, let pagesLeft, var held)?:
             page.more = nil
             var next: String?

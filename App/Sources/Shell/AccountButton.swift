@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct AccountButton: View {
+    /// Its tap area outside a toolbar; a toolbar sizes its own.
+    var edge: CGFloat?
+
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
@@ -17,6 +20,8 @@ struct AccountButton: View {
                             .offset(x: 2, y: -2)
                     }
                 }
+                .frame(width: edge, height: edge)
+                .contentShape(Circle())
         }
         .accessibilityLabel("Settings")
         .accessibilityValue(app.hasUpdate ? "Update available" : "")

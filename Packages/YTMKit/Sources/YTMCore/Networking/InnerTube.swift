@@ -80,8 +80,9 @@ final class InnerTube: Sendable {
         return try await post("browse", body: body, authenticated: authenticated)
     }
 
-    func continuation(_ token: String, authenticated: Bool = true) async throws -> JSON {
-        try await post("browse", body: ["continuation": token], authenticated: authenticated)
+    /// A search's next batch is asked of `search`, a page's of `browse`.
+    func continuation(_ token: String, endpoint: String = "browse", authenticated: Bool = true) async throws -> JSON {
+        try await post(endpoint, body: ["continuation": token], authenticated: authenticated)
     }
 
     func visitorData() async throws -> String {
