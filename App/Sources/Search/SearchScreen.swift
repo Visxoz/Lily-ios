@@ -25,11 +25,6 @@ struct SearchScreen: View {
                 let route = Route.search(shown, filter == 0 ? nil : SearchKind.allCases[filter - 1])
                 PageScreen(route: route)
                     .id(route)
-                    .safeAreaBar(edge: .top) {
-                        PillGroup(titles: Self.filters, selection: $filter)
-                            .padding(.horizontal, Metrics.pagePadding)
-                            .padding(.vertical, 8)
-                    }
                     // Covered by the choices while searching, so VoiceOver skips it.
                     .accessibilityHidden(app.isSearching)
             } else if recents.isEmpty {
@@ -45,17 +40,24 @@ struct SearchScreen: View {
             }
         }
         // Our own bar, as the system's field always takes a row of its own under the account button on iPhone, and
-        // focus doesn't reach a field put in the toolbar.
+        // focus doesn't reach a field put in the toolbar. The filters share it, as a bar on the results would dim the
+        // top of the choices over them.
         .safeAreaBar(edge: .top) {
-            GlassEffectContainer(spacing: 12) {
-                HStack(spacing: 12) {
-                    SearchField(query: $query, isSearching: $app.isSearching) { search(query) }
-                    AccountButton(edge: 44)
-                        .glassEffect(.regular.interactive(), in: Circle())
+            VStack(spacing: 0) {
+                GlassEffectContainer(spacing: 12) {
+                    HStack(spacing: 12) {
+                        SearchField(query: $query, isSearching: $app.isSearching) { search(query) }
+                        AccountButton(edge: 44)
+                            .glassEffect(.regular.interactive(), in: Circle())
+                    }
+                }
+                .padding(.bottom, 4)
+                if shown != nil, !app.isSearching {
+                    PillGroup(titles: Self.filters, selection: $filter)
+                        .padding(.vertical, 8)
                 }
             }
             .padding(.horizontal, Metrics.pagePadding)
-            .padding(.bottom, 4)
         }
         .toolbar(.hidden, for: .navigationBar)
         .onChange(of: app.isSearching) { _, active in
