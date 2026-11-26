@@ -86,20 +86,44 @@ private struct StorageRow: View {
     @State private var size: Int64?
 
     var body: some View {
+        let limit = app.settings.value.audioCacheBytes
         SettingRow(label: "Audio cache", detail: detail) {
-            PillButton(title: "Clear", small: true) {
-                Task {
-                    await app.audio.clearCache()
-                    size = await app.audio.cacheSizeBytes
+            HStack(spacing: 12) {
+                Menu {
+                    // A picker, so the size chosen is ticked.
+                    Picker("Cache size", selection: Binding(get: { limit }, set: setLimit)) {
+                        ForEach(Settings.audioCacheSizes, id: \.self) { Text(Self.bytes($0)).tag($0) }
+                    }
+                } label: {
+                    PillLabel(title: Self.bytes(limit), small: true)
                 }
+                .accessibilityLabel("Cache size")
+                .accessibilityValue(Self.bytes(limit))
+                PillButton(title: "Clear", small: true) {
+                    Task {
+                        await app.audio.clearCache()
+                        size = await app.audio.cacheSizeBytes
+                    }
+                }
+                .disabled(size == 0)
             }
-            .disabled(size == 0)
         }
         .task { size = await app.audio.cacheSizeBytes }
     }
 
     private var detail: String {
         guard let size else { return "Songs played lately, kept so they play again without the network." }
-        return "\(size.formatted(.byteCount(style: .file))) of songs played lately, kept so they play again without the network."
+        return "\(Self.bytes(size)) of songs played lately, kept so they play again without the network."
+    }
+
+    private func setLimit(_ bytes: Int64) {
+        app.settings.value.audioCacheBytes = bytes
+        // Set here as well as by the player, so the trim is queued ahead of the size read.
+        app.audio.cacheLimitBytes = bytes
+        Task { size = await app.audio.cacheSizeBytes }
+    }
+
+    private static func bytes(_ count: Int64) -> String {
+        count.formatted(.byteCount(style: .file))
     }
 }

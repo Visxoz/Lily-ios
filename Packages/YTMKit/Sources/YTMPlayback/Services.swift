@@ -44,6 +44,7 @@ extension YTMusic: MusicService {
     var mono: Bool { get set }
     var balance: Float { get set }
     var pauseOnUnplug: Bool { get set }
+    var cacheLimitBytes: Int64 { get set }
     var isMuted: Bool { get set }
     var speed: Double { get set }
     func play(_ item: AudioItem, from seconds: Double, paused: Bool)

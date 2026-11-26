@@ -3,7 +3,7 @@ import Observation
 import YTMCore
 
 /// Settings changes take effect as made: normalisation within the few seconds the engine has scheduled, quality,
-/// crossfade and Automix from the next song queued, speed at once.
+/// crossfade and Automix from the next song queued, speed and the cache's cap at once.
 extension PlayerController {
     public func toggleMute() {
         settings.value.muted.toggle()
@@ -66,6 +66,7 @@ extension PlayerController {
         if audio.mono != new.mono { audio.mono = new.mono }
         if audio.balance != new.balance { audio.balance = new.balance }
         if audio.pauseOnUnplug != new.pauseOnUnplug { audio.pauseOnUnplug = new.pauseOnUnplug }
+        if audio.cacheLimitBytes != new.audioCacheBytes { audio.cacheLimitBytes = new.audioCacheBytes }
         if audio.speed != new.speed {
             audio.speed = new.speed
             nowPlaying?.speed = new.speed

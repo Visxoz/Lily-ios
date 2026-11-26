@@ -66,6 +66,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public static let speeds = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]
     /// The crossfade lengths Settings offers, in seconds.
     public static let crossfadeLengths: [Double] = [1, 2, 3, 4, 5, 6, 8, 10, 12]
+    /// The audio cache caps Settings offers, in bytes.
+    public static let audioCacheSizes: [Int64] = [20, 40, 100, 250, 500, 1_000, 2_000].map { $0 * 1_000_000 }
 
     public var muted = false
     public var quality: AudioQuality = .high
@@ -78,6 +80,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var automix = false
     /// Pauses as the device playing is unplugged, rather than carrying on through the next.
     public var pauseOnUnplug = true
+    /// Songs played lately kept on the phone, past which the least recently played go.
+    public var audioCacheBytes: Int64 = 40_000_000
     public var speed = 1.0
     public var autoplay = true
     public var shuffle: ShuffleMode = .off
@@ -176,6 +180,7 @@ public struct Settings: Codable, Equatable, Sendable {
         crossfadeSeconds = min(max(crossfadeSeconds, Self.crossfadeLengths[0]), Self.crossfadeLengths[Self.crossfadeLengths.count - 1])
         file.read(&automix, .automix)
         file.read(&pauseOnUnplug, .pauseOnUnplug)
+        file.read(&audioCacheBytes, .audioCacheBytes) { Self.audioCacheSizes.contains($0) }
         file.read(&speed, .speed) { Self.speeds.contains($0) }
         file.read(&autoplay, .autoplay)
         file.read(&shuffle, .shuffle)

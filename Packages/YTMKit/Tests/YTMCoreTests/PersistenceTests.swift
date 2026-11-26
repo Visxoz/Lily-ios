@@ -63,6 +63,12 @@ import Testing
         #expect(try decode(#"{"speed": 1.7}"#).speed == 1, "not offered")
     }
 
+    @Test func keepsOnlyACacheSizeSettingsOffers() throws {
+        #expect(Settings.audioCacheSizes.contains(Settings().audioCacheBytes))
+        #expect(try decode(#"{"audioCacheBytes": 500000000}"#).audioCacheBytes == 500_000_000)
+        #expect(try decode(#"{"audioCacheBytes": 0}"#).audioCacheBytes == Settings().audioCacheBytes, "not offered")
+    }
+
     @Test func keepsTheCrossfadeWithinTheLengthsOffered() throws {
         #expect(try decode(#"{"crossfadeSeconds": 10}"#).crossfadeSeconds == 10)
         #expect(try decode(#"{"crossfadeSeconds": 30}"#).crossfadeSeconds == 12)

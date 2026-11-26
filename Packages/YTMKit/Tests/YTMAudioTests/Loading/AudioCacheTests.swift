@@ -72,6 +72,16 @@ struct AudioCacheTests {
         #expect(smaller.completeFile(for: "new", length: 10) != nil)
     }
 
+    @Test func trimsAtOnceToALowerCap() throws {
+        let cache = AudioCache(.init(directory: directory, limit: .max))
+        try store("old", bytes: 10, age: 300, in: cache)
+        try store("new", bytes: 10, age: 0, in: cache)
+        #expect(cache.size() == 20, "unbounded, nothing goes")
+        cache.setLimit(15)
+        #expect(cache.completeFile(for: "old", length: 10) == nil)
+        #expect(cache.completeFile(for: "new", length: 10) != nil)
+    }
+
     @Test func namesFilesSafely() throws {
         let cache = AudioCache(.init(directory: directory, limit: 1 << 20))
         let part = try cache.makePart(for: "../escape")

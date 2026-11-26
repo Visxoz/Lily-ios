@@ -76,4 +76,12 @@ struct PlayerSettingsTests {
         rig.player.outputUnplugged()
         #expect(rig.audio.log.filter { $0 == "pause" }.count == 1, "already paused, so nothing more")
     }
+
+    @Test func theCacheCapFollowsTheSettings() async throws {
+        let rig = await started()
+        #expect(rig.audio.cacheLimitBytes == Settings().audioCacheBytes, "set once the settings are read")
+        rig.settings.value.audioCacheBytes = 500_000_000
+        rig.player.apply(rig.settings.value)
+        #expect(rig.audio.cacheLimitBytes == 500_000_000)
+    }
 }

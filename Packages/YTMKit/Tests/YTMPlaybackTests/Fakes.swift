@@ -223,6 +223,7 @@ final class FakeMusic: MusicService {
     var mono = false
     var balance: Float = 0
     var pauseOnUnplug = true
+    var cacheLimitBytes = Int64.max
     var isMuted = false
     var speed = 1.0
     private(set) var played: [(item: AudioItem, from: Double, paused: Bool)] = []

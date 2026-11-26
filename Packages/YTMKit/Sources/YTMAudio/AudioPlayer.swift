@@ -71,6 +71,14 @@ import Network
         }
     }
 
+    /// The cache's cap; a lower one trims at once, sparing files being read.
+    public var cacheLimitBytes: Int64 {
+        didSet {
+            let bytes = cacheLimitBytes
+            engine.send { $0.cache.setLimit(bytes) }
+        }
+    }
+
     private let continuation: AsyncStream<AudioEvent>.Continuation
     private let engine: PlaybackEngine
     private var relay: Task<Void, Never>?
@@ -78,19 +86,19 @@ import Network
     private var session: UInt64 = 0
     private var currentID: String?
 
-    private static let cacheLimitBytes: Int64 = 40 << 20
-
     /// `proxies` is asked for at the first download, off the main actor.
     public convenience init(proxies: @escaping @Sendable () -> [ProxyConfiguration]) {
-        let cache = AudioCache.Location(directory: AudioCache.defaultDirectory, limit: Self.cacheLimitBytes)
+        // Unbounded until the saved settings set the cap, so a launch never trims to the default.
+        let cache = AudioCache.Location(directory: AudioCache.defaultDirectory, limit: .max)
         self.init(output: .device, source: HTTPByteSource(proxies: proxies), cache: cache)
     }
 
     init(output: PlaybackEngine.Output, source: any ByteSource, cache: AudioCache.Location) {
+        cacheLimitBytes = cache.limit
         (events, continuation) = AsyncStream.makeStream(of: AudioEvent.self)
         let (stamped, sink) = AsyncStream.makeStream(of: PlaybackEngine.Stamped.self)
         engine = PlaybackEngine(output: output, source: source, cache: cache, events: sink)
-        // Trimmed now, on the engine's queue, rather than in front of the first song's download.
+        // Made now, on the engine's queue, so stale parts go before the first song's download.
         engine.send { _ = $0.cache }
         relay = Task { [weak self] in
             for await event in stamped {

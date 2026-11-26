@@ -9,14 +9,13 @@ final class AudioCache {
     }
 
     let directory: URL
-    let limit: Int64
+    private(set) var limit: Int64
     private let files = FileManager.default
     /// Loaders on each file name, as the same song can play twice at once.
     private var reading: [String: Int] = [:]
     private static let partExtension = "part"
 
-    /// Works on the disk, so it is made on the engine's queue. Trims to the cap, which may have shrunk since the last
-    /// launch.
+    /// Works on the disk, so it is made on the engine's queue. Trims to the cap, if it has one.
     init(_ location: Location) {
         directory = location.directory
         limit = location.limit
@@ -98,6 +97,12 @@ final class AudioCache {
         for entry in completeFiles() where !kept.contains(entry.url.lastPathComponent) {
             try? files.removeItem(at: entry.url)
         }
+    }
+
+    /// A lower cap trims at once.
+    func setLimit(_ bytes: Int64) {
+        limit = bytes
+        evict()
     }
 
     /// A file being read stays past the cap, so a mix over it is not fetched again on a replay.
