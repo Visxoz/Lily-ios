@@ -15,9 +15,9 @@ enum HTTP {
         "gstatic.com",
     ]
     /// On these hosts only: Last.fm's API and sign-in page, ListenBrainz's API, Apple Music's and Spotify's players,
-    /// APIs and clips, and the lyrics sites.
+    /// APIs and clips, the lyrics sites, and GitHub's API for Lily's releases.
     private static let hosts: Set<String> = [
-        "ws.audioscrobbler.com", "www.last.fm", "api.listenbrainz.org",
+        "ws.audioscrobbler.com", "www.last.fm", "api.listenbrainz.org", "api.github.com",
         "music.apple.com", "amp-api.music.apple.com", "mvod.itunes.apple.com",
         "is1-ssl.mzstatic.com", "is2-ssl.mzstatic.com", "is3-ssl.mzstatic.com", "is4-ssl.mzstatic.com", "is5-ssl.mzstatic.com",
         "open.spotify.com", "open.spotifycdn.com", "api-partner.spotify.com", "spclient.wg.spotify.com", "canvaz.scdn.co",

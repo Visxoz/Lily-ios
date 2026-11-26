@@ -83,6 +83,8 @@ final class AppModel {
     var playlistsAdded = 0
     private(set) var artwork: ArtworkColours?
     private(set) var toast: Toast?
+    /// GitHub has a newer release, looked for once a launch.
+    private(set) var hasUpdate = false
 
     @ObservationIgnored private let home = TabNavigation()
     @ObservationIgnored private let explore = TabNavigation()
@@ -153,6 +155,7 @@ final class AppModel {
         )
         await homeSettled.value
         await refreshAccount()
+        hasUpdate = await AppRelease.hasUpdate()
     }
 
     /// The account's name and picture, and Library, as the last run saw them, while fresh ones load.

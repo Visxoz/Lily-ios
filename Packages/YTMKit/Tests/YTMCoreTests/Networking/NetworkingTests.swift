@@ -26,6 +26,7 @@ import Testing
         #expect(allowed("https://lrclib.net/api/get?track_name=a"))
         #expect(allowed("https://krcs.kugou.com/download?id=1"))
         #expect(allowed("https://lyrics.api.dacubeking.com/v2/lyrics"))
+        #expect(allowed("https://api.github.com/repos/Visxoz/Lily-ios/releases/latest"))
     }
 
     @Test func blocksEverythingElse() {
@@ -178,5 +179,14 @@ import Testing
 
     @Test func asksAsRustypipesDefaults() {
         #expect(InnerTube.language == "en" && InnerTube.country == "US")
+    }
+}
+
+@Suite struct AppReleaseTests {
+    @Test func offersOnlyANewerRelease() {
+        #expect(AppRelease.isNewer("v1.0.10", than: "1.0.9"))
+        #expect(!AppRelease.isNewer("v1.0.4", than: "1.0.4"))
+        #expect(!AppRelease.isNewer("v1.0.3", than: "1.0.4"))
+        #expect(AppRelease.isNewer("1.1", than: "1.0.4"))
     }
 }

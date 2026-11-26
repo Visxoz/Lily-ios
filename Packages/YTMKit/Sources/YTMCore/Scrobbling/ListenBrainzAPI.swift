@@ -25,7 +25,7 @@ enum ListenBrainzAPI {
         struct Info: Encodable {
             var mediaPlayer = "Lily"
             var submissionClient = "Lily"
-            var submissionClientVersion = ScrobbleService.version
+            var submissionClientVersion = AppRelease.version
             var musicService = "music.youtube.com"
             let durationMs: Int?
         }

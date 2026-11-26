@@ -23,10 +23,8 @@ public actor ScrobbleService {
     /// After a failure or a refused play, doubling while the service stays down, so an outage wakes the phone rarely.
     static let retryAfter = Duration.seconds(60)
     static let retryAtMost = Duration.seconds(30 * 60)
-    /// Nil outside the app, as in ytmcheck.
-    static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     /// "Lily/1.0", as Lily for Windows names itself; plain "Lily" without a version.
-    static let userAgent = version.map { "Lily/\($0)" } ?? "Lily"
+    static let userAgent = AppRelease.version.map { "Lily/\($0)" } ?? "Lily"
 
     private static let log = Logger(subsystem: "Lily", category: "Scrobbling")
 

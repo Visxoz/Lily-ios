@@ -2,12 +2,24 @@ import SwiftUI
 
 struct AccountButton: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.theme) private var theme
 
     var body: some View {
         Button { app.sheet = .settings } label: {
             AccountPhoto(size: 26)
+                .overlay(alignment: .topTrailing) {
+                    if app.hasUpdate {
+                        // Ringed, so it shows against the accent fill of a photo still loading.
+                        Circle()
+                            .fill(theme.accent)
+                            .stroke(theme.panel, lineWidth: 1.5)
+                            .frame(width: 9, height: 9)
+                            .offset(x: 2, y: -2)
+                    }
+                }
         }
         .accessibilityLabel("Settings")
+        .accessibilityValue(app.hasUpdate ? "Update available" : "")
     }
 }
 
