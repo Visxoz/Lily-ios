@@ -69,7 +69,7 @@ struct SmartShuffle {
             index += 1
         }
         knownRevision = queue.revision
-        guard dry, let seed = Self.seed(queue) else { return nil }
+        guard dry, let seed = Self.seed(queue, blocked) else { return nil }
         fetching = true
         return seed
     }
@@ -91,8 +91,12 @@ struct SmartShuffle {
         return nil
     }
 
-    private static func seed(_ queue: Queue<Track>) -> String? {
-        queue.entries.filter { !$0.isRecommended }.randomElement()?.item.id
+    /// Never a blocked artist's song, whose radio would be mostly theirs.
+    private static func seed(_ queue: Queue<Track>, _ blocked: [ArtistRef]) -> String? {
+        let entries = queue.entries
+        // Shuffled first, so the block check usually runs once rather than over a long queue.
+        return entries.indices.filter { !entries[$0].isRecommended }.shuffled()
+            .first { !entries[$0].item.isBy(anyOf: blocked) }.map { entries[$0].item.id }
     }
 }
 

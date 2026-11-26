@@ -51,6 +51,15 @@ struct SmartShuffleTests {
         #expect(ownAhead <= SmartShuffle.lookahead)
     }
 
+    @Test func leavesBlockedArtistsOutOfSeedsAndBatches() {
+        var smart = SmartShuffle()
+        var queue = queue(20)
+        let blocked = (0..<20).filter { $0 != 3 }.map { ArtistRef(id: "UC\($0)", name: "Artist \($0)") }
+        #expect(smart.topUp(&queue, recent: [], blocked: blocked) == "3")
+        let fresh = smart.receive([song("x")], generation: smart.generation, blocked: [ArtistRef(id: "UCx", name: "Artist x")])
+        #expect(!fresh, "a batch of only blocked songs brings nothing new")
+    }
+
     @Test func dropsABatchAskedForAnEarlierQueue() {
         var smart = SmartShuffle()
         var queue = queue(20)
