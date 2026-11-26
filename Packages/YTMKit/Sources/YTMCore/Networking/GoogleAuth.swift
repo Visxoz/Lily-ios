@@ -37,12 +37,15 @@ public actor GoogleAuth {
     /// The stored `Cookie` header, kept current by the cookies signed-in answers set.
     var sessionCookie: String? { cookie }
 
-    /// How long until the next renewal is due, at most `interval`; all of it signed out, zero when none was noted within it.
+    /// How long until the next renewal is due; all of `interval` signed out, zero when none was noted within it.
     public func renewalDue(every interval: Duration) -> Duration {
-        guard cookie != nil else { return interval }
-        guard let renewed else { return .zero }
-        let since = Duration.seconds(Date.now.timeIntervalSince(renewed))
-        return min(max(interval - since, .zero), interval)
+        cookie == nil ? interval : Self.due(after: renewed, now: .now, every: interval)
+    }
+
+    static func due(after renewed: Date?, now: Date, every interval: Duration) -> Duration {
+        // One noted ahead of now came from a clock since put right, so it says nothing.
+        guard let renewed, renewed <= now else { return .zero }
+        return max(interval - .seconds(now.timeIntervalSince(renewed)), .zero)
     }
 
     func noteRenewal() {

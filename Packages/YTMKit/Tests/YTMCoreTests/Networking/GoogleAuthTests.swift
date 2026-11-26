@@ -68,6 +68,15 @@ import Testing
         #expect(try GoogleAuth.merge(cookie, setting: setCookies(["SID=; Domain=.youtube.com"]), now: .now) == nil)
     }
 
+    @Test func renewsAnIntervalAfterTheLast() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let hour = Duration.seconds(3_600)
+        #expect(GoogleAuth.due(after: nil, now: now, every: hour) == .zero, "never renewed")
+        #expect(GoogleAuth.due(after: now.addingTimeInterval(-600), now: now, every: hour) == .seconds(3_000))
+        #expect(GoogleAuth.due(after: now.addingTimeInterval(-7_200), now: now, every: hour) == .zero)
+        #expect(GoogleAuth.due(after: now.addingTimeInterval(86_400), now: now, every: hour) == .zero, "noted under a clock since put right")
+    }
+
     @Test func takesOnlyTheSameLoginsCookies() async throws {
         let auth = GoogleAuth()
         try await auth.signIn(cookies: [try cookie("SAPISID", "abc", ".youtube.com")])
