@@ -191,7 +191,7 @@ struct PlaybackEngineTests {
         let item = try AudioItem.fixture("one", length: file.count)
         playback.engine.send { $0.play(item, from: 0, paused: false, session: 1) }
         let before = await playback.render(seconds: 0.5)
-        // In one go on the engine's queue, so the player's delayed pause lands after the ramp however busy the
+        // In one go on the engine's queue, so the output's delayed stop lands after the ramp however busy the
         // machine running the tests.
         let ramp = await playback.state { engine in
             engine.pause()
@@ -203,10 +203,25 @@ struct PlaybackEngineTests {
         playback.engine.send { $0.resume() }
         let after = await playback.render(seconds: 0.2)
         let decoded = try DecodableFile(file).decode()
-        // The player paused once the ramp ended, so the sound carries on from there.
+        // The output stopped once the ramp ended, so the sound carries on from there.
         let resumed = before.count + ramp.count
         let lag = bestLag(after[4_800..<5_800], in: decoded, at: resumed + 4_800, search: 1_200)
         #expect(abs(lag) <= 1_024, "no more skipped or repeated than one render: \(lag)")
+    }
+
+    @Test func pausingNearTheEndStaysOnTheSong() async throws {
+        let files = ["one": try Fixtures.opusWebM(first), "two": try Fixtures.opusWebM(second)]
+        let playback = OfflinePlayback(files: files)
+        let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
+        let two = try AudioItem.fixture("two", length: files["two", default: Data()].count)
+        playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
+        playback.engine.send { $0.setNext(two, .gapless, session: 1) }
+        _ = await playback.render(seconds: 0.3)
+        playback.engine.send { $0.pause() }
+        // Past the ramp, when the stopped output reports all it had scheduled as played.
+        try await Task.sleep(for: .milliseconds(300))
+        let heard = await playback.state { $0.heard?.item.id }
+        #expect(heard == "one", "neither crossed into the next nor finished while paused")
     }
 
     @Test func normalisesByTheItemsGain() async throws {

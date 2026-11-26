@@ -87,9 +87,8 @@ import os
     func activate() {
         guard !isActive else { return }
         do {
-            // The default route sharing, not long-form audio's, under which headphone presses (AirPods squeezes)
-            // never reached the app.
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            // Long-form audio routes as Music does, so AirPods can take the sound over from the car.
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: .longFormAudio)
             try AVAudioSession.sharedInstance().setActive(true)
             isActive = true
         } catch {

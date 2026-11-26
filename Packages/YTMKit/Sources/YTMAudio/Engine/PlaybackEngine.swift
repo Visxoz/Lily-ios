@@ -21,7 +21,7 @@ actor PlaybackEngine {
     static let aheadSeconds = 3.5
     /// Long enough for the mixer's volume ramp to reach silence.
     static let pauseRamp = DispatchTimeInterval.milliseconds(60)
-    /// After this long paused or stopped, the output stops so the device can sleep.
+    /// After this long with nothing playing, the output stops so the device can sleep.
     static let idleAfter = DispatchTimeInterval.seconds(30)
     /// The fade-in after a start, seek or stall: about one device callback.
     static let fadeInSeconds = 0.01
@@ -56,7 +56,7 @@ actor PlaybackEngine {
     var aheadFrames = 0
     /// Frames scheduled since the player last started, its timeline.
     var playerFrames: Int64 = 0
-    /// Bumped as the player is stopped, so completions of its old buffers are ignored.
+    /// Bumped as the player or the output stops, so completions of its old buffers are ignored.
     var generation = 0
     var playerRunning = false
     var fadeInNext = true
@@ -150,13 +150,11 @@ actor PlaybackEngine {
         graph.setSilenced(true)
         queue.asyncAfter(deadline: .now() + Self.pauseRamp) { [self] in
             assumeIsolated { engine in
-                guard engine.paused, engine.pauseToken == token, engine.playerRunning else { return }
-                engine.graph.player.pause()
-                engine.playerRunning = false
-                engine.clock.hold()
+                guard engine.paused, engine.pauseToken == token else { return }
+                // iOS counts a running output as playing, so a second AirPods squeeze would pause again.
+                engine.stopOutput()
             }
         }
-        stopOutputWhenIdle()
         updateBuffering()
     }
 
@@ -201,7 +199,10 @@ actor PlaybackEngine {
     /// carries on from where it was, as after a device change. Paused, `resume` does that.
     func setSpeed(_ speed: Double) {
         clock.setSpeed(speed)
-        guard graph.setSpeed(speed), heard != nil, !paused else { return }
+        guard graph.setSpeed(speed) else { return }
+        // The rewiring stopped the output, whose flushed schedule mustn't count as played.
+        generation += 1
+        guard heard != nil, !paused else { return }
         seek(to: clock.position(), session: session)
     }
 
@@ -273,14 +274,21 @@ actor PlaybackEngine {
     }
 
     func stopOutputWhenIdle() {
-        let token = pauseToken
         let generation = generation
         queue.asyncAfter(deadline: .now() + Self.idleAfter) { [self] in
             assumeIsolated { engine in
                 let stopped = engine.heard == nil && engine.generation == generation
-                guard engine.pauseToken == token, engine.paused || stopped else { return }
-                engine.graph.engine.stop()
+                guard engine.paused || stopped else { return }
+                engine.stopOutput()
             }
         }
+    }
+
+    /// The stop reports the whole schedule as played, so its completions are ignored.
+    private func stopOutput() {
+        generation += 1
+        playerRunning = false
+        clock.hold()
+        graph.engine.stop()
     }
 }
