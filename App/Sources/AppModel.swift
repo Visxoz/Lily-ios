@@ -140,8 +140,13 @@ final class AppModel {
         Task { [api] in
             try? await Task.sleep(for: Self.renewSignInAfter)
             while !Task.isCancelled {
-                await api.renewSignIn()
-                try? await Task.sleep(for: Self.renewSignInEvery)
+                // Across launches too, as RotateCookies answers 429 to renewals close together.
+                let due = await api.auth.renewalDue(every: Self.renewSignInEvery)
+                if due > .zero {
+                    try? await Task.sleep(for: due)
+                } else {
+                    await api.renewSignIn()
+                }
             }
         }
         let home = isSignedIn ? Task { try await fetchPage(.home) } : nil

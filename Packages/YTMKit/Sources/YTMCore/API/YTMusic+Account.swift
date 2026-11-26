@@ -19,6 +19,8 @@ extension YTMusic {
         guard let cookie = await auth.sessionCookie, let url = URL(string: "https://accounts.youtube.com/RotateCookies") else {
             return
         }
+        // Before the request, so a refused one still waits the hour and the renewal loop never spins.
+        await auth.noteRenewal()
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         // YouTube calls it from a frame on accounts.youtube.com.

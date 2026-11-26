@@ -7,6 +7,7 @@ public actor GoogleAuth {
     public static let shared = GoogleAuth()
 
     private static let keychainKey = "google.cookie"
+    private static let renewedKey = "google.renewed"
     static let log = Logger(subsystem: "Lily", category: "GoogleAuth")
     /// The cookies the Authorization hashes are made from.
     private static let sessionCookies = ["SAPISID", "__Secure-1PAPISID", "__Secure-3PAPISID"]
@@ -15,6 +16,10 @@ public actor GoogleAuth {
 
     /// Read lazily, on this actor rather than whichever thread made the instance.
     private lazy var cookie: String? = Keychain.data(for: Self.keychainKey).map { String(decoding: $0, as: UTF8.self) }
+    /// When the cookies were last sent for renewing, kept so the gap between renewals holds across launches.
+    private lazy var renewed: Date? = Keychain.data(for: Self.renewedKey)
+        .flatMap { Double(String(decoding: $0, as: UTF8.self)) }
+        .map { Date(timeIntervalSince1970: $0) }
 
     /// Yields when YouTube answers a signed-in request as signed out, as it does once the session has ended. Answers
     /// arriving while nothing waits wake the next wait. One reader, the app.
@@ -31,6 +36,20 @@ public actor GoogleAuth {
 
     /// The stored `Cookie` header, kept current by the cookies signed-in answers set.
     var sessionCookie: String? { cookie }
+
+    /// How long until the next renewal is due, at most `interval`; all of it signed out, zero when none was noted within it.
+    public func renewalDue(every interval: Duration) -> Duration {
+        guard cookie != nil else { return interval }
+        guard let renewed else { return .zero }
+        let since = Duration.seconds(Date.now.timeIntervalSince(renewed))
+        return min(max(interval - since, .zero), interval)
+    }
+
+    func noteRenewal() {
+        let now = Date.now
+        renewed = now
+        Keychain.set(Data(String(now.timeIntervalSince1970).utf8), for: Self.renewedKey)
+    }
 
     /// Keeps the session cookies of .youtube.com / .google.com read from the sign-in web view.
     public func signIn(cookies: [HTTPCookie]) throws {
