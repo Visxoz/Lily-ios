@@ -145,20 +145,21 @@ struct PageContent: View {
 
     private var scroller: some View {
         let isSplit = splitHeader != nil
+        let width = frame.width - 2 * Metrics.pagePadding
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 if route == .home {
                     Greeting()
                 }
                 if route == .library, let model {
-                    PinnedRow(model: model, width: frame.width - 2 * Metrics.pagePadding)
+                    PinnedRow(model: model, width: width)
                 }
                 if !isSplit, let header = page.header {
                     headerView(header)
                 }
                 let ownPlaylist = app.ownPlaylist(model) == nil ? nil : model
                 ForEach(page.sections.indices, id: \.self) { index in
-                    SectionRows(section: page.sections[index], width: frame.width - 2 * Metrics.pagePadding)
+                    SectionRows(section: page.sections[index], width: width)
                         // Its own songs are the first section's; any after are YouTube's suggestions.
                         .environment(\.ownPlaylist, index == 0 ? ownPlaylist : nil)
                 }

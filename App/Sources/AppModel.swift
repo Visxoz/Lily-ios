@@ -192,30 +192,6 @@ final class AppModel {
         }
     }
 
-    func isBlocked(_ artist: ArtistRef) -> Bool {
-        blocked.contains(where: artist.matches)
-    }
-
-    func toggleBlock(_ artist: ArtistRef) {
-        showToast(settings.value.toggleBlock(artist) ? "Blocked \(artist.name)" : "Unblocked \(artist.name)")
-    }
-
-    func isPinned(_ card: Card) -> Bool {
-        pinned.contains(where: card.matches)
-    }
-
-    func togglePin(_ card: Card) {
-        guard let account else { return }
-        let pinning = settings.value.togglePin(card, for: account)
-        showToast(pinning ? "Pinned to your library" : "Unpinned from your library")
-    }
-
-    /// Untouched unless pinned, so the settings' observers aren't woken for nothing.
-    func unpin(_ card: Card) {
-        guard settings.value.pinned.contains(where: card.matches) else { return }
-        settings.value.pinned.removeAll(where: card.matches)
-    }
-
     /// Replaces `theme` only when it changes, so views reading it redraw only then.
     func followTheme() async {
         let changes = Observations { [settings] in

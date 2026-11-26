@@ -55,6 +55,7 @@ enum LyricsChecks {
         async let lrcRed = outcome { try await LrcRed.lyrics(for: track) }
         async let kugou = outcome { try await KuGou.lyrics(for: track) }
         async let lrclib = outcome { try await LRCLIB.lyrics(for: track) }
+        // As a video, so lyrics(for:) asks YouTube alone.
         var video = track
         video.isVideo = true
         guard let own = try await Live.api.lyrics(for: video) else { return findings.fail("\(song.title): no YouTube lyrics") }

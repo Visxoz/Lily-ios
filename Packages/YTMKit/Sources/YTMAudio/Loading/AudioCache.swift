@@ -9,7 +9,7 @@ final class AudioCache {
     }
 
     let directory: URL
-    private(set) var limit: Int64
+    private var limit: Int64
     private let files = FileManager.default
     /// Loaders on each file name, as the same song can play twice at once.
     private var reading: [String: Int] = [:]
@@ -99,10 +99,10 @@ final class AudioCache {
         }
     }
 
-    /// A lower cap trims at once.
     func setLimit(_ bytes: Int64) {
+        let lower = bytes < limit
         limit = bytes
-        evict()
+        if lower { evict() }
     }
 
     /// A file being read stays past the cap, so a mix over it is not fetched again on a replay.

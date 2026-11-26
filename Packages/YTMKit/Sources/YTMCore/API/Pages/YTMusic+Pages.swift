@@ -54,7 +54,7 @@ extension YTMusic {
                 return (page, false)
             }
             page.sections[0].append(items, context: ItemContext())
-            // An empty batch adds no rows to scroll past, so nothing would ask for the next.
+            // An empty batch is taken as the end, so empty ones can't chain.
             if let next, !items.isEmpty, stepsLeft > 1 { page.more = .search(token: next, stepsLeft: stepsLeft - 1) }
         case .shelves(let token, let pagesLeft, var held)?:
             page.more = nil

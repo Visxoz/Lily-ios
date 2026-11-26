@@ -33,8 +33,7 @@ extension YTMusic {
         return Lyrics.chosen(youtube: own, apple: apple, others: others)
     }
 
-    /// The track with its length, which every other site's search and match need but home tiles and quick picks
-    /// don't give, and YouTube's answer for the song when the length had to be read from its queue.
+    /// The track with its length, which the other sites need and home tiles lack, and the `next` answer read for it.
     private func withLength(_ track: Track) async throws -> (Track, JSON?) {
         guard track.duration == nil else { return (track, nil) }
         let next = try await innerTube.next(["videoId": track.id], authenticated: false)

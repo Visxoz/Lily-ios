@@ -16,7 +16,7 @@ struct BlockedArtistsScreen: View {
                 ForEach(app.blocked, id: \.self) { artist in
                     SettingRow(label: artist.name) {
                         // No toast, which would show behind Settings; the row going says as much.
-                        PillButton(title: "Unblock", small: true) { _ = app.settings.value.toggleBlock(artist) }
+                        PillButton(title: "Unblock", small: true) { app.settings.value.blockedArtists.removeAll(where: artist.matches) }
                             .accessibilityLabel("Unblock \(artist.name)")
                     }
                 }

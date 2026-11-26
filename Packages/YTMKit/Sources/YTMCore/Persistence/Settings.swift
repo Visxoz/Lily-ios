@@ -212,7 +212,7 @@ public struct Settings: Codable, Equatable, Sendable {
         pinned = file.readEach(.pinned)
         file.read(&pinsAccount, .pinsAccount)
         // Older versions pinned playlists alone, by ID, for the account then signed in; Library's cards title them.
-        if let ids = try? file.decodeIfPresent([String].self, forKey: .pinned), !ids.isEmpty {
+        if pinned.isEmpty, let ids = try? file.decodeIfPresent([String].self, forKey: .pinned), !ids.isEmpty {
             pinned = ids.map { Card(kind: .playlist, id: $0, title: "") }
             pinsAccount = account
         }

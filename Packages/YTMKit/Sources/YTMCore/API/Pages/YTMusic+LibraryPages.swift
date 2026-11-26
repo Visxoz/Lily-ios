@@ -105,8 +105,8 @@ extension Page {
         return Section.cards("Pinned", shown, layout: .carousel)
     }
 
-    /// Each whole list of albums by artist, then title, with those by no one named last. A list cut short keeps
-    /// YouTube's order, since sorting part of it would mislead.
+    /// Each whole list of albums by artist, then title, with those by no one named last. Library's preview, which
+    /// links to the rest, keeps YouTube's order.
     public func albumsByArtist() -> Page {
         var page = self
         for (at, section) in sections.enumerated() {

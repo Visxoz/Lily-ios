@@ -172,8 +172,8 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
     // MARK: Moving through the queue
 
     /// The entry `advance` would move to, without moving.
-    public func peekNext(repeat mode: RepeatMode) -> Element? {
-        nextIndex(user: false, repeat: mode).map { entries[$0].item }
+    public func peekNext(user: Bool = false, repeat mode: RepeatMode) -> Element? {
+        nextIndex(user: user, repeat: mode).map { entries[$0].item }
     }
 
     /// Moves to the next entry; `user` skips leave repeat-one. Returns nil at the end of the queue.

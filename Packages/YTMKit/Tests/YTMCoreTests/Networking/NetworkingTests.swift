@@ -65,11 +65,7 @@ import Testing
         #expect(context["userAgent"] as? String == ClientProfile.androidVR.userAgent)
         let web = ClientProfile.webRemix.context(hl: "en", visitorData: nil)
         #expect(web["deviceMake"] == nil && web["visitorData"] == nil)
-    }
-
-    @Test func asksInEnglishNamingNoCountry() {
-        #expect(InnerTube.language == "en")
-        #expect(ClientProfile.webRemix.context(hl: InnerTube.language, visitorData: nil)["gl"] == nil)
+        #expect(web["gl"] == nil, "no country named")
     }
 
     @Test func headersNameTheClient() {

@@ -97,8 +97,7 @@ final class PageModel {
         loadingMore = true
         defer { if generation == self.generation { loadingMore = false } }
         guard let step = try? await app.fetchMore(of: source, for: route), isCurrent(generation, account, in: app) else { return }
-        // Saved or subscribed to meanwhile, the page shown has it.
-        // A kind's search list cut short by a failed step stays, rather than going back to its first batch next visit.
+        // Keeps saves made meanwhile; a search kind cut short stays rather than restarting next visit.
         show(step.page.keepingLibraryState(of: self.source), for: app, saved: !step.whole && !route.pagesOnScroll)
     }
 
@@ -192,9 +191,8 @@ final class PageModel {
         generation == self.generation && account == app.accountGeneration
     }
 
-    /// Home ages out as pages stop being fresh, as the app stays alive for days; any other page is stale once no
-    /// longer fresh in the cache, unless `returning` with it on screen. A kind's search list never is, as reloading
-    /// would drop the reader back to its first batch.
+    /// Home ages out, as the app stays alive for days; other pages once the cache's copy isn't fresh, unless
+    /// `returning`. A search kind never, as a reload loses the place.
     private func isStale(in app: AppModel, returning: Bool) -> Bool {
         if route.pagesOnScroll { return false }
         guard route == .home else { return !returning && app.keptPage(route)?.isFresh != true }
