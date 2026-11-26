@@ -131,14 +131,14 @@ private struct SearchField: View {
                 .accessibilityAction(.escape) { isSearching = false }
             if isSearching {
                 // Clears the text first, as the system's field does, then ends the search.
-                IconButton(icon: .close, size: 36, iconSize: 15) {
+                IconButton(icon: .close, size: 44, iconSize: 15) {
                     if query.isEmpty { isSearching = false } else { query = "" }
                 }
                 .accessibilityLabel(query.isEmpty ? "Cancel" : "Clear text")
             }
         }
         .padding(.leading, 14)
-        .padding(.trailing, isSearching ? 4 : 14)
+        .padding(.trailing, isSearching ? 0 : 14)
         .frame(maxWidth: .infinity, minHeight: 44)
         // The whole capsule focuses the field, not only its line of text.
         .contentShape(Capsule())
