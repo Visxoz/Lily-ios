@@ -121,8 +121,11 @@ jobs:
           jq --arg version "$VERSION" --arg build "$(info CFBundleVersion)" --arg min_os "$(info MinimumOSVersion)" \
             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg sha "$sha" --argjson size "$size" \
             --arg url "https://github.com/$REPO/releases/download/$tag/Lily.ipa" \
-            --rawfile notes "$RUNNER_TEMP/whats-new.txt" --slurpfile previous "$RUNNER_TEMP/previous.json" '
-            .apps[0].versions = [{
+            --rawfile notes "$RUNNER_TEMP/whats-new.txt" --slurpfile previous "$RUNNER_TEMP/previous.json" \
+            --arg commit "$GITHUB_SHA" '
+            # Stores cache images by URL, so each release points at its own commit to show fresh screenshots.
+            (.. | strings) |= sub("/refs/heads/main/"; "/\($commit)/")
+            | .apps[0].versions = [{
               version: $version, buildVersion: $build, date: $date, downloadURL: $url, size: $size,
               sha256: $sha, minOSVersion: $min_os, localizedDescription: ($notes | sub("\\s+$"; ""))
             }] + [($previous[0].apps[0].versions // [])[] | select(.version != $version)]
