@@ -57,14 +57,19 @@ import Testing
 
 @Suite struct ClientProfileTests {
     @Test func appClientsDescribeTheirDevice() {
-        let context = ClientProfile.androidVR.context(hl: "en", gl: "GB", visitorData: "V")
+        let context = ClientProfile.androidVR.context(hl: "en", visitorData: "V")
         #expect(context["clientName"] as? String == "ANDROID_VR")
         #expect(context["deviceModel"] as? String == "Quest 3")
         #expect(context["androidSdkVersion"] as? Int == 32)
         #expect(context["visitorData"] as? String == "V")
         #expect(context["userAgent"] as? String == ClientProfile.androidVR.userAgent)
-        let web = ClientProfile.webRemix.context(hl: "en", gl: "US", visitorData: nil)
+        let web = ClientProfile.webRemix.context(hl: "en", visitorData: nil)
         #expect(web["deviceMake"] == nil && web["visitorData"] == nil)
+    }
+
+    @Test func asksInEnglishNamingNoCountry() {
+        #expect(InnerTube.language == "en")
+        #expect(ClientProfile.webRemix.context(hl: InnerTube.language, visitorData: nil)["gl"] == nil)
     }
 
     @Test func headersNameTheClient() {
@@ -175,10 +180,6 @@ import Testing
         }
         #expect(value == "v1")
         #expect(await issuer.fetches == 1)
-    }
-
-    @Test func asksAsRustypipesDefaults() {
-        #expect(InnerTube.language == "en" && InnerTube.country == "US")
     }
 }
 

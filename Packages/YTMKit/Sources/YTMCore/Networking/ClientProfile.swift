@@ -34,8 +34,8 @@ struct ClientProfile: Sendable, Hashable {
         return parts.url
     }
 
-    func context(hl: String, gl: String, visitorData: String?) -> [String: Any] {
-        var client: [String: Any] = ["clientName": name, "clientVersion": version, "hl": hl, "gl": gl]
+    func context(hl: String, visitorData: String?) -> [String: Any] {
+        var client: [String: Any] = ["clientName": name, "clientVersion": version, "hl": hl]
         if let visitorData { client["visitorData"] = visitorData }
         if let device {
             client["deviceMake"] = device.make

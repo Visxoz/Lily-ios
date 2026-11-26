@@ -5,9 +5,9 @@ final class InnerTube: Sendable {
     private let visitor: VisitorData
     private let refusals = Refusals()
 
-    /// English, so parsers can read YouTube's labels ("Song", "1.2M"); the country picks charts and catalogue.
+    /// English, so parsers can read YouTube's labels ("Song", "1.2M"). No country is sent, so YouTube goes by the IP
+    /// address; naming one it doesn't serve, such as Andorra, gets every request refused.
     static let language = "en"
-    static let country = "US"
 
     static let retries = 2
 
@@ -35,7 +35,7 @@ final class InnerTube: Sendable {
         let visitorData = if let visitorData { visitorData } else { try await visitor.value() }
         var body = body
         var context = body["context"] as? [String: Any] ?? [:]
-        context["client"] = client.context(hl: Self.language, gl: Self.country, visitorData: visitorData)
+        context["client"] = client.context(hl: Self.language, visitorData: visitorData)
             .merging(context["client"] as? [String: Any] ?? [:]) { $1 }
         body["context"] = context
         guard JSONSerialization.isValidJSONObject(body) else {
