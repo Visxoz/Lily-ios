@@ -255,7 +255,7 @@ private struct CompactControls: View {
                 ArtworkView(url: track.thumbnail, size: 52)
                 TrackTitle(track: track, compact: true)
                 PlayPauseButton(size: 44)
-                IconButton(icon: .next, size: 44, iconSize: 26, colour: theme.text) { app.player.next() }
+                IconButton(icon: .next, size: 44, iconSize: 26, colour: theme.text, feedback: .skip) { app.player.next() }
                     .accessibilityLabel("Next")
             }
             MiniProgress()
@@ -314,6 +314,7 @@ private struct LargeArtwork: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @State private var shift: CGFloat = 0
+    @State private var skips = 0
 
     var body: some View {
         GeometryReader { space in
@@ -334,6 +335,7 @@ private struct LargeArtwork: View {
         // Hit-tested as a whole, as the still takes no touches while hidden under the tall clip.
         .contentShape(Rectangle())
         .gesture(SidewaysPan(moved: { shift = $0 }, ended: ended))
+        .sensoryFeedback(.skip, trigger: skips)
     }
 
     private func ended(_ x: CGFloat, velocity: CGFloat) {
@@ -341,6 +343,7 @@ private struct LargeArtwork: View {
         let travel = x + velocity / 2
         if abs(travel) > Self.skipDistance, travel.sign == x.sign {
             if travel < 0 { app.player.next() } else { app.player.previous() }
+            skips += 1
         }
         withAnimation(Theme.normal) { shift = 0 }
     }

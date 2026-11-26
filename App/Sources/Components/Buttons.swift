@@ -12,16 +12,42 @@ struct IconView: View {
     }
 }
 
+extension SensoryFeedback {
+    /// Play, pause and shuffle-play; firmer than a skip.
+    static let play = SensoryFeedback.impact(weight: .medium)
+    static let skip = SensoryFeedback.impact(weight: .light)
+}
+
+/// A button that plays `feedback` with each tap, or none when nil.
+struct FeedbackButton<Label: View>: View {
+    let feedback: SensoryFeedback?
+    let action: () -> Void
+    @ViewBuilder let label: Label
+
+    @State private var taps = 0
+
+    var body: some View {
+        Button {
+            if feedback != nil { taps += 1 }
+            action()
+        } label: {
+            label
+        }
+        .sensoryFeedback(trigger: taps) { _, _ in feedback }
+    }
+}
+
 struct IconButton: View {
     let icon: Icon
     var size: CGFloat = 32
     var iconSize: CGFloat = 18
     var active = false
     var colour: Color?
+    var feedback: SensoryFeedback?
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        FeedbackButton(feedback: feedback, action: action) {
             IconLabel(icon: icon, size: size, iconSize: iconSize, active: active, colour: colour)
         }
         .buttonStyle(PressScale(scale: 0.88, animation: .easeOut(duration: 0.09)))
@@ -66,12 +92,13 @@ struct PlayButton: View {
     var playing = false
     var colour: Color?
     var iconColour: Color?
+    var feedback: SensoryFeedback? = .play
     let action: () -> Void
 
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Button(action: action) {
+        FeedbackButton(feedback: feedback, action: action) {
             Circle()
                 .fill(colour ?? theme.accent)
                 .shadow(color: theme.shadow, radius: 6, y: 4)
@@ -99,7 +126,7 @@ struct ActionPill: View {
     var body: some View {
         // The accent stays readable as text in every look, so it stands out without a solid fill.
         let foreground = primary ? theme.accent : theme.text
-        Button(action: action) {
+        FeedbackButton(feedback: .play, action: action) {
             HStack(spacing: 8) {
                 IconView(icon: icon, size: 22, colour: foreground)
                 if !compact {

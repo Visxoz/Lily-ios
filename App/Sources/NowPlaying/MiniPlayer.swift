@@ -33,7 +33,7 @@ struct MiniPlayer: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 PlayPauseButton(size: 42)
-                IconButton(icon: .next, size: 44, iconSize: 26, colour: theme.text) { app.player.next() }
+                IconButton(icon: .next, size: 44, iconSize: 26, colour: theme.text, feedback: .skip) { app.player.next() }
                     .accessibilityLabel("Next")
             }
             .padding(.leading, 10)

@@ -80,7 +80,7 @@ private struct RatingButtons: View {
     }
 
     private func button(_ icon: Icon, on: Bool, label: String, action: @escaping () -> Void) -> some View {
-        IconButton(icon: icon, size: 40, iconSize: 22, colour: on ? theme.text : theme.textSecondary, action: action)
+        IconButton(icon: icon, size: 40, iconSize: 22, colour: on ? theme.text : theme.textSecondary, feedback: .selection, action: action)
             .accessibilityLabel(label)
             .accessibilityAddTraits(on ? .isSelected : [])
     }
