@@ -246,17 +246,11 @@ private struct PagerBounceOff: UIViewRepresentable {
 private struct CompactControls: View {
     let track: Track
 
-    @Environment(AppModel.self) private var app
-    @Environment(\.theme) private var theme
-
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
                 ArtworkView(url: track.thumbnail, size: 52)
-                TrackTitle(track: track, compact: true)
-                PlayPauseButton(size: 44)
-                IconButton(icon: .next, size: 44, iconSize: 26, colour: theme.text, feedback: .skip) { app.player.next() }
-                    .accessibilityLabel("Next")
+                CompactTransport(playSize: 44) { TrackTitle(track: track, compact: true) }
             }
             MiniProgress()
         }

@@ -22,19 +22,18 @@ struct MiniPlayer: View {
         if let track = app.player.current, Self.shown(on: tab, in: app) {
             HStack(spacing: 12) {
                 ArtworkView(url: track.thumbnail, size: Self.art, radius: 8)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(track.title)
-                        .scaledFont(15, weight: .semibold)
-                        .foregroundStyle(theme.text)
-                    Text(track.artistNames)
-                        .scaledFont(13)
-                        .foregroundStyle(theme.textSecondary)
+                CompactTransport(playSize: 42) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(track.title)
+                            .scaledFont(15, weight: .semibold)
+                            .foregroundStyle(theme.text)
+                        Text(track.artistNames)
+                            .scaledFont(13)
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                PlayPauseButton(size: 42)
-                IconButton(icon: .next, size: 44, iconSize: 26, colour: theme.text, feedback: .skip) { app.player.next() }
-                    .accessibilityLabel("Next")
             }
             .padding(.leading, 10)
             .padding(.trailing, 8)
