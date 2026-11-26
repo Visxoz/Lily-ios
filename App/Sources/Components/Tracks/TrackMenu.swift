@@ -73,7 +73,7 @@ struct CardMenu: View {
         }
         CardDownloadItem(card: card)
         if let link = card.link { LinkItems(link: link, title: card.title) }
-        if let artist = card.artist { BlockItem(artist: artist) }
+        if let artist = card.artist ?? card.track?.artists.first { BlockItem(artist: artist) }
     }
 }
 
