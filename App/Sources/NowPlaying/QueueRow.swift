@@ -23,7 +23,7 @@ struct QueueRow: View {
                 }
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.title)
-                    .font(.system(size: 14, weight: current ? .bold : .medium))
+                    .scaledFont(14, weight: current ? .bold : .medium)
                     .foregroundStyle(theme.text)
                 HStack(spacing: 4) {
                     if recommended {
@@ -31,14 +31,15 @@ struct QueueRow: View {
                             .accessibilityLabel("Smart Shuffle pick")
                     }
                     Text(track.artistNames)
-                        .font(.system(size: 13))
+                        .scaledFont(13)
                         .foregroundStyle(theme.textSecondary)
                 }
             }
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(track.duration.map(Formatting.duration) ?? "")
-                .font(.system(size: 13).monospacedDigit())
+                .monospacedDigit()
+                .scaledFont(13)
                 .foregroundStyle(theme.textSecondary)
         }
         .padding(.horizontal, 8)

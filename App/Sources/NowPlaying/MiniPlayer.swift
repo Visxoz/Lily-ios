@@ -24,10 +24,10 @@ struct MiniPlayer: View {
                 ArtworkView(url: track.thumbnail, size: Self.art, radius: 8)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(track.title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .scaledFont(15, weight: .semibold)
                         .foregroundStyle(theme.text)
                     Text(track.artistNames)
-                        .font(.system(size: 13))
+                        .scaledFont(13)
                         .foregroundStyle(theme.textSecondary)
                 }
                 .lineLimit(1)

@@ -29,12 +29,12 @@ struct CardView: View {
                 )
                     .padding(.bottom, 4)
                 Text(card.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .scaledFont(15, weight: .semibold)
                     .foregroundStyle(theme.text)
                 HStack(spacing: 4) {
                     if showsPinBadges { PinBadge(card: card) }
                     Text(card.subtitle)
-                        .font(.system(size: 13))
+                        .scaledFont(13)
                         .foregroundStyle(theme.textSecondary)
                 }
             }

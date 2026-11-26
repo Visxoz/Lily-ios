@@ -95,6 +95,9 @@ private struct BandRow: View {
                 .foregroundStyle(enabled ? theme.text : theme.textDim)
                 .frame(width: 48, alignment: .trailing)
         }
-        .font(.system(size: 13))
+        .scaledFont(13)
+        // The fixed columns keep the sliders lined up, so larger text shrinks to fit them.
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
     }
 }

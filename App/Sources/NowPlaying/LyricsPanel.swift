@@ -82,7 +82,7 @@ private struct LyricsLines: View {
                 }
                 if !lyrics.source.isEmpty {
                     Text(lyrics.source)
-                        .font(.system(size: 12))
+                        .scaledFont(12)
                         .foregroundStyle(theme.textSecondary)
                 }
             }
@@ -214,7 +214,7 @@ private struct LyricLine: View {
             }
             // Swapped at once as a line starts or ends, so its two forms never stand together mid-fade.
             .transition(.identity)
-            .font(.system(size: 22, weight: .bold))
+            .scaledFont(22, weight: .bold)
             .foregroundStyle(theme.text)
             if !romanised.isEmpty { extra(romanised) }
             if !translation.isEmpty { extra(translation) }
@@ -229,7 +229,7 @@ private struct LyricLine: View {
 
     private func extra(_ text: String) -> some View {
         Text(verbatim: text)
-            .font(.system(size: 16, weight: .semibold))
+            .scaledFont(16, weight: .semibold)
             .foregroundStyle(theme.textSecondary)
     }
 }

@@ -21,10 +21,10 @@ struct TrackRow: View {
                         PlayingEqualizer()
                     } else {
                         Text(number, format: .number.grouping(.never))
-                            .font(.system(size: 15))
+                            .scaledFont(15)
                             .foregroundStyle(theme.textSecondary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.6)
+                            .minimumScaleFactor(0.45)
                     }
                 }
                 .frame(width: Metrics.rowNumber)
@@ -35,12 +35,12 @@ struct TrackRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(track.title)
-                        .font(.system(size: 15, weight: .medium))
+                        .scaledFont(15, weight: .medium)
                         .foregroundStyle(playing ? theme.accent : theme.text)
                     HStack(spacing: 4) {
                         DownloadBadge(videoId: track.id)
                         Text(track.artistNames)
-                            .font(.system(size: 13))
+                            .scaledFont(13)
                             .foregroundStyle(theme.textSecondary)
                     }
                 }
@@ -52,8 +52,11 @@ struct TrackRow: View {
                     Color.clear.frame(width: Metrics.rowMore)
                     if let length {
                         Text(length)
-                            .font(.system(size: 14).monospacedDigit())
+                            .monospacedDigit()
+                            .scaledFont(14)
                             .foregroundStyle(theme.textSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             .frame(width: Metrics.rowDuration, alignment: .trailing)
                     }
                 }
@@ -101,7 +104,7 @@ struct TrackColumns: View {
             IconView(icon: .clock, size: 16, colour: theme.textSecondary)
                 .frame(width: Metrics.rowDuration, alignment: .trailing)
         }
-        .font(.system(size: 14))
+        .scaledFont(14)
         .foregroundStyle(theme.textSecondary)
         .padding(.horizontal, Metrics.rowPadding)
         .frame(height: Metrics.columnsHeight)

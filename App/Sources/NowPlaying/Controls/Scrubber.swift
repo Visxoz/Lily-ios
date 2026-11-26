@@ -29,11 +29,11 @@ struct Scrubber: View {
                 .disabled(length <= 0)
                 .accessibilityLabel("Position")
                 HStack {
-                    Text(played)
+                    Text(played).monospacedDigit()
                     Spacer()
-                    Text(total)
+                    Text(total).monospacedDigit()
                 }
-                .font(.system(size: 12).monospacedDigit())
+                .scaledFont(12)
                 .foregroundStyle(theme.textSecondary)
                 .accessibilityHidden(true)
             }

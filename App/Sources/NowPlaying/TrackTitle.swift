@@ -16,14 +16,14 @@ struct TrackTitle: View {
                 Button { app.openAlbum(of: track) } label: {
                     // Under the artwork there is room for a long title to wrap.
                     Text(track.title)
-                        .font(.system(size: compact ? 16 : 22, weight: .bold))
+                        .scaledFont(compact ? 16 : 22, weight: .bold)
                         .foregroundStyle(theme.text)
                         .lineLimit(compact ? 1 : 2)
                 }
                 .disabled(track.album == nil)
                 Button { app.openArtist(of: track) } label: {
                     Text(track.artistNames)
-                        .font(.system(size: compact ? 13 : 16))
+                        .scaledFont(compact ? 13 : 16)
                         .foregroundStyle(theme.textSecondary)
                         .lineLimit(1)
                 }
@@ -53,7 +53,7 @@ private struct UpNextLine: View {
         let next = mode == .one || queue.count < 2 ? nil : queue.peekNext(repeat: mode)
         // Always laid out, so the artwork above keeps its size as the line comes and goes.
         Text(verbatim: next.map { "Next: \($0.title)  \u{2022}  \($0.artistNames)" } ?? " ")
-            .font(.system(size: 13))
+            .scaledFont(13)
             .foregroundStyle(theme.textSecondary)
             .lineLimit(1)
             .accessibilityHidden(next == nil)

@@ -60,7 +60,7 @@ struct SignInScreen<Session>: View {
         case .failed(let message):
             VStack(spacing: 20) {
                 Text(message)
-                    .font(.system(size: 13))
+                    .scaledFont(13)
                     .foregroundStyle(theme.signInError)
                     .multilineTextAlignment(.center)
                 PillButton(title: "Try again", primary: true) { phase = .browsing }

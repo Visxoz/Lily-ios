@@ -75,7 +75,7 @@ struct NowPlayingScreen: View {
         // On the panel, or stood lyrics, a pull down goes back to the artwork rather than closing the screen.
         .interactiveDismissDisabled((page == .panel && layout != .sideBySide) || (layout == .stand && lyricsShown))
         // In the look's own scheme, not the dark one over the clip.
-        .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0).preferredColorScheme(app.theme.colorScheme) }
+        .sheet(item: $app.nowPlayingPicker) { PlaylistPickerSheet(track: $0).preferredColorScheme(app.theme.colorScheme).cappedTypeSize() }
         .onAppear { app.nowPlayingShown = true }
         .onDisappear {
             app.nowPlayingShown = false

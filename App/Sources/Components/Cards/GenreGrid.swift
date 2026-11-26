@@ -37,9 +37,12 @@ struct GenreTile: View {
                     .offset(x: 12, y: 20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 Text(card.title)
-                    .font(.system(size: 20, weight: .bold))
+                    .scaledFont(20, weight: .bold)
                     .foregroundStyle(theme.onColour)
                     .multilineTextAlignment(.leading)
+                    // Two lines are all the fixed-height chip holds at the larger text sizes.
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
             }

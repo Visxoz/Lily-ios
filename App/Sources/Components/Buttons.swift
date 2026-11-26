@@ -131,7 +131,7 @@ struct ActionPill: View {
                 IconView(icon: icon, size: 22, colour: foreground)
                 if !compact {
                     Text(title)
-                        .font(.system(size: 15, weight: .bold))
+                        .scaledFont(15, weight: .bold)
                         .foregroundStyle(foreground)
                         .lineLimit(1)
                         .fixedSize()
@@ -175,7 +175,7 @@ struct PillLabel: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: small ? 13 : 14, weight: .bold))
+            .scaledFont(small ? 13 : 14, weight: .bold)
             .foregroundStyle(primary ? theme.textInverse : theme.text)
             // A pill is one line: a row squeezes its description instead.
             .lineLimit(1)
@@ -205,7 +205,7 @@ struct Pill: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: compact ? 13 : 14, weight: .semibold))
+                .scaledFont(compact ? 13 : 14, weight: .semibold)
                 .foregroundStyle(active ? theme.textInverse : theme.text)
                 .lineLimit(1)
                 .padding(.horizontal, compact ? 10 : 14)

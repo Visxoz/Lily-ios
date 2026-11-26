@@ -263,8 +263,10 @@ private struct Greeting: View {
 
     var body: some View {
         Text(Self.greeting(hour: Calendar.current.component(.hour, from: .now)))
-            .font(.system(size: 32, weight: .heavy))
+            .scaledFont(32, weight: .heavy)
             .foregroundStyle(theme.text)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             .accessibilityAddTraits(.isHeader)
             .padding(.horizontal, Metrics.pagePadding)
             .frame(height: Metrics.greetingHeight, alignment: .bottom)
@@ -334,7 +336,7 @@ private struct StickyTitle: View {
                 PlayButton(size: 30, action: play)
             }
             Text(title)
-                .font(.system(size: 17, weight: .heavy))
+                .scaledFont(17, weight: .heavy)
                 .foregroundStyle(theme.text)
                 .lineLimit(1)
         }

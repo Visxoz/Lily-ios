@@ -73,7 +73,7 @@ private struct SettingsTabs: View {
         } label: {
             // One weight for both states, so the row never shifts.
             Text(Self.titles[index])
-                .font(.system(size: 13, weight: .semibold))
+                .scaledFont(13, weight: .semibold)
                 .foregroundStyle(active ? theme.text : theme.textSecondary)
                 .fixedSize()
                 .frame(height: 44)

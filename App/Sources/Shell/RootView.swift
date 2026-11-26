@@ -129,5 +129,6 @@ private struct SheetContent: View {
             }
         }
         .overlay(alignment: .bottom) { ToastView() }
+        .cappedTypeSize()
     }
 }

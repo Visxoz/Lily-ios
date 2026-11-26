@@ -65,7 +65,7 @@ private struct VersionRow: View {
     /// Inside the button, so the whole 44 pt is tappable.
     private var label: some View {
         Text("Update available")
-            .font(.system(size: 13, weight: .semibold))
+            .scaledFont(13, weight: .semibold)
             .foregroundStyle(theme.accent)
             .frame(minHeight: 44)
             .contentShape(.rect)

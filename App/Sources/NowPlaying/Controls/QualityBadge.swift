@@ -10,14 +10,14 @@ struct QualityBadge: View {
         HStack(spacing: 0) {
             if stream.isPremium {
                 Text("PREMIUM")
-                    .font(.system(size: 10, weight: .heavy))
+                    .scaledFont(10, weight: .heavy)
                     .foregroundStyle(theme.onColour)
                     .padding(.horizontal, 6)
                     .frame(maxHeight: .infinity)
                     .background(theme.accent)
             }
             Text(stream.badge)
-                .font(.system(size: 10, weight: .bold))
+                .scaledFont(10, weight: .bold)
                 .foregroundStyle(stream.isPremium ? theme.text : theme.textSecondary)
                 .padding(.horizontal, 7)
         }

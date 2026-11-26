@@ -10,7 +10,7 @@ struct BlockedArtistsScreen: View {
             VStack(alignment: .leading, spacing: 18) {
                 if app.blocked.isEmpty {
                     Text("No artists blocked.")
-                        .font(.system(size: 13))
+                        .scaledFont(13)
                         .foregroundStyle(theme.textSecondary)
                 }
                 ForEach(app.blocked, id: \.self) { artist in

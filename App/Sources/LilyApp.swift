@@ -18,6 +18,7 @@ struct LilyApp: App {
         WindowGroup {
             RootView()
                 .environment(app)
+                .cappedTypeSize()
         }
         .onChange(of: scenePhase) { _, phase in
             app.hideArtwork(phase == .background)

@@ -47,7 +47,7 @@ struct UpNextPanel: View, Equatable {
     private func header(count: Int) -> some View {
         HStack(spacing: 14) {
             Text(editing && !selection.isEmpty ? "\(selection.count) selected" : "Queue  •  \(Formatting.songs(count))")
-                .font(.system(size: 15, weight: .bold))
+                .scaledFont(15, weight: .bold)
                 .foregroundStyle(theme.text)
                 .lineLimit(1)
             Spacer()
@@ -152,8 +152,9 @@ private struct PanelAction: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .scaledFont(13, weight: .semibold)
                 .foregroundStyle(isEnabled ? theme.textSecondary : theme.textDim)
+                .lineLimit(1)
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }

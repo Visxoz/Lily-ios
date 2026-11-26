@@ -258,13 +258,13 @@ private struct HeaderText<Trailing: View>: View {
         VStack(alignment: centred ? .center : .leading, spacing: 4) {
             if !header.label.isEmpty {
                 Text(header.label)
-                    .font(.system(size: 12, weight: .bold))
+                    .scaledFont(12, weight: .bold)
                     .tracking(1.2)
                     .textCase(.uppercase)
                     .foregroundStyle(secondary)
             }
             Text(header.title)
-                .font(.system(size: titleSize, weight: .heavy))
+                .scaledFont(titleSize, weight: .heavy)
                 .tracking(titleSize * -0.02)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
@@ -273,7 +273,7 @@ private struct HeaderText<Trailing: View>: View {
             if !header.subtitle.isEmpty || !header.meta.isEmpty || Trailing.self != EmptyView.self {
                 HStack(spacing: 12) {
                     details
-                        .font(.system(size: 14))
+                        .scaledFont(14)
                         .lineLimit(2)
                     trailing
                 }
