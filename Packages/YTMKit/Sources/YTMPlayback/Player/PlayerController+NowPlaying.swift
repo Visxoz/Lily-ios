@@ -50,6 +50,8 @@ extension PlayerController {
     func present(_ track: Track, at position: Double) {
         let newSong = current?.id != track.id
         current = track
+        // Autoplay's radio is dropped with its song only while that song plays.
+        if autoplayed?.seed != track.id { autoplayed = nil }
         duration = playback.duration
         playback.heldPosition = position
         isPlaying = true

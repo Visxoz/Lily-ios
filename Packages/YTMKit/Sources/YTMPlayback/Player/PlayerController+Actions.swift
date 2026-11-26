@@ -169,6 +169,7 @@ extension PlayerController {
     /// so the radio joins only the queue it is for.
     private func queueRadio(of seed: String, forAutoplay: Bool) {
         playback.extending = true
+        autoplayed = forAutoplay ? (seed, queue.nextId..<queue.nextId) : nil
         let music = music
         extending = Task { [weak self] in
             let result = await Result { try await music.radio(videoId: seed) }
@@ -176,7 +177,10 @@ extension PlayerController {
             playback.extending = false
             switch result {
             case .success(let tracks):
+                let first = queue.nextId
                 appendUnique(tracks)
+                // Unless another song started meanwhile.
+                if forAutoplay, autoplayed?.seed == seed { autoplayed?.entries = first..<queue.nextId }
             case .failure(let error) where forAutoplay:
                 Logger.playback.warning("autoplay radio failed: \(sentence(for: error), privacy: .public)")
             case .failure(let error):

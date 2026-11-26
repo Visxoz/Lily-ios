@@ -28,7 +28,8 @@ public struct Queue<Element: Hashable & Sendable & Spreadable>: Sendable {
     public private(set) var currentIndex: Int?
     /// Bumped whenever entries are added, removed or reordered, so views and Smart Shuffle know when to look again.
     public private(set) var revision = 0
-    private var nextId = 0
+    /// The id the next entry added gets, so ids taken between two reads mark the entries added in between.
+    private(set) var nextId = 0
 
     public init() {
         self.init(seed: .random(in: .min ... .max))

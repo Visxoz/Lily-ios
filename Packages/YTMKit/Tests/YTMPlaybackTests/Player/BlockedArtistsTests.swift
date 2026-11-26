@@ -117,4 +117,30 @@ struct BlockedArtistsTests {
         #expect(rig.audio.played.count == played, "not restarted")
         #expect(rig.music.calls.filter { $0 == "radio a" }.count == 1, "no radio of it asked for")
     }
+
+    @Test func blockingTheLastSongDropsTheRadioAutoplayQueuedFromIt() async {
+        let rig = await started()
+        rig.music.set { $0.radios["a"] = songs("x", "y") }
+        rig.player.play(songs("a"))
+        await rig.settle()
+        await rig.soundStarts()
+        #expect(rig.player.queue.items.map(\.id) == ["a", "x", "y"])
+        block("a", in: rig)
+        await rig.settle()
+        #expect(!rig.player.isPlaying && rig.player.current?.id == "a", "stopped on it")
+        #expect(rig.player.queue.items.map(\.id) == ["a"])
+    }
+
+    @Test func blockingTheLastSongPausedDropsItsRadioToo() async {
+        let rig = await started()
+        rig.music.set { $0.radios["a"] = songs("x", "y") }
+        rig.player.play(songs("a"))
+        await rig.settle()
+        await rig.soundStarts()
+        rig.player.setPaused(true)
+        block("a", in: rig)
+        await rig.settle()
+        #expect(!rig.player.isPlaying && rig.player.current?.id == "a", "left where it is")
+        #expect(rig.player.queue.items.map(\.id) == ["a"])
+    }
 }

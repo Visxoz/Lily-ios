@@ -118,6 +118,9 @@ public struct MotionClip: Sendable {
     @ObservationIgnored var extending: Task<Void, Never>?
     /// A radio fetched once the queue has played out, to move on to.
     @ObservationIgnored var autoplay: Task<Void, Never>?
+    /// The radio autoplay is queueing from the song playing and the entries it added, dropped should that song be
+    /// disliked or blocked.
+    @ObservationIgnored var autoplayed: (seed: String, entries: Range<Int>)?
     /// What a page or card asked to play, while its tracks load.
     @ObservationIgnored var pendingPlay: Task<Void, Never>?
     /// The rest of a long playlist being added after its first batch started.

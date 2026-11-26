@@ -21,17 +21,23 @@ extension PlayerController {
     }
 
     /// Skips a song disliked or blocked, stopping on it at the queue's end or a repeat of it alone, rather than
-    /// restarting it or autoplaying a radio seeded by it.
+    /// restarting it or autoplaying a radio seeded by it, and dropping the radio autoplay queued from it.
     func skip(past id: String) {
+        dropAutoplayRadio(of: id)
         guard let upcoming = queue.peekNext(user: true, repeat: repeatMode), upcoming.id != id else {
             // A radio still on its way would play on from it.
             autoplay?.cancel()
-            extending?.cancel()
-            playback.extending = false
+            cancelExtending()
             stop()
             return
         }
         next()
+    }
+
+    /// The radio cancelled never gets to say it is done, so the end of the queue may ask for one again.
+    func cancelExtending() {
+        extending?.cancel()
+        playback.extending = false
     }
 
     /// A restart counts as a new play.

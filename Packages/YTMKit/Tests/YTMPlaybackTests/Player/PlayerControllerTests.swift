@@ -213,6 +213,102 @@ struct PlayerControllerTests {
         #expect(rig.music.calls.filter { $0.hasPrefix("rate") }.sorted() == ["rate a DISLIKE", "rate a INDIFFERENT", "rate a LIKE"])
     }
 
+    @Test func dislikingTheLastSongDropsTheRadioAutoplayQueuedFromIt() async {
+        let rig = Rig()
+        rig.music.set {
+            $0.signedIn = true
+            $0.radios["a"] = songs("x", "y")
+        }
+        await rig.player.start()
+        rig.player.play(songs("a"))
+        await rig.settle()
+        await rig.soundStarts()
+        rig.player.addToQueue(songs("z"))
+        #expect(rig.player.queue.items.map(\.id) == ["a", "x", "y", "z"])
+        rig.player.rate(.dislike)
+        await rig.settle()
+        #expect(rig.player.current?.id == "z", "a song the user queued still plays")
+        #expect(rig.player.queue.items.map(\.id) == ["a", "z"])
+    }
+
+    @Test func dislikingTheLastSongDropsTheRadioAutoplayIsStillFetching() async {
+        let rig = Rig()
+        rig.music.set {
+            $0.signedIn = true
+            $0.radios["a"] = songs("x", "y")
+            $0.held = ["radio a"]
+        }
+        await rig.player.start()
+        rig.player.play(songs("a"))
+        await rig.yieldToTasks()
+        // Not `soundStarts`, whose settle would wait on the radio held back.
+        if let id = rig.playing?.id { rig.player.handle(.started(id: id)) }
+        await rig.yieldToTasks()
+        rig.player.addToQueue(songs("z"))
+        rig.player.rate(.dislike)
+        rig.music.release("radio a")
+        await rig.settle()
+        #expect(rig.player.current?.id == "z")
+        #expect(rig.player.queue.items.map(\.id) == ["a", "z"], "the radio arriving late is dropped")
+    }
+
+    @Test func dislikingTheLastSongDropsSmartShufflePicksAmongItsRadio() async {
+        let rig = Rig()
+        rig.music.set {
+            $0.signedIn = true
+            $0.radios["a"] = (0..<12).map { song("x\($0)") }
+            $0.anyRadio = (0..<12).map { song("r\($0)") }
+        }
+        await rig.player.start()
+        rig.settings.value.shuffle = .smart
+        rig.player.apply(rig.settings.value)
+        rig.player.play(songs("a"))
+        await rig.settle()
+        await rig.soundStarts()
+        #expect(!rig.player.queue.recommendedIndices.isEmpty, "picks mixed into the radio")
+        rig.player.rate(.dislike)
+        await rig.settle()
+        #expect(!rig.player.isPlaying)
+        #expect(rig.player.queue.items.map(\.id) == ["a"])
+    }
+
+    @Test func dislikingASongPlayedAgainAfterItsRadioKeepsTheRadio() async {
+        let rig = Rig()
+        rig.music.set {
+            $0.signedIn = true
+            $0.radios["a"] = songs("x", "y")
+        }
+        await rig.player.start()
+        rig.player.play(songs("a"))
+        await rig.settle()
+        await rig.soundStarts()
+        rig.player.next()
+        await rig.settle()
+        rig.player.previous()
+        await rig.settle()
+        #expect(rig.player.current?.id == "a")
+        rig.player.rate(.dislike)
+        await rig.settle()
+        #expect(rig.player.current?.id == "x", "played on into, the radio is the user's now")
+        #expect(rig.player.queue.items.map(\.id) == ["a", "x", "y"])
+    }
+
+    @Test func dislikingTheSongARadioWasStartedFromPlaysOnIntoIt() async {
+        let rig = Rig()
+        rig.music.set {
+            $0.signedIn = true
+            $0.radios["a"] = songs("x", "y")
+        }
+        await rig.player.start()
+        rig.player.startRadio(from: song("a"))
+        await rig.settle()
+        await rig.soundStarts()
+        rig.player.rate(.dislike)
+        await rig.settle()
+        #expect(rig.player.current?.id == "x", "the radio was chosen")
+        #expect(rig.player.queue.items.map(\.id) == ["a", "x", "y"])
+    }
+
     @Test func aSmartShuffleTopUpPlacingNothingLeavesTheQueueAlone() async {
         let rig = await started()
         rig.settings.value.shuffle = .smart

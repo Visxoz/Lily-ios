@@ -21,9 +21,7 @@ extension PlayerController {
     /// Also drops the rest of a playlist, or a radio, still on its way.
     public func clearUpcoming() {
         continuing?.cancel()
-        extending?.cancel()
-        // The radio cancelled never gets to say it is done, and the end of the queue asks for one again.
-        playback.extending = false
+        cancelExtending()
         let before = queue.revision
         queue.clearUpcoming()
         if queue.revision != before { queueEdited() }
@@ -64,11 +62,23 @@ extension PlayerController {
     func leaveOutBlocked(_ blocked: [ArtistRef]) {
         // First, so the skip lands on a song kept.
         removeEntries { $0.item.isBy(anyOf: blocked) }
-        guard isPlaying, let at = queue.currentIndex, queue.entries[at].item.isBy(anyOf: blocked) else { return }
+        guard let at = queue.currentIndex, queue.entries[at].item.isBy(anyOf: blocked) else { return }
         let playing = queue.entries[at]
+        // Paused too, so Play doesn't end in its radio.
+        dropAutoplayRadio(of: playing.item.id)
+        guard isPlaying else { return }
         skip(past: playing.item.id)
         // Its entry, spared while it played.
         removeEntries { $0.id == playing.id }
+    }
+
+    /// Drops the radio autoplay queued or is fetching from a song rejected, with Smart Shuffle's picks put in since.
+    func dropAutoplayRadio(of id: String) {
+        guard let radio = autoplayed, radio.seed == id else { return }
+        autoplayed = nil
+        // Still on its way, it would join behind the song skipped to.
+        cancelExtending()
+        removeEntries { radio.entries.contains($0.id) || ($0.isRecommended && $0.id >= radio.entries.lowerBound) }
     }
 
     /// All but the current entry; the queue is left untouched when none match, so its observers aren't woken.
