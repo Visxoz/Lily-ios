@@ -220,7 +220,8 @@ struct PlaybackEngineTests {
         playback.engine.send { $0.pause() }
         // Past the ramp, when the stopped output reports all it had scheduled as played.
         try await Task.sleep(for: .milliseconds(300))
-        let heard = await playback.state { $0.heard?.item.id }
+        let (heard, running) = await playback.state { ($0.heard?.item.id, $0.playerRunning) }
+        #expect(!running, "the output stopped")
         #expect(heard == "one", "neither crossed into the next nor finished while paused")
     }
 

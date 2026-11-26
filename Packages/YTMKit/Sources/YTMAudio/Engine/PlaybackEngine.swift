@@ -103,6 +103,8 @@ actor PlaybackEngine {
         clear()
         self.paused = paused
         graph.setSilenced(paused)
+        // As a pause does, so iOS stops counting a song loaded paused as playing.
+        if paused { stopOutput() }
         guard let track = open(item, at: seconds, announcingStart: true) else { return }
         // Sent after the download's first job, so the output wakes while the first range is in flight, not after it.
         if !paused { send { _ = $0.graph.start() } }
@@ -151,8 +153,9 @@ actor PlaybackEngine {
         queue.asyncAfter(deadline: .now() + Self.pauseRamp) { [self] in
             assumeIsolated { engine in
                 guard engine.paused, engine.pauseToken == token else { return }
-                // iOS counts a running output as playing, so a second AirPods squeeze would pause again.
-                engine.stopOutput()
+                // iOS counts a running output as playing, so a second AirPods squeeze would pause again. Between
+                // songs it waits, as a stopped output lets iOS suspend the app mid-fetch.
+                if engine.heard == nil { engine.stopOutputWhenIdle() } else { engine.stopOutput() }
             }
         }
         updateBuffering()
@@ -166,6 +169,8 @@ actor PlaybackEngine {
             // The output stopped while paused, idle or interrupted and took the player's schedule with it, so it is
             // remade from where the sound stopped.
             seek(to: clock.position(), session: session)
+            // Awake while bytes not yet fetched arrive, as `play` does.
+            _ = graph.start()
         } else if !scheduled.isEmpty, !playerRunning {
             startPlayer()
         }
@@ -201,7 +206,7 @@ actor PlaybackEngine {
         clock.setSpeed(speed)
         guard graph.setSpeed(speed) else { return }
         // The rewiring stopped the output, whose flushed schedule mustn't count as played.
-        generation += 1
+        stopOutput()
         guard heard != nil, !paused else { return }
         seek(to: clock.position(), session: session)
     }
