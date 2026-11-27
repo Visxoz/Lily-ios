@@ -86,6 +86,7 @@ extension PlaybackEngine {
             heard.seek(to: clock.position())
             restartPlayer()
         }
+        producing?.leaveWarp()
         if let next { keepWarm(next) }
         next = nil
         plan = nil

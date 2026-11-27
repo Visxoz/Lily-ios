@@ -20,6 +20,7 @@ protocol MusicService: Sendable {
     func loadStep(_ page: Page) async throws -> (page: Page, whole: Bool)
     func songVersion(of video: Track) async throws -> Track?
     func lyrics(for track: Track) async throws -> Lyrics?
+    func sung(videoId: String) async throws -> [Range<Double>]?
     func rating(videoId: String) async throws -> Rating
     func rate(videoId: String, _ rating: Rating) async throws
     func createPlaylist(title: String, videoIds: [String]) async throws -> String
@@ -48,7 +49,7 @@ extension YTMusic: MusicService {
     var isMuted: Bool { get set }
     var speed: Double { get set }
     func play(_ item: AudioItem, from seconds: Double, paused: Bool)
-    func setNext(_ item: AudioItem?, _ transition: Transition)
+    func setNext(_ item: AudioItem?, _ transition: Transition, sung: Sung)
     func warm(_ item: AudioItem)
     func pause()
     func resume()

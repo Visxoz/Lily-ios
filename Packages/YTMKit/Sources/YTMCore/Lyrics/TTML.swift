@@ -11,6 +11,8 @@ enum TTML {
         return Lyrics(
             lines: reader.lines,
             starts: reader.timed ? reader.starts : [],
+            // Ends only where every line has one, as YouTube's.
+            ends: reader.timed && reader.ends.count == reader.lines.count ? reader.ends : [],
             words: orEmpty(reader.words),
             translations: orEmpty(reader.extras[Extra.translation.rawValue]),
             romanised: orEmpty(reader.extras[Extra.romanised.rawValue]),
@@ -69,6 +71,8 @@ enum TTML {
 
         var lines: [String] = []
         var starts: [Double] = []
+        /// Only for lines that have one.
+        var ends: [Double] = []
         var words: [[Lyrics.Word]] = []
         /// Each line's translation and romanisation, by `Extra`.
         var extras: [[String]] = Extra.each([])
@@ -78,6 +82,7 @@ enum TTML {
         private var inBody = false
         private var inLine = false
         private var begin: Double?
+        private var end: Double?
         private var key: String?
         private var lineWords: [Lyrics.Word] = []
         /// Text since the last span boundary, its whitespace collapsed.
@@ -119,6 +124,7 @@ enum TTML {
             case "p" where inBody:
                 inLine = true
                 begin = Self.time("begin", in: attributes)
+                end = Self.time("end", in: attributes)
                 key = Self.attribute("key", in: attributes)
             case "span" where inLine:
                 let kind: Extra? = switch Self.attribute("role", in: attributes) {
@@ -219,6 +225,7 @@ enum TTML {
                 }
                 lines.append(text)
                 starts.append(start.isFinite ? start : starts.last ?? 0)
+                if let end { ends.append(end) }
                 words.append(lineWords)
             }
             inLine = false

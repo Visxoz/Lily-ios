@@ -20,10 +20,16 @@ enum Fixtures {
     /// Seeded white noise, steady and without a beat; at a quarter of full scale, as Opus overshoots on noise and
     /// louder would reach the limiter.
     static func noise(frames: Int, seed: UInt32) -> [Float] {
-        var state = seed
-        return (0..<frames).map { _ in
-            state = state &* 1_664_525 &+ 1_013_904_223
-            return (Float(state >> 8) / Float(1 << 24) - 0.5) / 2
+        let draw = white(seed)
+        return (0..<frames).map { _ in draw() / 2 }
+    }
+
+    /// White noise in -0.5..<0.5, the same from each `seed`.
+    static func white(_ seed: UInt32) -> () -> Float {
+        var seed = seed
+        return {
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            return Float(seed >> 8) / Float(1 << 24) - 0.5
         }
     }
 
@@ -285,6 +291,87 @@ final class RecordingByteSource: ByteSource {
     func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
         asked.withLock { $0.append(range) }
         return served.bytes(of: url, headers: headers, range: range)
+    }
+}
+
+/// Two channels held as a decoder holds its frames, for the engine's stages to read and write.
+final class StereoBuffer {
+    let count: Int
+    private let left: UnsafeMutablePointer<Float>
+    private let right: UnsafeMutablePointer<Float>
+    private let pointers: UnsafeMutablePointer<UnsafeMutablePointer<Float>>
+
+    init(_ left: [Float], _ right: [Float]) {
+        precondition(left.count == right.count)
+        count = left.count
+        self.left = .allocate(capacity: max(count, 1))
+        self.right = .allocate(capacity: max(count, 1))
+        self.left.initialize(from: left, count: count)
+        self.right.initialize(from: right, count: count)
+        pointers = .allocate(capacity: 2)
+        pointers.initialize(from: [self.left, self.right], count: 2)
+    }
+
+    convenience init(_ samples: [Float]) {
+        self.init(samples, samples)
+    }
+
+    deinit {
+        left.deallocate()
+        right.deallocate()
+        pointers.deallocate()
+    }
+
+    var channels: Crossfade.Channels { (UnsafePointer(left), UnsafePointer(right)) }
+    var output: UnsafePointer<UnsafeMutablePointer<Float>> { UnsafePointer(pointers) }
+    var samples: (left: [Float], right: [Float]) {
+        (Array(UnsafeBufferPointer(start: left, count: count)), Array(UnsafeBufferPointer(start: right, count: count)))
+    }
+}
+
+extension Automix.Mixer {
+    /// Mixes the blend's frames from `position`, each side at a steady gain, as the engine mixes a buffer; a nil side
+    /// has ended.
+    func mixed(_ incoming: StereoBuffer?, _ outgoing: StereoBuffer?, at position: Int = 0, gains: (Float, Float) = (1, 1)) -> (left: [Float], right: [Float]) {
+        let count = incoming?.count ?? outgoing?.count ?? 0
+        let out = StereoBuffer(Array(repeating: 0, count: count))
+        let ramp = { (gain: Float) in Crossfade.Ramp(from: gain, to: gain, length: count) }
+        // Kept alive while their pointers are read, which an optimised build would not otherwise promise.
+        withExtendedLifetime((incoming, outgoing)) {
+            mix(
+                incoming: incoming?.channels, outgoing: outgoing?.channels, gains: (ramp(gains.0), ramp(gains.1)),
+                count: count, at: position, into: out.output, offset: 0
+            )
+        }
+        return out.samples
+    }
+}
+
+extension Varispeed {
+    /// Up to `frames` read at the curve's speeds from `input`'s frame `origin` on, as a track reads its decoder: fed
+    /// `piece` frames at a time and handed on at most `take` at a time.
+    func read(_ input: (left: [Float], right: [Float]), from origin: Int, frames: Int, piece: Int = 4_096, take: Int = .max) -> (left: [Float], right: [Float]) {
+        let reader = Reader(curve: self, from: Int64(origin))
+        var (fed, out) = (origin, (left: [Float](), right: [Float]()))
+        while out.left.count < frames {
+            let ready = reader.render()
+            if ready > 0 {
+                let count = min(ready, take, frames - out.left.count)
+                out.left += UnsafeBufferPointer(start: reader.channels.left, count: count)
+                out.right += UnsafeBufferPointer(start: reader.channels.right, count: count)
+                reader.consume(count)
+            } else if reader.inputEnded {
+                break
+            } else if fed < input.left.count {
+                let end = min(fed + piece, input.left.count)
+                let held = StereoBuffer(Array(input.left[fed..<end]), Array(input.right[fed..<end]))
+                withExtendedLifetime(held) { reader.append(held.channels, count: held.count) }
+                fed = end
+            } else {
+                reader.endInput()
+            }
+        }
+        return out
     }
 }
 

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import YTMAudio
 import YTMCore
 
 /// Settings changes take effect as made: normalisation within the few seconds the engine has scheduled, quality,
@@ -99,12 +100,13 @@ extension PlayerController {
             queueing?.cancel()
             prefetcher.clear()
             gapless.forget()
-            audio.setNext(nil, .gapless)
+            audio.setNext(nil, .gapless, sung: Sung())
             preparePremium()
         } else if old.transition != new.transition {
             // A song queued, or being queued, with the old setting is queued again.
             dropQueuedNext()
         }
+        if old.transition != new.transition { prefetchSung() }
     }
 
     /// The engine's gain on top of the loudness correction: Quiet's 0.5 is 6 dB under Normal before the boost cap.

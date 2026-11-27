@@ -28,6 +28,8 @@ extension PlayerController {
         }
         // `updateGapless` then queues nothing, so the song ends with `.finished`.
         if timer == .endOfSong { dropQueuedNext() }
+        // Stops or starts the lookups of where the songs are sung, as the next will or won't play.
+        prefetchSung()
     }
 
     /// Moves on, or with the timer armed stops on the song, as at the queue's end.

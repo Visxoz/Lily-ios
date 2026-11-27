@@ -25,7 +25,7 @@ import Testing
             [word("Lorem ", 1, 1.5), word("ip", 1.5, 1.75), word("sum ", 1.75, 2), word("dolor, ", 2, 2.5), word("sit", 2.5, 3)],
             [word("Amet", 4, 5)],
         ]
-        #expect(read == Lyrics(lines: ["Lorem ipsum dolor, sit", "Amet"], starts: [1, 4], words: words, source: "Source: Apple Music"))
+        #expect(read == Lyrics(lines: ["Lorem ipsum dolor, sit", "Amet"], starts: [1, 4], ends: [3, 5], words: words, source: "Source: Apple Music"))
         #expect(read?.isWordSynced == true)
     }
 
@@ -69,8 +69,10 @@ import Testing
             """#,
             timing: "Line"
         )
-        #expect(read == Lyrics(lines: ["Lorem ipsum", "Dolor, sit & amet"], starts: [1, 3.5], source: "Source: Apple Music"))
+        #expect(read == Lyrics(lines: ["Lorem ipsum", "Dolor, sit & amet"], starts: [1, 3.5], ends: [2, 4], source: "Source: Apple Music"))
         #expect(read?.isSynced == true)
+        let open = lyrics(#"<p begin="1.000" end="2.000">Lorem</p><p begin="3.000">Ipsum</p>"#, timing: "Line")
+        #expect(open?.ends == [], "ends only where every line has one")
         #expect(lyrics("<p>Lorem</p><p>Ipsum</p>", timing: "None")?.isSynced == false, "unsynced without any times")
     }
 

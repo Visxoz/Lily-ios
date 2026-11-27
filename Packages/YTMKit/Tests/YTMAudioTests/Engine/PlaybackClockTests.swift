@@ -31,6 +31,13 @@ struct PlaybackClockTests {
         #expect(abs(clock.position(at: now + 2 * second) - 13) < 1e-6, "a pin keeps the speed")
     }
 
+    @Test func runsOnAtAVarispeedsPace() {
+        let clock = PlaybackClock()
+        let now = mach_absolute_time()
+        clock.pin(30, since: now, pace: 1.03)
+        #expect(abs(clock.position(at: now + second) - 31.03) < 1e-6, "song time, ahead of the time played")
+    }
+
     @Test func keepsTheDurationAndDownload() {
         let clock = PlaybackClock()
         #expect(clock.duration == nil && clock.buffered == 0)

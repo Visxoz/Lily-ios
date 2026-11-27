@@ -23,7 +23,11 @@ extension PlaybackEngine {
             planFade()
             var limit = frames(Self.bufferSeconds)
             if let plan, plan.from === track {
-                let left = plan.start - track.position
+                if let curve = plan.curve, track.warp == nil, track.position >= plan.start {
+                    track.startWarp(curve)
+                }
+                // Frames before the fade: to the plan's start, then through any varispeed's ramp.
+                let left = track.warp?.beforeSpeed ?? plan.start - track.position
                 guard left > 0 else {
                     beginFade(plan)
                     continue
@@ -46,13 +50,13 @@ extension PlaybackEngine {
         while filled < limit, case .frames(let count) = track.supply(), let channels = track.channels {
             let taken = min(count, limit - filled)
             Crossfade.copy(channels, gain: gain, count: taken, into: out, at: filled)
-            track.decoder?.consume(taken)
+            track.consume(taken)
             filled += taken
         }
         track.gain = gain.at(filled)
         guard filled > 0 else { return nil }
         buffer.frameLength = AVAudioFrameCount(filled)
-        return (buffer, Scheduled(track: track, first: first, frames: filled))
+        return (buffer, Scheduled(track: track, first: first, frames: filled, song: track.position - first))
     }
 
     /// Counts as the incoming item's buffer: the switch is heard as the fade starts.
@@ -74,21 +78,20 @@ extension PlaybackEngine {
             }
             // Either side may have ended, and is silence from there.
             let taken = min(Self.frames(in: incoming), Self.frames(in: outgoing), count - filled)
-            Crossfade.mix(
-                incoming: incoming == .ended ? nil : track.channels.map { ($0, gains.incoming) },
-                outgoing: outgoing == .ended ? nil : fade.from.channels.map { ($0, gains.outgoing) },
+            fade.mixer.mix(
+                incoming: incoming == .ended ? nil : track.channels,
+                outgoing: outgoing == .ended ? nil : fade.from.channels,
+                gains: gains,
                 count: taken,
-                at: fade.mixed + Int64(filled),
-                of: fade.length,
-                trade: fade.trade,
+                at: Int(fade.mixed) + filled,
                 into: out,
                 offset: filled
             )
             if incoming != .ended {
-                track.decoder?.consume(taken)
+                track.consume(taken)
             }
             if outgoing != .ended {
-                fade.from.decoder?.consume(taken)
+                fade.from.consume(taken)
             }
             filled += taken
         }
@@ -100,7 +103,7 @@ extension PlaybackEngine {
         }
         guard filled > 0 else { return nil }
         buffer.frameLength = AVAudioFrameCount(filled)
-        return (buffer, Scheduled(track: track, first: first, frames: filled))
+        return (buffer, Scheduled(track: track, first: first, frames: filled, song: track.position - first))
     }
 
     /// The most a quiet track is turned up, +3 dB, as its peaks are unknown and quiet tracks are often the
@@ -136,30 +139,38 @@ extension PlaybackEngine {
         guard plan == nil, let next, next.leadTrimmed, let track = producing,
               let rate = track.sampleRate, next.sampleRate == rate, track.length != nil else { return }
         let limit = Int64(AudioPlayer.silenceTrimSeconds * rate)
-        let (end, length, trade): (Int64, Int64, Automix.Trade?)
+        let (end, length, style, warp): (Int64, Int64, Automix.Style, (start: Int64, curve: Varispeed)?)
         switch nextTransition {
         case .gapless:
             return
         case .crossfade(let seconds):
             guard let found = track.soundEnd(limit: limit) else { return }
-            (end, length, trade) = (found, Int64(seconds * rate), nil)
+            (end, length, style, warp) = (found, Int64(seconds * rate), .crossfade, nil)
         case .automix:
             guard let intro = next.intro(frames: Int64(Automix.introSeconds * rate)),
                   let (found, tail) = track.tail(limit: limit, frames: Int64(Automix.tailSeconds * rate)) else { return }
+            let voices = Automix.Voices(nextSung, tailEnd: Double(found) / rate, introStart: Double(next.position) / rate, rate: rate)
             // Within what is yet to be scheduled, so the beats still land together.
-            let mix = Automix.plan(tail: tail, intro: intro, rate: rate, room: Int(max(found - track.position, 0)))
-            (end, length, trade) = (found, Int64(mix.frames), Automix.Trade(mix, rate: rate))
+            let mix = Automix.plan(tail: tail, intro: intro, rate: rate, room: Int(max(found - track.position, 0)), voices: voices)
+            // The tail's frames counted from the item's, and the varispeed from as far back as its taps reach.
+            let tailStart = found - Int64(tail.frames)
+            (end, length, style) = (found, Int64(mix.frames), mix.style)
+            warp = mix.warp.map { (tailStart + Int64($0.start) - Int64(Varispeed.reach), $0.curve) }
         }
-        // What is scheduled already plays as it is, so a late plan shortens the fade.
-        let start = max(end - length, track.position)
-        plan = FadePlan(from: track, start: start, length: max(end - start, 0), trade: trade)
+        // What is scheduled already plays as it is, so a late plan shortens a crossfade; Automix plans within it.
+        let start = max(warp?.start ?? end - length, track.position)
+        let frames = warp == nil ? max(end - start, 0) : length
+        plan = FadePlan(
+            from: track, start: start, length: frames, mixer: Automix.Mixer(frames: Int(frames), style: style, rate: rate),
+            curve: warp?.curve
+        )
     }
 
     private func beginFade(_ plan: FadePlan) {
         self.plan = nil
         producing = next
         next = nil
-        fade = plan.length > 0 ? Fade(from: plan.from, length: plan.length, trade: plan.trade) : nil
+        fade = plan.length > 0 ? Fade(from: plan.from, length: plan.length, mixer: plan.mixer) : nil
     }
 
     private func followOn() -> Bool {
@@ -339,15 +350,16 @@ extension PlaybackEngine {
     private func pinClock() {
         guard let heard, let rate = heard.sampleRate,
               let last = scheduled.last(where: { $0.track === heard }) else { return }
-        let end = Double(last.first + Int64(last.frames)) / rate
+        let end = Double(last.first + last.song) / rate
         guard playerRunning, let (sample, hostTime) = graph.renderedSample(),
               let entry = scheduled.first(where: { $0.track === heard && sample < $0.start + Int64($0.frames) })
         else {
             clock.pin(min(clock.position(), end), since: nil)
             return
         }
-        let frame = entry.first + max(sample - entry.start, 0)
-        clock.pin(Double(frame) / rate, since: hostTime, limit: end)
+        let pace = Double(entry.song) / Double(entry.frames)
+        let frame = Double(entry.first) + Double(max(sample - entry.start, 0)) * pace
+        clock.pin(frame / rate, since: hostTime, limit: end, pace: pace)
     }
 
     func updateBuffering() {

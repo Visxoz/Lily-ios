@@ -20,6 +20,8 @@ final class Track {
     /// A buffer of its sound has been scheduled.
     var hasSounded = false
     private(set) var leadTrimmed = false
+    /// Automix's varispeed, read in place of the decoder's frames while it plays.
+    private(set) var warp: Varispeed.Reader?
     /// Automix's analyses, kept as each decodes seconds of the file.
     private var analysedTail: (end: Int64, analysis: Automix.Analysis)?
     private var analysedIntro: Automix.Analysis?
@@ -45,7 +47,8 @@ final class Track {
     }
 
     var sampleRate: Double? { decoder?.sampleRate }
-    var position: Int64 { decoder?.position ?? 0 }
+    /// In song frames, through any varispeed.
+    var position: Int64 { warp?.position ?? decoder?.position ?? 0 }
 
     /// The item's length in frames, once its file is complete.
     var length: Int64? { decoder?.length(of: state) }
@@ -108,6 +111,7 @@ final class Track {
     /// Starts again at `seconds`, or there once the decoder opens.
     func seek(to seconds: Double) {
         finished = false
+        warp = nil
         guard let decoder else {
             startAt = seconds
             return
@@ -115,8 +119,43 @@ final class Track {
         decoder.seek(to: Int64((seconds * decoder.sampleRate).rounded()))
     }
 
-    /// A failed download ends the item where its bytes ran out.
+    /// Through any varispeed, which reads silence past the decoder's end.
     func supply() -> PacketDecoder.Supply {
+        guard let warp, let decoder else { return decoded() }
+        while warp.render() == 0 {
+            if warp.inputEnded { return .ended }
+            switch decoded() {
+            case .frames(let count):
+                warp.append(decoder.stereo, count: count)
+                decoder.consume(count)
+            case .waiting:
+                return .waiting
+            case .ended:
+                warp.endInput()
+            }
+        }
+        return .frames(warp.available)
+    }
+
+    func consume(_ count: Int) {
+        if let warp { warp.consume(count) } else { decoder?.consume(count) }
+    }
+
+    /// Plays on from here at `curve`'s speeds.
+    func startWarp(_ curve: Varispeed) {
+        warp = Varispeed.Reader(curve: curve, from: position)
+    }
+
+    /// Carries on at its own speed from the song frame the varispeed reached.
+    func leaveWarp() {
+        guard let warp else { return }
+        self.warp = nil
+        finished = false
+        decoder?.seek(to: warp.position)
+    }
+
+    /// A failed download ends the item where its bytes ran out.
+    private func decoded() -> PacketDecoder.Supply {
         guard let decoder, !finished else { return .ended }
         aim()
         do {
@@ -134,7 +173,7 @@ final class Track {
     }
 
     var channels: Crossfade.Channels? {
-        decoder.map { ($0.samples(0), $0.samples(1)) }
+        warp?.channels ?? decoder?.stereo
     }
 
     /// Cut so a blend brings in music rather than silence. False while waiting on the file.
@@ -142,15 +181,14 @@ final class Track {
         guard !leadTrimmed else { return true }
         guard let decoder else { return false }
         scan: while decoder.position < limit {
-            switch supply() {
+            switch decoded() {
             case .waiting:
                 return false
             case .ended:
                 break scan
             case .frames(let count):
                 let window = min(count, Int(limit - decoder.position))
-                guard let channels else { break scan }
-                let silent = Crossfade.leadingSilence(channels, count: window)
+                let silent = Crossfade.leadingSilence(decoder.stereo, count: window)
                 decoder.consume(silent)
                 if silent < window {
                     break scan
@@ -218,7 +256,7 @@ final class Track {
         while true {
             switch (try? scanner.supply(state)) ?? .ended {
             case .frames(let count):
-                guard body((scanner.samples(0), scanner.samples(1)), count, scanner.position) else { return true }
+                guard body(scanner.stereo, count, scanner.position) else { return true }
                 scanner.consume(count)
             case .waiting:
                 return false
@@ -291,4 +329,8 @@ final class Track {
             trailingFrames: source?.trailingFrames ?? 0
         )
     }
+}
+
+private extension PacketDecoder {
+    var stereo: Crossfade.Channels { (samples(0), samples(1)) }
 }

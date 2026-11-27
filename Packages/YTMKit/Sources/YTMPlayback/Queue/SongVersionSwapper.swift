@@ -19,6 +19,10 @@ struct SongVersionSwapper {
         if case .known(let song?) = lookups[videoId] { song } else { nil }
     }
 
+    func isLooking(for videoId: String) -> Bool {
+        if case .pending = lookups[videoId] { true } else { false }
+    }
+
     /// False when the lookup is already under way or done.
     mutating func beginLookup(_ videoId: String) -> Bool {
         guard lookups[videoId] == nil else { return false }
@@ -53,6 +57,8 @@ extension PlayerController {
             let song = try? result.get()
             songVersions.found(song, for: next.id)
             if let song { prefetchSongVersion(of: next.id, song) }
+            // The video is asked where it is sung unless its swap is still on its way.
+            prefetchSung()
         }
     }
 
@@ -72,6 +78,9 @@ extension PlayerController {
         guard current?.id != videoId, !queue.replace(where: { $0.id == videoId }, with: song).isEmpty else { return false }
         prefetcher.remove(videoId)
         Logger.playback.info("\(videoId, privacy: .public): playing its song version, \(song.id, privacy: .public)")
+        // The song's lyrics go first, so `prefetchSung` waits for them.
+        if let next = queue.peekNext(repeat: repeatMode) { prefetchLyrics(of: next) }
+        prefetchSung()
         return true
     }
 }

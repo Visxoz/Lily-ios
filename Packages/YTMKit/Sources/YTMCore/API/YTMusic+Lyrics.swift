@@ -33,6 +33,20 @@ extension YTMusic {
         return Lyrics.chosen(youtube: own, apple: apple, others: others)
     }
 
+    /// Where a song is sung, by YouTube's timed lyrics alone: never the hub, whose pass check a song merely played
+    /// shouldn't start. Nil when it has none or they're untimed.
+    @concurrent
+    public func sung(videoId: String) async throws -> [Range<Double>]? {
+        guard let browseId = try await lyricsBrowseId(videoId) else { return nil }
+        return try await timedLyrics(browseId)?.sung
+    }
+
+    /// Where the song's lyrics are browsed, by YouTube's answer for it, asked unless `fetched`.
+    private func lyricsBrowseId(_ videoId: String, next fetched: JSON? = nil) async throws -> String? {
+        let next = if let fetched { fetched } else { try await innerTube.next(["videoId": videoId], authenticated: false) }
+        return Lyrics.browseId(in: next)
+    }
+
     /// The track with its length, which the other sites need and home tiles lack, and the `next` answer read for it.
     private func withLength(_ track: Track) async throws -> (Track, JSON?) {
         guard track.duration == nil else { return (track, nil) }
@@ -62,20 +76,21 @@ extension YTMusic {
     /// Timed lines as the Android app is given them, else the web client's block of text. Nil when the song has none.
     /// `fetched` is YouTube's answer for the song when it was already asked.
     private func youtubeLyrics(videoId: String, next fetched: JSON? = nil) async throws -> Lyrics? {
-        let next = if let fetched { fetched } else { try await innerTube.next(["videoId": videoId], authenticated: false) }
-        guard let browseId = Lyrics.browseId(in: next) else { return nil }
+        guard let browseId = try await lyricsBrowseId(videoId, next: fetched) else { return nil }
         do {
-            // Not retried: the web lyrics are the fallback.
-            let android = try await innerTube.post(
-                "browse", body: ["browseId": browseId], client: .androidMusic, authenticated: false, retries: 0
-            )
-            if let timed = Lyrics(timed: android) { return timed }
+            if let timed = try await timedLyrics(browseId) { return timed }
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             // The web client's lyrics follow, which are the same words.
         }
         return try Lyrics(plain: await innerTube.browse(browseId, authenticated: false))
+    }
+
+    /// Timed lines as the Android app is given them. Not retried: the lyrics fall back to the web's, and `sung` stays
+    /// unknown.
+    private func timedLyrics(_ browseId: String) async throws -> Lyrics? {
+        Lyrics(timed: try await innerTube.post("browse", body: ["browseId": browseId], client: .androidMusic, authenticated: false, retries: 0))
     }
 }
 
@@ -104,23 +119,30 @@ extension Lyrics {
         }.first
     }
 
-    /// Nil when the answer isn't in the shape expected or has no lines. Synced only if every line has its time.
+    /// Nil when the answer isn't in the shape expected or has no lines. Starts and ends are each kept only if every
+    /// line has one, and ends only with starts.
     init?(timed response: JSON) {
         let data = response["contents", "elementRenderer", "newElement", "type", "componentType", "model", "timedLyricsModel", "lyricsData"]
         let timed = data["timedLyricsData"].array
         guard !timed.isEmpty else { return nil }
         var lines: [String] = []
         var starts: [Double] = []
+        var ends: [Double] = []
         lines.reserveCapacity(timed.count)
         starts.reserveCapacity(timed.count)
+        ends.reserveCapacity(timed.count)
         for line in timed {
             guard let text = line["lyricLine"].string else { return nil }
             lines.append(text)
-            if let ms = line["cueRange", "startTimeMilliseconds"].string.flatMap({ UInt64($0) }) {
-                starts.append(Double(ms) / 1000)
-            }
+            let cue = line["cueRange"]
+            if let ms = cue["startTimeMilliseconds"].string.flatMap({ UInt64($0) }) { starts.append(Double(ms) / 1000) }
+            if let ms = cue["endTimeMilliseconds"].string.flatMap({ UInt64($0) }) { ends.append(Double(ms) / 1000) }
         }
-        self.init(lines: lines, starts: starts.count == lines.count ? starts : [], source: data["sourceMessage"].string ?? "")
+        let synced = starts.count == lines.count
+        self.init(
+            lines: lines, starts: synced ? starts : [], ends: synced && ends.count == lines.count ? ends : [],
+            source: data["sourceMessage"].string ?? ""
+        )
     }
 
     /// Nil when YouTube answers with a message, such as "Lyrics not available", instead.

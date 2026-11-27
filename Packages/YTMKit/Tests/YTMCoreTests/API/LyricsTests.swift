@@ -41,18 +41,61 @@ import Testing
         #expect(chosen(nil) == nil)
     }
 
+    private func timedLines(_ lines: [String], _ starts: [Double], ends: [Double] = [], words: [[Lyrics.Word]] = []) -> Lyrics {
+        Lyrics(lines: lines, starts: starts, ends: ends, words: words)
+    }
+
+    private func words(_ spans: [(Double, Double)]) -> [Lyrics.Word] {
+        spans.map { Lyrics.Word(text: "la ", start: $0.0, end: $0.1) }
+    }
+
+    @Test func sungByWordsJoinsThoseABreathApart() {
+        let lyrics = timedLines(
+            ["One", "Two", "Three"], [1, 5, 20],
+            // Out of order, overlapping, and one ending before it starts; a line without words is sung as a line.
+            words: [words([(1, 1.5), (1.9, 2.4), (3.1, 3.5)]), words([(6, 7), (5, 6.5), (9, 8)]), []]
+        )
+        #expect(lyrics.sung == [1..<2.4, 3.1..<3.5, 5..<7, 20..<25])
+    }
+
+    @Test func sungByLinesRunsToTheNextAtMostAWhile() {
+        #expect(timedLines(["One", "♪", "Two", "Three"], [0, 10, 12, 13]).sung == [0..<5, 12..<18])
+    }
+
+    @Test func sungByLinesEndsWhereTheyEnd() {
+        // Shorter than the cap, longer, past the next line, and not after its start.
+        let lyrics = timedLines(["One", "♪", "Two", "Three", "♪", "Four"], [0, 10, 12, 22, 25, 35], ends: [3, 11, 20, 40, 31, 34])
+        #expect(lyrics.sung == [0..<3, 12..<17, 22..<25, 35..<40])
+    }
+
+    @Test func sungIsUnknownWithoutTiming() {
+        #expect(Lyrics(lines: ["One", "Two"]).sung == nil)
+        #expect(Lyrics(lines: []).sung == nil)
+        #expect(timedLines(["", "♪"], [0, 4]).sung == nil)
+    }
+
     @Test func readsSyncedLinesWithTheirStarts() throws {
         let json = try timed(#"""
             {"lyricLine":"One","cueRange":{"startTimeMilliseconds":"1500","endTimeMilliseconds":"3000","metadata":{"id":"1"}}},
             {"lyricLine":"Two","cueRange":{"startTimeMilliseconds":"3000","endTimeMilliseconds":"4000"}}
             """#)
-        #expect(Lyrics(timed: json) == Lyrics(lines: ["One", "Two"], starts: [1.5, 3.0], source: "Source: Musixmatch"))
+        #expect(Lyrics(timed: json) == Lyrics(lines: ["One", "Two"], starts: [1.5, 3.0], ends: [3, 4], source: "Source: Musixmatch"))
     }
 
     @Test func untimedLinesHaveNoStarts() throws {
         let lyrics = try #require(Lyrics(timed: timed(#"{"lyricLine":"One"},{"lyricLine":"Two","cueRange":{"startTimeMilliseconds":"3000"}}"#)))
         #expect(lyrics.lines == ["One", "Two"])
         #expect(lyrics.starts.isEmpty, "synced only when every line is")
+        #expect(lyrics.ends.isEmpty)
+    }
+
+    @Test func endsAreKeptOnlyWhenEveryLineHasOne() throws {
+        let lyrics = try #require(Lyrics(timed: timed(#"""
+            {"lyricLine":"One","cueRange":{"startTimeMilliseconds":"1500","endTimeMilliseconds":"3000"}},
+            {"lyricLine":"Two","cueRange":{"startTimeMilliseconds":"3000"}}
+            """#)))
+        #expect(lyrics.starts == [1.5, 3])
+        #expect(lyrics.ends.isEmpty)
     }
 
     @Test func otherShapesAreNone() throws {

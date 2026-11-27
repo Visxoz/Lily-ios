@@ -96,6 +96,8 @@ extension PlayerController {
         lyricsLoad = Task { [weak self] in
             let result = await Result { try await music.lyrics(for: current) }
             guard let self else { return }
+            // Once the state below settles: `prefetchSung` waited for these, or asks itself after a failure.
+            defer { prefetchSung() }
             // Kept even when the song has changed meanwhile, for when it plays again.
             if case .success(let found) = result { remember(found, for: id) }
             guard !Task.isCancelled, lyricsFor == id else { return }
@@ -122,6 +124,7 @@ extension PlayerController {
             let result = await Result { try await music.lyrics(for: song) }
             self?.lyricsAhead.remove(id)
             if case .success(let found) = result { self?.remember(found, for: id) }
+            self?.prefetchSung()
         }
     }
 

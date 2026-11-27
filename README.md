@@ -46,7 +46,7 @@ Tap the lyrics button in Now Playing for lyrics that light up word by word as th
 <td width="33%" valign="top">
 
 ### Automix
-Blends each song into the next like a DJ, over a fade-out or a quiet intro, on the beat when the tempos match. Turn it on in **Settings ▸ Playback**; otherwise songs follow on gaplessly.
+Blends each song into the next like a DJ, over a fade-out or a quiet intro, on the bar or the beat, nudging the tempo to meet when it's close. It trades the bass, sweeps or echoes out, and uses the timed lyrics to keep two singers from overlapping. Turn it on in **Settings ▸ Playback**; otherwise songs follow on gaplessly.
 
 </td>
 </tr>

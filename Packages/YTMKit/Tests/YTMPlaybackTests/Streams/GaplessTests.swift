@@ -28,7 +28,7 @@ struct GaplessTests {
         #expect(GaplessScheduler.lead(.gapless, speed: 1) == 15)
         #expect(GaplessScheduler.lead(.crossfade(6), speed: 1) == 25)
         #expect(GaplessScheduler.lead(.crossfade(12), speed: 1) == 31, "the longest fade offered")
-        #expect(GaplessScheduler.lead(.automix, speed: 1) == 31, "the longest blend")
+        #expect(GaplessScheduler.lead(.automix, speed: 1) == 39, "the longest blend and its varispeed")
         #expect(abs(GaplessScheduler.lead(.crossfade(6), speed: 1.2) - 28) < 1e-9, "only opening the next takes clock time")
     }
 

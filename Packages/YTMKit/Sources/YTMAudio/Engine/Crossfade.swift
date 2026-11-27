@@ -1,19 +1,22 @@
 import Accelerate
 import Foundation
 
-/// Worked out once both items' silences are known; `start` is a frame of the item fading out.
+/// Worked out once both items' silences are known.
 struct FadePlan {
     let from: Track
+    /// The frame of the item fading out where the fade starts, or its varispeed should it have one.
     let start: Int64
+    /// Frames played, from the end of any varispeed's ramp.
     let length: Int64
-    let trade: Automix.Trade?
+    let mixer: Automix.Mixer
+    /// Automix's varispeed from `start`, meeting the incoming item's tempo by the fade.
+    let curve: Varispeed?
 }
 
 struct Fade {
     let from: Track
     let length: Int64
-    /// Automix's bass trade; nil for a plain crossfade.
-    let trade: Automix.Trade?
+    let mixer: Automix.Mixer
     var mixed: Int64 = 0
 
     var remaining: Int64 { length - mixed }
@@ -60,44 +63,6 @@ enum Crossfade {
         vDSP_vrampmul(channels.left, 1, &start, &step, out[0] + offset, 1, vDSP_Length(count))
         start = gain.at(offset)
         vDSP_vrampmul(channels.right, 1, &start, &step, out[1] + offset, 1, vDSP_Length(count))
-    }
-
-    /// Equal-power curves keep the loudness steady through the overlap, where linear ones dip midway.
-    /// A nil side has ended and counts as silence; `offset` is also each side's frame of its ramp.
-    static func mix(
-        incoming: (channels: Channels, gain: Ramp)?,
-        outgoing: (channels: Channels, gain: Ramp)?,
-        count: Int,
-        at position: Int64,
-        of length: Int64,
-        trade: Automix.Trade?,
-        into out: UnsafePointer<UnsafeMutablePointer<Float>>,
-        offset: Int
-    ) {
-        for frame in 0..<count {
-            let at = position + Int64(frame)
-            let angle = Double(at) / Double(max(length, 1)) * .pi / 2
-            let fadeIn = Float(sin(angle))
-            let fadeOut = Float(cos(angle))
-            var left: Float = 0
-            var right: Float = 0
-            if let incoming {
-                var sample = (incoming.channels.left[frame], incoming.channels.right[frame])
-                if let trade { sample = trade.incoming(sample, at: at) }
-                let gain = incoming.gain.at(offset + frame) * fadeIn
-                left += sample.0 * gain
-                right += sample.1 * gain
-            }
-            if let outgoing {
-                var sample = (outgoing.channels.left[frame], outgoing.channels.right[frame])
-                if let trade { sample = trade.outgoing(sample, at: at) }
-                let gain = outgoing.gain.at(offset + frame) * fadeOut
-                left += sample.0 * gain
-                right += sample.1 * gain
-            }
-            out[0][offset + frame] = left
-            out[1][offset + frame] = right
-        }
     }
 
     /// The sound after a start, seek or stall would otherwise step in and click.

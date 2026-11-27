@@ -22,12 +22,19 @@ struct GaplessScheduler {
     var queuedFailed = false
     /// The song last tried for queueing, so a failure is not retried every tick.
     private(set) var tried: String?
+    /// Where the current and next songs are sung, for Automix.
+    var sung = SungSpans()
 
     /// Album tracks in order are often written to run straight on, so are never blended into.
     static func inAlbumOrder(_ current: Track?, _ next: Track) -> Bool {
         guard let current, let album = current.album?.id, album == next.album?.id else { return false }
         guard let a = current.trackNumber, let b = next.trackNumber else { return true }
         return a < .max && a + 1 == b
+    }
+
+    /// How `next` follows `current` with `setting` as set.
+    static func transition(_ setting: Transition, from current: Track?, to next: Track?) -> Transition {
+        if let next, !inAlbumOrder(current, next) { setting } else { .gapless }
     }
 
     /// In song time, which passes `speed` times as fast as wall time.
@@ -39,7 +46,7 @@ struct GaplessScheduler {
     func plan(
         position: Double, duration: Double, started: Bool, current: Track?, next: Track?, transition: Transition, speed: Double
     ) -> (stale: Bool, due: (id: String, transition: Transition)?) {
-        let transition = if let next, !Self.inAlbumOrder(current, next) { transition } else { Transition.gapless }
+        let transition = Self.transition(transition, from: current, to: next)
         let stale = queued.map { $0.trackID != next?.id } ?? false
         let nearEnd = started && duration > 0 && duration - position <= Self.lead(transition, speed: speed) && (queued == nil || stale)
         guard nearEnd, let next, tried != next.id else { return (stale, nil) }
@@ -99,7 +106,7 @@ extension PlayerController {
             do {
                 let prefetched = try result.get()
                 let item = try audioItem(for: next, stream: prefetched.stream)
-                audio.setNext(item, transition)
+                audio.setNext(item, transition, sung: sung(for: transition, next: nextID))
                 gapless.setQueued(.init(trackID: nextID, itemID: item.id, prefetched: prefetched))
             } catch {
                 Logger.playback.debug("could not queue the next track: \(sentence(for: error), privacy: .public)")
@@ -112,7 +119,7 @@ extension PlayerController {
         queueing?.cancel()
         guard gapless.queued != nil else { return gapless.forget() }
         gapless.unqueue(into: &prefetcher)
-        audio.setNext(nil, .gapless)
+        audio.setNext(nil, .gapless, sung: Sung())
     }
 
     /// The queued song became audible: moves the queue on without loading anything.

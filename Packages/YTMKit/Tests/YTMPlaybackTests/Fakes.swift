@@ -29,6 +29,8 @@ final class FakeMusic: MusicService {
         var playerUnprepared = false
         var lyrics: [String: Lyrics] = [:]
         var lyricsFail = false
+        var sung: [String: [Range<Double>]] = [:]
+        var songVersions: [String: Track] = [:]
         /// Playlists and albums as `page` and `loadStep` serve them, a batch at a time.
         var playlistBatches: [String: [[Track]]] = [:]
         /// Batch tokens, as `PL#1`, that fail as YouTube's do: the page ends there, not whole.
@@ -180,13 +182,20 @@ final class FakeMusic: MusicService {
 
     func songVersion(of video: Track) async throws -> Track? {
         log("version \(video.id)")
-        return nil
+        return state.withLock { $0.songVersions[video.id] }
     }
 
     func lyrics(for track: Track) async throws -> Lyrics? {
         log("lyrics \(track.id)")
         if state.withLock(\.lyricsFail) { throw YTMError(.network, "No connection.") }
         return state.withLock { $0.lyrics[track.id] }
+    }
+
+    func sung(videoId: String) async throws -> [Range<Double>]? {
+        log("sung \(videoId)")
+        await waitWhileHeld("sung \(videoId)")
+        if Task.isCancelled { log("cancelled sung \(videoId)") }
+        return state.withLock { $0.sung[videoId] }
     }
 
     func rating(videoId: String) async throws -> Rating {
@@ -230,6 +239,7 @@ final class FakeMusic: MusicService {
     private(set) var next: AudioItem?
     private(set) var warmed: [AudioItem] = []
     private(set) var nextTransition = Transition.gapless
+    private(set) var nextSung = Sung()
     private(set) var seeks: [Double] = []
     private(set) var log: [String] = []
 
@@ -244,9 +254,10 @@ final class FakeMusic: MusicService {
         log.append("play \(item.id)")
     }
 
-    func setNext(_ item: AudioItem?, _ transition: Transition) {
+    func setNext(_ item: AudioItem?, _ transition: Transition, sung: Sung) {
         next = item
         nextTransition = transition
+        nextSung = sung
         log.append("next \(item?.id ?? "nil")")
     }
 

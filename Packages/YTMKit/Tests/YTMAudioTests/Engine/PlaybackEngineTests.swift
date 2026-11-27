@@ -149,6 +149,122 @@ struct PlaybackEngineTests {
         #expect(playback.events == [.buffering(true), .started(id: "one"), .buffering(false), .advanced(id: "two"), .finished])
     }
 
+    /// Two click tracks 2.5% apart, which Automix meets by speeding the first up.
+    private func varispeeded() throws -> [String: Data] {
+        ["one": try Fixtures.opusWebM(clicks(120, seconds: 30)), "two": try Fixtures.opusWebM(clicks(123, seconds: 15))]
+    }
+
+    /// Plays one into two by Automix until the blend is planned: the output so far, and its varispeed's start and
+    /// curve and the blend's length.
+    private func plannedVarispeed(
+        _ files: [String: Data]
+    ) async throws -> (playback: OfflinePlayback, output: [Float], start: Int, curve: Varispeed, length: Int) {
+        let playback = OfflinePlayback(files: files)
+        let one = try AudioItem.fixture("one", length: files["one", default: Data()].count)
+        let two = try AudioItem.fixture("two", length: files["two", default: Data()].count)
+        playback.engine.send { $0.play(one, from: 0, paused: false, session: 1) }
+        playback.engine.send { $0.setNext(two, .automix, session: 1) }
+        var output: [Float] = []
+        for _ in 0..<100 where await playback.state({ $0.plan == nil }) {
+            output += await playback.render(seconds: 0.1)
+        }
+        let planned = await playback.state { engine in
+            engine.plan.flatMap { plan in plan.curve.map { (Int(plan.start), $0, Int(plan.length)) } }
+        }
+        let (start, curve, length) = try #require(planned, "a varispeed")
+        return (playback, output, start, curve, length)
+    }
+
+    @Test func blendsThroughAVarispeedOntoTheIncomingWhole() async throws {
+        let files = try varispeeded()
+        let (playback, planning, start, curve, length) = try await plannedVarispeed(files)
+        var output = planning
+        for _ in 0..<100 where !playback.events.contains(.finished) {
+            output += await playback.render(seconds: 0.5)
+        }
+        let outgoing = try DecodableFile(files["one", default: Data()]).decode()
+        let incoming = try DecodableFile(files["two", default: Data()]).decode()
+        expectSame(output[480..<start], outgoing[480...], "the first item whole up to the varispeed")
+        // Its first frames pass as they are, then the ramp, then the blend at the incoming item's tempo.
+        let ramp = Varispeed.reach + Int(curve.ramp)
+        let last = Double(start + Varispeed.reach) + curve.songFrames(curve.ramp) + curve.speed * Double(length)
+        // Opus drops the clicks' steady floor, so the sound ends with the last click, short of the file.
+        let sounded = outgoing.lastIndex { abs($0) >= Crossfade.silence }.map { $0 + 1 } ?? 0
+        #expect(abs(last - Double(sounded)) < 2, "the blend ends as the first item's sound does, at \(last) of \(sounded)")
+        let warped = curve.read((outgoing, outgoing), from: start, frames: ramp).left
+        expectSame(output[start..<(start + ramp)], warped[...], "the ramp read from the decoder's packets as in one")
+        let end = start + ramp + length
+        expectSame(output[end...].prefix(48_000), incoming[length...], "then the second item whole from the blend's end")
+        #expect(playback.events == [.buffering(true), .started(id: "one"), .buffering(false), .advanced(id: "two"), .finished])
+    }
+
+    /// Where a varispeed is undone: before its ramp is scheduled, part way up it, or once the fade after it is
+    /// scheduled, though not yet heard.
+    enum Undo: CaseIterable {
+        case before, during, after
+    }
+
+    @Test(arguments: Undo.allCases)
+    func undoingAVarispeedRestoresTheTailAsDecoded(_ undo: Undo) async throws {
+        let files = try varispeeded()
+        let file = files["one", default: Data()]
+        let decoded = try DecodableFile(file).decode()
+        let (playback, planning, start, curve, _) = try await plannedVarispeed(files)
+        var output = planning
+        // The song frame heard `frames` into the varispeed, its first frames passing as they are.
+        let song = { (frames: Int) in Double(start + Varispeed.reach) + curve.songFrames(Double(frames - Varispeed.reach)) }
+        // Dropped as what is heard comes 2 s short of the ramp, by then scheduled part way up, or a second short of the
+        // fade, by then scheduled.
+        let due = switch undo {
+        case .before: 0
+        case .during: start - 2 * Int(Fixtures.rate)
+        case .after: start + Varispeed.reach + Int(curve.ramp) - Int(Fixtures.rate)
+        }
+        while output.count < due {
+            output += await playback.render(seconds: 0.1)
+        }
+        if undo == .after {
+            // On to the next buffer played out, which pins the clock to the frame rendered; each render runs a whole
+            // piece of the offline output, however short asked.
+            let oldest = { @Sendable (engine: isolated PlaybackEngine) in engine.scheduled.first?.start }
+            let pinned = await playback.state(oldest)
+            for _ in 0..<100 where await playback.state(oldest) == pinned {
+                output += await playback.render(seconds: 1 / Fixtures.rate)
+            }
+        }
+        // How far the varispeed had got and whether the switch was scheduled, and where the item heard carries on.
+        let (played, reached, switched, resumed) = await playback.state { engine in
+            let (warp, switched) = (engine.heard?.warp, engine.producing !== engine.heard)
+            engine.setNext(nil, .gapless, session: 1)
+            return (warp?.played ?? 0, warp?.position ?? 0, switched, engine.scheduled.first?.first ?? 0)
+        }
+        let dropped = output.count
+        for _ in 0..<100 where !playback.events.contains(.finished) {
+            output += await playback.render(seconds: 0.5)
+        }
+        expectSame(output[480..<start], decoded[480...], "whole up to it")
+        switch undo {
+        case .before:
+            #expect(played == 0, "never varispeeded")
+            expectSame(output[start..<decoded.count], decoded[start...], "whole to the end")
+        case .during:
+            #expect(played > 0 && !switched, "\(played) frames up the ramp")
+            let ramp = curve.read((decoded, decoded), from: start, frames: played).left
+            expectSame(output[start..<(start + played)], ramp[...], "up the ramp as read")
+            // No reset, so on at once from the song frame the varispeed reached.
+            let after = try DecodableFile(file).decode(from: reached)
+            expectSame(output[(start + played)...].prefix(after.count), after[...], "then on from where it left off")
+        case .after:
+            #expect(switched, "the fade scheduled")
+            // From where the clock had got to in song time, which the ramp has put ahead of the frames played, fading
+            // in afresh.
+            #expect(abs(Double(resumed) - song(dropped - start)) < 0.002 * Fixtures.rate, "on from \(resumed), \(dropped) heard, \(played) played to \(reached)")
+            let after = try DecodableFile(file).decode(from: resumed)
+            expectSame(output[(dropped + 480)...].prefix(after.count - 480), after[480...], "then on from the clock")
+        }
+        #expect(playback.events == [.buffering(true), .started(id: "one"), .buffering(false), .finished])
+    }
+
     @Test func dropsTheNextWhenASeekFollowsTheSwitch() async throws {
         let files = ["one": try Fixtures.opusWebM(first), "two": try Fixtures.opusWebM(second)]
         let playback = OfflinePlayback(files: files)
@@ -352,6 +468,14 @@ private final class StallingByteSource: ByteSource {
         continuation.yield(file.subdata(in: Int(range.lowerBound)..<after))
         state.withLock { $0.held = continuation }
         return stream
+    }
+}
+
+/// Clicks at `bpm` from 0.125 s, over a faint steady floor, which Opus filters out as it does any DC.
+private func clicks(_ bpm: Double, seconds: Double) -> [Float] {
+    let period = 60 / bpm * Fixtures.rate
+    return (0..<Int(seconds * Fixtures.rate)).map { frame in
+        frame >= 6_000 && Double(frame - 6_000).truncatingRemainder(dividingBy: period) < 240 ? 0.4 : 0.002
     }
 }
 

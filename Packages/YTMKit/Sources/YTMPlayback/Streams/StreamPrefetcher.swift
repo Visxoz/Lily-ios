@@ -101,6 +101,8 @@ extension PlayerController {
     /// Smart Shuffle goes first, as the next song may be one of its recommendations. Never waits.
     func prefetchNext() {
         topUpSmartShuffle()
+        // Last, so it waits for the lyrics fetched ahead rather than asking too.
+        defer { prefetchSung() }
         guard let next = queue.peekNext(repeat: repeatMode) else { return }
         // A downloaded video stays, as its song version may need the network.
         if next.isVideo, localStream(next.id) == nil { swapInSongVersion(next) }
@@ -134,7 +136,10 @@ extension PlayerController {
         let task = prefetcher.begin(track.id, resolver(for: track.id))
         Task { [weak self] in
             let result = await task.result
-            guard let self, prefetcher.finish(track.id, task) else { return }
+            guard let self else { return }
+            // However it ends, a video waiting on this as its song version's stream is then asked where it is sung.
+            defer { prefetchSung() }
+            guard prefetcher.finish(track.id, task) else { return }
             switch result {
             case .success(let stream):
                 guard keep(self) else { return }

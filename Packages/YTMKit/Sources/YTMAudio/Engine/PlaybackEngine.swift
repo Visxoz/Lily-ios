@@ -46,6 +46,8 @@ actor PlaybackEngine {
     var pauseOnUnplug = true
     /// How `next` follows the item heard.
     var nextTransition = Transition.gapless
+    /// Where the item heard and `next` are sung, for Automix.
+    var nextSung = Sung()
     var plan: FadePlan?
     var fade: Fade?
     /// The item heard has ended, and the next is still opening.
@@ -70,6 +72,8 @@ actor PlaybackEngine {
         /// The item frame of its first frame.
         let first: Int64
         let frames: Int
+        /// The item frames its frames play, which a varispeed packs more or fewer of.
+        let song: Int64
         /// Its first frame on the player's timeline.
         var start: Int64 = 0
     }
@@ -117,11 +121,12 @@ actor PlaybackEngine {
         updateBuffering()
     }
 
-    func setNext(_ item: AudioItem?, _ transition: Transition, session: UInt64) {
+    func setNext(_ item: AudioItem?, _ transition: Transition, sung: Sung = Sung(), session: UInt64) {
         guard session == self.session, heard != nil else { return }
         dropNext()
         next = item.flatMap { open($0, at: 0, announcingStart: false) }
         nextTransition = transition
+        nextSung = sung
         // The item heard ended waiting for the next, which is gone.
         if next == nil, awaitingNext {
             awaitingNext = false

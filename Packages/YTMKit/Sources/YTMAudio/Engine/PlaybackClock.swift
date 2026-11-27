@@ -13,11 +13,13 @@ final class PlaybackClock: Sendable {
         var duration: Double?
         var buffered: Double = 0
         var speed = 1.0
+        /// Song seconds a second of the sound pinned plays, which Automix's varispeed moves off 1.
+        var pace = 1.0
 
         func position(at hostTime: UInt64) -> Double {
             guard let since, hostTime > since else { return seconds }
             let elapsed = AVAudioTime.seconds(forHostTime: hostTime) - AVAudioTime.seconds(forHostTime: since)
-            return min(seconds + elapsed * speed, max(limit, seconds))
+            return min(seconds + elapsed * speed * pace, max(limit, seconds))
         }
     }
 
@@ -37,11 +39,12 @@ final class PlaybackClock: Sendable {
     }
 
     /// Runs on from host time `since` up to `limit`, or holds at `seconds` when `since` is nil.
-    func pin(_ seconds: Double, since: UInt64?, limit: Double = .infinity) {
+    func pin(_ seconds: Double, since: UInt64?, limit: Double = .infinity, pace: Double = 1) {
         state.withLock { state in
             state.seconds = seconds
             state.since = since
             state.limit = limit
+            state.pace = pace
         }
     }
 

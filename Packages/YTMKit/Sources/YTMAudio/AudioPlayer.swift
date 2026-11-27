@@ -122,9 +122,9 @@ import Network
     }
 
     /// Replaces any item queued before; nil clears it. Its download starts now.
-    public func setNext(_ item: AudioItem?, _ transition: Transition) {
+    public func setNext(_ item: AudioItem?, _ transition: Transition, sung: Sung) {
         let session = session
-        engine.send { $0.setNext(item, transition, session: session) }
+        engine.send { $0.setNext(item, transition, sung: sung, session: session) }
     }
 
     /// Fetches the start of an item likely to play next, so a skip to it starts sooner; only the last is warmed.

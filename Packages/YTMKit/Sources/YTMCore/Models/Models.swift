@@ -208,6 +208,8 @@ public struct Lyrics: Codable, Hashable, Sendable {
     public var lines: [String]
     /// Each line's start in seconds when synced, else empty.
     public var starts: [Double]
+    /// Each line's end where every line has one, else empty.
+    public var ends: [Double]
     /// Each line's words when sung word by word, else empty; a line may still have none.
     public var words: [[Word]]
     /// Each line's translation, "" where it has none; empty without any.
@@ -218,11 +220,12 @@ public struct Lyrics: Codable, Hashable, Sendable {
     public var source: String
 
     public init(
-        lines: [String], starts: [Double] = [], words: [[Word]] = [], translations: [String] = [],
+        lines: [String], starts: [Double] = [], ends: [Double] = [], words: [[Word]] = [], translations: [String] = [],
         romanised: [String] = [], source: String = ""
     ) {
         self.lines = lines
         self.starts = starts
+        self.ends = ends
         self.words = words
         self.translations = translations
         self.romanised = romanised
@@ -244,6 +247,43 @@ public struct Lyrics: Codable, Hashable, Sendable {
             if starts[mid] <= time { lo = mid + 1 } else { hi = mid }
         }
         return lo == 0 ? nil : lo - 1
+    }
+
+    /// How long a line counts as sung at most, in seconds.
+    private static let lineSeconds = 5.0
+    /// Sung spans closer than this are one, as a breath isn't a gap.
+    private static let sungGap = 0.6
+
+    /// Where they are sung, sorted and merged: word timing where present, else each line to its end, at most
+    /// `lineSeconds` and never past the next line. Nil if untimed.
+    public var sung: [Range<Double>]? {
+        guard isSynced else { return nil }
+        let lineEnds = ends.count == lines.count ? ends : nil
+        var spans: [(start: Double, end: Double)] = []
+        for (i, line) in lines.enumerated() {
+            if words.indices.contains(i), !words[i].isEmpty {
+                spans += words[i].map { (start: $0.start, end: $0.end) }
+                continue
+            }
+            // A blank or "♪" line is a break, which still ends the one before.
+            guard line.unicodeScalars.contains(where: { $0.properties.isAlphabetic || $0.properties.numericType != nil }) else { continue }
+            let start = starts[i]
+            let next = i + 1 < starts.count ? starts[i + 1] : .infinity
+            // YouTube's ends often run on to the next line, across a break.
+            let end = lineEnds.flatMap { $0[i] > start ? $0[i] : nil } ?? .infinity
+            spans.append((start, min(end, start + Self.lineSeconds, next)))
+        }
+        // Checked before they become ranges, which trap on an end before the start.
+        let valid = spans.filter { $0.start.isFinite && $0.end.isFinite && $0.start < $0.end }.sorted { $0.start < $1.start }
+        var merged: [Range<Double>] = []
+        for (start, end) in valid {
+            if let last = merged.last, start - last.upperBound < Self.sungGap {
+                merged[merged.count - 1] = last.lowerBound..<max(last.upperBound, end)
+            } else {
+                merged.append(start..<end)
+            }
+        }
+        return merged.isEmpty ? nil : merged
     }
 }
 
