@@ -15,6 +15,8 @@
 <br>
 <a href="https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://github.com/Visxoz/Lily-ios/releases/latest/download/source.json"><img src="docs/add-feather.svg" width="300" alt="Add to Feather"></a>&nbsp;&nbsp;<a href="https://github.com/Visxoz/Lily-ios/releases/latest"><img src="docs/get-github.svg" width="300" alt="Download the IPA from GitHub"></a>
 
+New to sideloading? **[Here's how to get set up](#new-to-sideloading)**.
+
 <br>
 
 <img src="docs/hero.svg" width="100%" alt="Currents downloaded to play offline under the glass tab bar, Now Playing on the moving cover of SZA's SOS, and lyrics from Tame Impala's Currents lit word by word">
@@ -85,6 +87,17 @@ Swift and SwiftUI from top to bottom, with no web wrapper. It reopens on the son
 Open it up and every screen is laid out again for its two halves: the player beside its lyrics or queue, and albums beside their tracks. Stand it half open and the artwork faces you, with the controls on the flat half. The open layouts need iOS 27.1 or later.
 
 ## Install
+
+<a name="new-to-sideloading"></a>
+<details>
+<summary>New to sideloading?</summary>
+
+You'll need one of these stores on your iPhone first:
+
+- **SideStore** ([setup guide](https://docs.sidestore.io/docs/installation/prerequisites)) or **AltStore** ([Windows](https://faq.altstore.io/altstore-classic/how-to-install-altstore-windows) · [Mac](https://faq.altstore.io/altstore-classic/how-to-install-altstore-macos)): you need a free Apple ID, and a computer only for setup. After that they refresh apps from your phone over Wi-Fi with a VPN app on; for AltStore, set up [Remote AltServer](https://faq.altstore.io/altstore-classic/remote-altservers) first. Use AltStore Classic: AltStore PAL only installs apps notarised by Apple.
+- **Feather** ([GitHub](https://github.com/claration/Feather)): best if you already have a paid developer certificate.
+
+</details>
 
 1. On your iPhone, tap **Add to AltStore**, **Add to SideStore** or **Add to Feather** at the top of this page.
 2. Your store opens and adds Lily's source. Install Lily from it.
