@@ -1,5 +1,6 @@
 import Foundation
 import os
+import Synchronization
 
 /// YouTube's web player for one version, cut down to the code that unscrambles stream URLs.
 struct PlayerScript: Codable, Sendable {
@@ -16,6 +17,9 @@ struct PlayerScript: Codable, Sendable {
     }
 
     private static let iframeAPI = "https://www.youtube.com/iframe_api"
+    /// A version this build couldn't read fails alike until YouTube ships another, so its script isn't fetched again;
+    /// forgotten at relaunch, so an update that reads it tries afresh.
+    private static let unreadable = Mutex<String?>(nil)
 
     /// Inputs the player must change before a new version is trusted, as it is cached until YouTube's next one.
     /// Premium formats always need the signature.
@@ -30,18 +34,27 @@ struct PlayerScript: Codable, Sendable {
             throw YTMError(.parse, "The version of YouTube's player wasn't found.")
         }
         if let cached = store.load(PlayerScript.self, from: .player), cached.id == id { return cached }
+        if unreadable.withLock({ $0 == id }) { throw YTMError(.parse, "This version of YouTube's player can't be read.") }
 
         let clock = ContinuousClock()
         let started = clock.now
         let source = try await [UInt8](fetch("https://www.youtube.com/s/player/\(id)/player_ias.vflset/en_US/base.js"))
         let fetched = clock.now
-        guard let timestamp = signatureTimestamp(in: source) else {
-            throw YTMError(.parse, "The signature timestamp wasn't found in YouTube's player.")
+        let player: PlayerScript
+        do {
+            guard let timestamp = signatureTimestamp(in: source) else {
+                throw YTMError(.parse, "The signature timestamp wasn't found in YouTube's player.")
+            }
+            player = PlayerScript(id: id, signatureTimestamp: timestamp, code: try PlayerTrimmer.trim(source))
+        } catch {
+            unreadable.withLock { $0 = id }
+            throw error
         }
-        let player = PlayerScript(id: id, signatureTimestamp: timestamp, code: try PlayerTrimmer.trim(source))
         let trimmed = clock.now
+        // A solve that throws may only have run out of time or memory, so only a wrong answer marks the version.
         let check = try await player.solve(n: checkN, signature: checkSignature)
         guard check.n != checkN, check.signature != checkSignature else {
+            unreadable.withLock { $0 = id }
             throw YTMError(.unplayable, "YouTube's player didn't unscramble a test URL.")
         }
         Logger.premium.info("""
