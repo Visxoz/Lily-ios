@@ -12,6 +12,8 @@ struct PageHeaderView: View {
     let topInset: CGFloat
     /// The banner's width in pixels, which its decode is cut to; nil until measured.
     let bannerPixelWidth: Int?
+    /// The banner's decode, which the page's backdrop shares; nil until it is known.
+    let bannerPixels: Int?
     /// Under iPhone Duo's column of tabs only; elsewhere it would mirror the banner into the pull to refresh's space.
     let extendsBanner: Bool
     /// Wider than tall, as iPhone Duo open.
@@ -21,12 +23,15 @@ struct PageHeaderView: View {
     let link: String?
     /// The page from YouTube, which saves and subscribes; nil for one held on the device.
     let model: PageModel?
+    /// A search's top artist, which the banner opens.
+    let topResult: Card?
     /// Opens the rename or delete dialog of the account's own playlist; nil for any other page.
     let edit: ((PlaylistDialog) -> Void)?
     let perform: (HeaderAction) -> Void
 
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    @Environment(\.displayScale) private var displayScale
     @State private var fit = ActionsFit()
 
     private nonisolated static let actionsSpace = "actions"
@@ -39,45 +44,14 @@ struct PageHeaderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if header.banner {
-                let height = Self.artEdge(header, topInset: topInset)
-                ZStack(alignment: .bottomLeading) {
-                    // Not loaded until the width is known, so an uncut decode never lands in the cache beside the cut one.
-                    ArtworkImage(url: bannerPixelWidth == nil ? nil : header.thumbnail, edge: height, placeholder: false, pixelWidth: bannerPixelWidth)
-                        .frame(height: height)
-                        // Sharp down to just above the text, then as if behind frosted glass, which the text sits
-                        // on. Laid out as the photograph, so the two line up.
-                        .overlay {
-                            if let frosted = backdrop?.frosted {
-                                FrostedGlass(frosted: frosted)
-                                    // The banner's size, so the fades are measured on it rather than on an image
-                                    // overhanging it.
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .mask(PageTint.fade(from: 0.2, to: 0.45, edge: .bottom))
-                                    .mask(besideText)
-                                    .transition(.opacity)
-                            }
-                        }
-                        .animation(.easeOut(duration: 0.5), value: backdrop?.frosted == nil)
-                        // The page's colour behind the text, as the frost is set by the whole photograph, so a
-                        // bright or dark patch of it there would still show through.
-                        .overlay {
-                            LinearGradient(colors: [theme.panel.opacity(0), theme.panel.opacity(0.55)], startPoint: .top, endPoint: .bottom)
-                                .mask(PageTint.fade(from: 0.15, to: 0.45, edge: .bottom))
-                                .mask(besideText)
-                        }
-                        .clipped()
-                        // Into the page's backdrop at the foot, so the songs below meet no edge.
-                        .mask(PageTint.fade(from: isWide ? 0.8 : 0.7))
-                        .backgroundExtensionEffect(isEnabled: extendsBanner)
-                    // An artist's Subscribe beside its count of subscribers, leaving the row below room for words.
-                    HeaderText(header: header, foreground: theme.text, secondary: theme.textSecondary) {
-                        subscribe(small: true)
-                    }
-                    .padding(.horizontal, Metrics.pagePadding)
-                    .padding(.bottom, 20)
+                if let topResult {
+                    // Shaped to its frame, so a touch on the bar above, where the photo reaches, doesn't open it.
+                    Button { app.activate(topResult, displayScale: displayScale) } label: { banner.contentShape(Rectangle()) }
+                        .buttonStyle(.plain)
+                        .contextMenu { CardMenu(card: topResult) }
+                } else {
+                    banner
                 }
-                .frame(height: height)
-                .padding(.top, -topInset)
             } else {
                 let hasArt = header.thumbnail != nil || canPlay
                 VStack(spacing: 20) {
@@ -104,6 +78,52 @@ struct PageHeaderView: View {
                     .frame(height: Metrics.actionsHeight)
             }
         }
+    }
+
+    private var banner: some View {
+        let height = Self.artEdge(header, topInset: topInset)
+        return ZStack(alignment: .bottomLeading) {
+            // Not loaded until the width is known, so an uncut decode never lands in the cache beside the cut one.
+            ArtworkImage(
+                url: bannerPixelWidth == nil ? nil : header.thumbnail, edge: height, placeholder: false,
+                pixelEdge: bannerPixels,
+                pixelWidth: bannerPixelWidth
+            )
+                .frame(height: height)
+                // Sharp down to just above the text, then as if behind frosted glass, which the text sits
+                // on. Laid out as the photograph, so the two line up.
+                .overlay {
+                    if let frosted = backdrop?.frosted {
+                        FrostedGlass(frosted: frosted)
+                            // The banner's size, so the fades are measured on it rather than on an image
+                            // overhanging it.
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .mask(PageTint.fade(from: 0.2, to: 0.45, edge: .bottom))
+                            .mask(besideText)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeOut(duration: 0.5), value: backdrop?.frosted == nil)
+                // The page's colour behind the text, as the frost is set by the whole photograph, so a
+                // bright or dark patch of it there would still show through.
+                .overlay {
+                    LinearGradient(colors: [theme.panel.opacity(0), theme.panel.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                        .mask(PageTint.fade(from: 0.15, to: 0.45, edge: .bottom))
+                        .mask(besideText)
+                }
+                .clipped()
+                // Into the page's backdrop at the foot, so the songs below meet no edge.
+                .mask(PageTint.fade(from: isWide ? 0.8 : 0.7))
+                .backgroundExtensionEffect(isEnabled: extendsBanner)
+            // An artist's Subscribe beside its count of subscribers, leaving the row below room for words.
+            HeaderText(header: header, foreground: theme.text, secondary: theme.textSecondary) {
+                subscribe(small: true)
+            }
+            .padding(.horizontal, Metrics.pagePadding)
+            .padding(.bottom, 20)
+        }
+        .frame(height: height)
+        .padding(.top, -topInset)
     }
 
     /// On a wide screen, the banner's frost and wash only behind the text: right across, they read as a wall of blur.
@@ -188,7 +208,7 @@ struct PageHeaderView: View {
             }
             if let link {
                 Menu {
-                    if let model, let card = Card(pinning: model.route, header) {
+                    if let card = topResult ?? model.flatMap({ Card(pinning: $0.route, header) }) {
                         PinItem(card: card)
                         if let artist = card.artist { BlockItem(artist: artist) }
                     }

@@ -82,7 +82,11 @@ struct PageContent: View {
         }
         .modifier(Refresh(model: model))
         .task(id: tintSource) {
-            guard let tintSource else { return }
+            // Cleared too, as a refreshed search may no longer be led by an artist.
+            guard let tintSource else {
+                backdrop = nil
+                return
+            }
             // Held in the view too, as another page may empty the cache while this one stays in a stack.
             if let cached = Self.backdrops[tintSource.key] {
                 backdrop = cached
@@ -114,7 +118,7 @@ struct PageContent: View {
     private var tint: PageTint {
         let shown = shownBackdrop
         // Tinted, not frosted, under a banner on a wide screen, where more glass would read as a band of blur.
-        let frosted = isWide && page.header?.banner == true ? nil : shown?.frosted
+        let frosted = isWide && shownHeader?.banner == true ? nil : shown?.frosted
         return PageTint(colour: shown?.tint ?? Theme.routeTint(route), frosted: frosted, top: frame.top)
     }
 
@@ -122,25 +126,48 @@ struct PageContent: View {
         backdrop ?? tintSource.flatMap { Self.backdrops[$0.key] }
     }
 
+    /// A search led by an artist, which opens as the artist's page does.
+    private var topArtist: Card? {
+        guard case .search(_, nil) = route, case .cards(let top)? = page.sections.first, top.layout == .top,
+              let card = top.cards.first, card.kind == .artist, card.thumbnail != nil
+        else { return nil }
+        return card
+    }
+
+    /// The page's header, else its top artist's, as a banner.
+    private var shownHeader: PageHeader? {
+        page.header ?? topArtist.map {
+            // Without a count, the card's subtitle is only "Artist", which the label already says.
+            PageHeader(label: "Artist", title: $0.title, subtitle: $0.subtitle == "Artist" ? "" : $0.subtitle, thumbnail: $0.thumbnail, banner: true)
+        }
+    }
+
     private func headerView(_ header: PageHeader) -> PageHeaderView {
-        PageHeaderView(
+        // A search's top artist stands in for the page: its banner opens the artist and its buttons play it.
+        let artist = topArtist
+        return PageHeaderView(
             header: header,
-            canPlay: canPlay,
+            canPlay: canPlay || artist != nil,
             canShuffle: canPlay || header.shufflePlaylistId != nil,
-            canRadio: header.radioId != nil,
+            canRadio: header.radioId != nil || artist != nil,
             backdrop: shownBackdrop,
             topInset: frame.top,
             bannerPixelWidth: bannerPixelWidth,
+            bannerPixels: tintSource?.pixels,
             extendsBanner: frame.side > 0,
             isWide: isWide,
             download: canPlay && Downloads.isDownloadable(route) ? DownloadButton(route: route, page: page) : nil,
-            link: route.link,
+            link: artist?.link ?? route.link,
             model: model,
+            topResult: artist,
             edit: app.ownPlaylist(model) == nil ? nil : { which in
                 newName = header.title
                 dialog = which
             }
-        ) { app.perform($0, on: page) }
+        ) { action in
+            guard let artist else { return app.perform(action, on: page) }
+            if action == .radio { app.startRadio(from: artist) } else { app.play(artist) }
+        }
     }
 
     private var scroller: some View {
@@ -154,11 +181,12 @@ struct PageContent: View {
                 if route == .library, let model {
                     PinnedRow(model: model, width: width)
                 }
-                if !isSplit, let header = page.header {
+                if !isSplit, let header = shownHeader {
                     headerView(header)
                 }
                 let ownPlaylist = app.ownPlaylist(model) == nil ? nil : model
-                ForEach(page.sections.indices, id: \.self) { index in
+                // The top artist's section is the banner above.
+                ForEach(page.sections.indices.dropFirst(topArtist == nil ? 0 : 1), id: \.self) { index in
                     SectionRows(section: page.sections[index], width: width)
                         // Its own songs are the first section's; any after are YouTube's suggestions.
                         .environment(\.ownPlaylist, index == 0 ? ownPlaylist : nil)
@@ -210,7 +238,12 @@ struct PageContent: View {
                 width: proxy.size.width, top: proxy.safeAreaInsets.top,
                 side: max(proxy.safeAreaInsets.leading, proxy.safeAreaInsets.trailing)
             )
-        } action: { frame = $0 }
+        } action: { measured in
+            var measured = measured
+            // Held while the search's choices cover the results, as its bar drops the filters, which would reload a banner.
+            if app.isSearching, topArtist != nil, frame.width > 0 { measured.top = frame.top }
+            frame = measured
+        }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > Metrics.stickyTitleAfter
         } action: { _, shown in
@@ -245,14 +278,17 @@ struct PageContent: View {
     }
 
     private var tintSource: TintSource? {
-        guard let header = page.header, let url = header.thumbnail, !header.banner || bannerPixelWidth != nil else { return nil }
-        let edge = PageHeaderView.artEdge(header, topInset: frame.top)
-        return TintSource(url: url, pixels: ArtworkImage.pixels(edge: edge, scale: displayScale), width: bannerPixelWidth)
+        guard let header = shownHeader, let url = header.thumbnail, !header.banner || bannerPixelWidth != nil else { return nil }
+        let artPixels = ArtworkImage.pixels(edge: PageHeaderView.artEdge(header, topInset: frame.top), scale: displayScale)
+        // A square photo across a banner fills its width too, so a wide screen doesn't stretch it.
+        // shortcut: on iPhone Duo open its unseen height is decoded too (about 13 MB); cut height in ImagePipeline if memory tells.
+        let pixels = topArtist == nil ? artPixels : max(artPixels, bannerPixelWidth ?? 0)
+        return TintSource(url: url, pixels: pixels, width: bannerPixelWidth)
     }
 
     /// A banner's width in pixels, which its decode and the tint's are cut to so they share it; none until measured.
     private var bannerPixelWidth: Int? {
-        guard page.header?.banner == true, frame.width > 0 else { return nil }
+        guard shownHeader?.banner == true, frame.width > 0 else { return nil }
         return Int((frame.width * displayScale).rounded(.up))
     }
 }
