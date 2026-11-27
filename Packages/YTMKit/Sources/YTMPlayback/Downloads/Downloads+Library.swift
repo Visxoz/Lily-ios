@@ -5,6 +5,8 @@ import YTMCore
 extension Downloads {
     /// Collections and smart picks are brought up to date once a day, as YouTube Music's are.
     static let refreshEvery: TimeInterval = 24 * 60 * 60
+    /// A sync that failed is due again in an hour, rather than on every return to the app.
+    private static var dueInAnHour: Date { .now.addingTimeInterval(60 * 60 - refreshEvery) }
     /// Smart downloads mix the latest plays with radios of this many of them.
     static let smartSeeds = 3
 
@@ -129,7 +131,8 @@ extension Downloads {
                 }
                 index.collections[at].tracks = tracks
             }
-            if synced { index.collectionsSynced = .now }
+            // One deleted or private playlist would otherwise have every return to the app sync them all again.
+            index.collectionsSynced = synced ? .now : Self.dueInAnHour
             keepCollectionArtwork()
         }
         var again = false
@@ -143,6 +146,8 @@ extension Downloads {
             } else if let picks {
                 index.smart = picks
                 index.smartRefreshed = .now
+            } else {
+                index.smartRefreshed = Self.dueInAnHour
             }
         }
         failed.removeAll()

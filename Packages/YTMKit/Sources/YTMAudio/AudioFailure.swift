@@ -1,5 +1,5 @@
 public enum AudioFailure: Error, Equatable, Sendable {
-    /// The network failed after every retry.
+    /// The server answered every retry, but never with the song's bytes.
     case download
     /// The connection stopped answering and stayed gone a minute.
     case dropped

@@ -302,6 +302,9 @@ import YTMCore
             let reason = (error as? AudioFailure)?.message ?? sentence(for: error)
             Logger.playback.info("\(track.id, privacy: .public): download failed: \(reason, privacy: .public)")
             failed.insert(track.id)
+            // googlevideo answered, just not with the song: marked failed so it isn't retried every minute, yet the
+            // queue still waits a minute in case YouTube refuses every song.
+            if error as? AudioFailure == .download { rest() }
         }
         reconcile()
         // A song missing from the index has its file deleted at the next launch.
@@ -319,7 +322,7 @@ import YTMCore
     }
 
     private static func isNetwork(_ error: any Error) -> Bool {
-        error is URLError || (error as? YTMError)?.kind == .network || [.download, .dropped].contains(error as? AudioFailure)
+        error is URLError || (error as? YTMError)?.kind == .network || error as? AudioFailure == .dropped
     }
 
     // MARK: The network
