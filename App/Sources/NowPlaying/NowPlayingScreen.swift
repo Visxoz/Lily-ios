@@ -25,11 +25,15 @@ struct NowPlayingScreen: View {
     @Environment(AppModel.self) private var app
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var page: Page? = .artwork
     @State private var tab = PanelTab.upNext
     @State private var shape = Shape()
     /// Off the artwork page, which the fixed clip behind the pager can't follow, so it gives way to the still on the page.
+    /// Until then the panel is out of sight and its clocks rest.
     @State private var paging = false
+    /// The artwork page wholly scrolled away, so its clocks rest.
+    @State private var artworkGone = false
 
     var body: some View {
         @Bindable var app = app
@@ -56,6 +60,7 @@ struct NowPlayingScreen: View {
             page = .artwork
             // A pager gone mid-swipe never says it stopped.
             paging = false
+            artworkGone = false
             if $1 == .stand { tab = .upNext }
         }
         // The clip is dark or bright whatever the look, so the bar and status bar over it are light, as in Apple Music.
@@ -82,7 +87,8 @@ struct NowPlayingScreen: View {
             app.player.showsLyrics = false
         }
         // Set here, not as the lyrics appear, as opening or closing the phone swaps lyrics views in no set order.
-        .onChange(of: lyricsShown, initial: true) { app.player.showsLyrics = $1 }
+        // Locking the phone leaves the screen up, so lyrics nobody sees would load for every song.
+        .onChange(of: lyricsShown && scenePhase != .background, initial: true) { app.player.showsLyrics = $1 }
         .modifier(FoldToScrub(isSideBySide: layout == .sideBySide))
     }
 
@@ -112,10 +118,12 @@ struct NowPlayingScreen: View {
                 artworkPage(track, open: show)
                     .containerRelativeFrame(.vertical)
                     .accessibilityHidden(page != .artwork)
+                    .environment(\.offPage, artworkGone)
                     .id(Page.artwork)
                 panelPage(track, select: show)
                     .containerRelativeFrame(.vertical)
                     .accessibilityHidden(page != .panel)
+                    .environment(\.offPage, !paging)
                     .id(Page.panel)
             }
             .scrollTargetLayout()
@@ -126,6 +134,10 @@ struct NowPlayingScreen: View {
         .scrollPosition(id: $page, anchor: .center)
         // Off the artwork page, not merely touched or dragged by the zoom's close, which leaves the pager still.
         .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { paging = $1 }
+        // The two pages are of a height, so the artwork is gone once the offset passes half the content.
+        .onScrollGeometryChange(for: Bool.self) {
+            $0.contentSize.height > 0 && $0.contentOffset.y + $0.contentInsets.top > $0.contentSize.height / 2 - 0.5
+        } action: { artworkGone = $1 }
         .scrollIndicators(.hidden)
     }
 

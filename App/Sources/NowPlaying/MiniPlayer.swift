@@ -84,20 +84,26 @@ struct MiniProgress: View {
     }
 }
 
-/// The playing position, pulled every `interval` while playing and never while paused or `held`.
+extension EnvironmentValues {
+    /// On the pager page scrolled wholly out of sight, which stays mounted, so its clocks rest.
+    @Entry var offPage = false
+}
+
+/// The playing position, pulled every `interval` while playing and never while paused, `held` or off the page.
 struct Playhead<Content: View>: View {
     let interval: Double
     var held = false
     @ViewBuilder let content: (Double) -> Content
 
     @Environment(AppModel.self) private var app
+    @Environment(\.offPage) private var offPage
     /// The place last sought, shown while paused as the engine's clock may not have reached it and a paused playhead
     /// is never pulled again.
     @State private var sought: Double?
 
     var body: some View {
         let player = app.player
-        TimelineView(.animation(minimumInterval: interval, paused: !player.isPlaying || held)) { _ in
+        TimelineView(.animation(minimumInterval: interval, paused: !player.isPlaying || held || offPage)) { _ in
             content((player.isPlaying ? nil : sought) ?? player.currentTime)
         }
         .onChange(of: player.lastSeek) { _, seek in sought = seek.to }

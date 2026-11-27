@@ -86,9 +86,10 @@ struct PlayingEqualizer: View {
     var colour: Color?
 
     @Environment(AppModel.self) private var app
+    @Environment(\.offPage) private var offPage
 
     var body: some View {
-        Equalizer(active: app.player.isPlaying, colour: colour)
+        Equalizer(active: app.player.isPlaying && !offPage, colour: colour)
     }
 }
 
