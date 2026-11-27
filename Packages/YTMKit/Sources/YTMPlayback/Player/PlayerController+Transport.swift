@@ -94,6 +94,8 @@ extension PlayerController {
             return
         }
         if paused {
+            // Counts what was heard since the last tick, up to a second.
+            if isPlaying { onTick() }
             audio.pause()
         } else {
             activateAudioSession()

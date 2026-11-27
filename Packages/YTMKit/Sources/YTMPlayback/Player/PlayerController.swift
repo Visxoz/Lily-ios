@@ -17,7 +17,8 @@ public struct MotionClip: Sendable {
 /// never observed: read `currentTime` from a `TimelineView`. Everything else that changes is observable.
 @MainActor @Observable public final class PlayerController {
     /// How often the sound is checked while playing, for gapless queueing, scrobbling and Now Playing's position.
-    nonisolated static let tick = Duration.milliseconds(250)
+    /// Once a second is plenty for all three, and it runs for hours with the screen off.
+    nonisolated static let tick = Duration.seconds(1)
     static let maxConsecutiveFailures = 3
 
     /// Change it through the player's methods.
@@ -220,7 +221,7 @@ public struct MotionClip: Sendable {
         ticking = Task { [weak self] in
             while true {
                 do {
-                    try await Task.sleep(for: Self.tick, tolerance: .milliseconds(50))
+                    try await Task.sleep(for: Self.tick, tolerance: .milliseconds(250))
                 } catch {
                     return
                 }

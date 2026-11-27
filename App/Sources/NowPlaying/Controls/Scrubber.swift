@@ -1,7 +1,7 @@
 import SwiftUI
 import YTMCore
 
-/// The position is pulled four times a second, as the player ticks, never while paused or dragged; a drag seeks once
+/// The position is pulled four times a second, never while paused or dragged; a drag seeks once
 /// let go.
 struct Scrubber: View {
     @Environment(AppModel.self) private var app
