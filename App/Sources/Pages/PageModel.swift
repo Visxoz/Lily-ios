@@ -154,8 +154,13 @@ final class PageModel {
         }
         do {
             var page = try await app.fetchPage(route)
-            // Edited while it loaded, as by removing a song during a pull to refresh, the page shown is newer.
-            guard isCurrent(generation, account, in: app), edits == app.pageEdits[route] || self.page == nil else { return }
+            guard isCurrent(generation, account, in: app) else { return }
+            // Edited while it loaded, as by removing a song during a pull to refresh, the page shown is newer, and
+            // carries on from where it was, as this load dropped any step in flight.
+            guard edits == app.pageEdits[route] || self.page == nil else {
+                step += 1
+                return
+            }
             if revision != app.libraryRevisions[route] {
                 // Saved or subscribed to while it loaded, as on the page it replaces, and so in the copy cached.
                 let kept = page.keepingLibraryState(of: source)
