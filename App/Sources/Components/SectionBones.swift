@@ -109,9 +109,9 @@ struct GridBones: View {
 private struct SpeedDialBones: View {
     var body: some View {
         VStack(spacing: 16) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Metrics.cardGap), count: 3), spacing: Metrics.cardGap) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SpeedDial.gap), count: 3), spacing: SpeedDial.gap) {
                 ForEach(0..<9, id: \.self) { _ in
-                    Bone(radius: 10)
+                    Bone(radius: SpeedDial.radius)
                         .aspectRatio(1, contentMode: .fit)
                 }
             }

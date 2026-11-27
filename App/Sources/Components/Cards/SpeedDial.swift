@@ -13,8 +13,10 @@ struct SpeedDial: View {
     /// Past a phone's width, as on iPhone Duo's inner display, a page this wide is as tall as the screen, so the next
     /// one shows beside it instead.
     static let maxPageWidth: CGFloat = 420
+    static let gap: CGFloat = 5
+    static let radius: CGFloat = 10
 
-    /// The die ends the first page, as YouTube's does.
+    /// The die ends the last page, as YouTube's does.
     private enum Tile {
         case card(Card)
         case die
@@ -22,7 +24,7 @@ struct SpeedDial: View {
 
     var body: some View {
         let pageWidth = min(width, Self.maxPageWidth)
-        let cell = (pageWidth - CGFloat(Self.columns - 1) * Metrics.cardGap) / CGFloat(Self.columns)
+        let cell = (pageWidth - CGFloat(Self.columns - 1) * Self.gap) / CGFloat(Self.columns)
         let pages = Self.pages(of: cards)
         // Every page as tall as a full one, so the dots stay put; a lone page as tall as its rows.
         let rows = pages.count > 1 ? 3 : Self.rows(pages.first?.count ?? 0)
@@ -30,7 +32,7 @@ struct SpeedDial: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 2 * Metrics.pagePadding) {
                     ForEach(pages.indices, id: \.self) { index in
-                        Grid(horizontalSpacing: Metrics.cardGap, verticalSpacing: Metrics.cardGap) {
+                        Grid(horizontalSpacing: Self.gap, verticalSpacing: Self.gap) {
                             ForEach(0..<Self.rows(pages[index].count), id: \.self) { row in
                                 GridRow {
                                     ForEach(pages[index].indices.dropFirst(row * Self.columns).prefix(Self.columns), id: \.self) { slot in
@@ -39,7 +41,7 @@ struct SpeedDial: View {
                                 }
                             }
                         }
-                        .frame(width: pageWidth, height: CGFloat(rows) * cell + CGFloat(max(rows - 1, 0)) * Metrics.cardGap, alignment: .topLeading)
+                        .frame(width: pageWidth, height: CGFloat(rows) * cell + CGFloat(max(rows - 1, 0)) * Self.gap, alignment: .topLeading)
                         .id(index)
                     }
                 }
@@ -71,7 +73,7 @@ struct SpeedDial: View {
 
     private static func pages(of cards: [Card]) -> [[Tile]] {
         var tiles = cards.map(Tile.card)
-        if !tiles.isEmpty { tiles.insert(.die, at: min(perPage - 1, tiles.count)) }
+        if !tiles.isEmpty { tiles.append(.die) }
         return stride(from: 0, to: tiles.count, by: perPage).map { Array(tiles[$0..<min($0 + perPage, tiles.count)]) }
     }
 
@@ -88,7 +90,11 @@ private struct SpeedDialTile: View {
     @Environment(\.theme) private var theme
     @Environment(\.displayScale) private var displayScale
 
-    static let radius: CGFloat = 10
+    private static let shade = LinearGradient(
+        stops: [.init(color: .clear, location: 0), .init(color: Theme.titleShade, location: 0.6)],
+        startPoint: .top,
+        endPoint: .bottom
+    )
 
     var body: some View {
         Button { app.activate(card, displayScale: displayScale) } label: {
@@ -97,30 +103,32 @@ private struct SpeedDialTile: View {
                     url: card.thumbnail, size: size, round: card.kind == .artist, radius: 0,
                     pixelEdge: CardView.artPixels(scale: displayScale)
                 )
-                LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: UnitPoint(x: 0.5, y: 0.5), endPoint: .bottom)
                 HStack(spacing: 2) {
                     Text(card.title)
-                        .scaledFont(15, weight: .bold)
+                        .scaledFont(13, weight: .semibold)
                         .foregroundStyle(theme.onColour)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if card.route != nil {
-                        IconView(icon: .chevron, size: 20, colour: theme.onColour)
+                        IconView(icon: .chevron, size: 16, colour: theme.onColour)
                     }
                 }
-                .padding(.leading, 10)
+                .padding(.leading, 8)
                 .padding(.trailing, 4)
-                .padding(.bottom, 8)
+                .padding(.bottom, 6)
+                .padding(.top, 8)
+                // On the title, not the tile, so the strip grows with the text.
+                .background(Self.shade)
             }
             .frame(width: size, height: size)
-            // Dark behind an artist's round art, so the shade at the foot darkens its corners evenly.
+            // Dark behind an artist's round art, so the strip darkens its corners evenly.
             .background(card.kind == .artist ? Color.black : theme.elevated)
-            .clipShape(RoundedRectangle(cornerRadius: Self.radius))
+            .clipShape(RoundedRectangle(cornerRadius: SpeedDial.radius))
             .overlay {
                 if let track = card.track, app.isPlaying(track) {
-                    RoundedRectangle(cornerRadius: Self.radius + 4)
-                        .strokeBorder(theme.text, lineWidth: 3)
-                        .padding(-5)
+                    RoundedRectangle(cornerRadius: SpeedDial.radius + 3)
+                        .strokeBorder(theme.text, lineWidth: 2)
+                        .padding(-3)
                 }
             }
             .contentShape(Rectangle())
@@ -144,17 +152,24 @@ private struct SpeedDialDie: View {
             if let card = cards.randomElement() { app.play(card) }
         } label: {
             ZStack {
-                LinearGradient(colors: [theme.accent.opacity(0.35), theme.elevated], startPoint: .top, endPoint: .bottom)
+                let glow = [theme.accent.opacity(0.35), theme.accent.opacity(0)]
+                // Black with paled dots in the dark looks; a light tile with softened ones in Light.
+                let light = theme.isLight
+                let dot = theme.accent.mix(with: theme.onColour, by: light ? 0.45 : 0.6).opacity(light ? 1 : 0.75)
+                light ? theme.elevated : Color.black
+                // The accent glows in from two opposite corners, as on YouTube's.
+                RadialGradient(colors: glow, center: .topTrailing, startRadius: 0, endRadius: size * 0.6)
+                RadialGradient(colors: glow, center: .bottomLeading, startRadius: 0, endRadius: size * 0.6)
                 // A die's three, corner to corner.
                 ForEach(-1...1, id: \.self) { step in
                     Circle()
-                        .fill(theme.text.opacity(0.8))
+                        .fill(dot)
                         .frame(width: size * 0.2, height: size * 0.2)
                         .offset(x: CGFloat(step) * size * 0.26, y: CGFloat(step) * size * 0.26)
                 }
             }
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: SpeedDialTile.radius))
+            .clipShape(RoundedRectangle(cornerRadius: SpeedDial.radius))
             .contentShape(Rectangle())
         }
         .buttonStyle(PressScale(scale: 0.97))

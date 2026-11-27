@@ -43,6 +43,8 @@ nonisolated struct Theme: Equatable, Sendable {
     let textInverse: Color
     /// Text and icons on the accent, artwork and other strong colours: white in every look.
     let onColour = Color(rgb: .white)
+    /// The shade under a speed dial title: dark in every look, as the title is white.
+    static let titleShade = Color(rgb: .black).opacity(0.75)
 
     let shadowSoft = Color(rgb: .black).opacity(0.376)
     let shadow = Color(rgb: .black).opacity(0.5)
