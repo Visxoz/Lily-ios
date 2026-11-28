@@ -154,6 +154,14 @@ struct StreamLoaderTests {
         #expect(!StreamLoader.isConnection(ByteSourceError.empty))
     }
 
+    @Test func givesUpAtOnceOnAWholeFileForARange() async throws {
+        let item = try AudioItem.fixture("song", length: file.count)
+        let started = ContinuousClock.now
+        let (_, _, failure) = try await load(item, from: WholeFileOnly())
+        #expect(failure == .download)
+        #expect(ContinuousClock.now - started < StreamLoader.retryDelay, "no retries")
+    }
+
     @Test func carriesOnOnceTheConnectionIsBack() async throws {
         let item = try AudioItem.fixture("song", length: file.count)
         let (_, received, failure) = try await load(item, from: DroppingOnce(file: file))
@@ -175,6 +183,13 @@ private struct IgnoringRanges: ByteSource {
 
     func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
         MemoryByteSource(files: ["song": file]).bytes(of: url, headers: headers, range: 0..<Int64(file.count))
+    }
+}
+
+/// Answers every range with the whole file, as `RangeDelegate` reports a 200 to one.
+private struct WholeFileOnly: ByteSource {
+    func bytes(of url: URL, headers: [String: String], range: Range<Int64>) -> AsyncThrowingStream<Data, any Error> {
+        AsyncThrowingStream { $0.finish(throwing: ByteSourceError.notPartial) }
     }
 }
 

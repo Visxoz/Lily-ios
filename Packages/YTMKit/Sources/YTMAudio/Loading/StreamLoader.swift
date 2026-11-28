@@ -183,8 +183,9 @@ final class StreamLoader {
                     try? await Task.sleep(for: delay)
                     continue
                 }
-                guard retries < Self.maxRetries else {
-                    Logger.audio.warning("A download failed after \(Self.maxRetries) retries: \(Self.reason(error), privacy: .public)")
+                // A whole file in place of a range comes again however often asked.
+                guard retries < Self.maxRetries, error as? ByteSourceError != .notPartial else {
+                    Logger.audio.warning("A download failed after \(retries) retries: \(Self.reason(error), privacy: .public)")
                     return .download
                 }
                 retries += 1

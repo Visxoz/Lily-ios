@@ -34,7 +34,8 @@ final class HTTPByteSource: ByteSource {
             configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
             configuration.httpCookieStorage = nil
             configuration.httpShouldSetCookies = false
-            configuration.timeoutIntervalForRequest = 20
+            // Idle time, the first byte's wait included, reset by every packet: a stalled range is retried sooner.
+            configuration.timeoutIntervalForRequest = 10
             configuration.proxyConfigurations = proxies()
             let session = URLSession(configuration: configuration)
             made = session
