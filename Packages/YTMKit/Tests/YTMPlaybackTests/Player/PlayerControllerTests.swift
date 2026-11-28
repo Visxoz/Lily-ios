@@ -256,7 +256,8 @@ struct PlayerControllerTests {
         let rig = Rig()
         rig.music.set {
             $0.signedIn = true
-            $0.radios["a"] = (0..<12).map { song("x\($0)") }
+            // Smart Shuffle may seed from "a" too, which would otherwise bring only songs already queued.
+            $0.firstRadios["a"] = (0..<12).map { song("x\($0)") }
             $0.anyRadio = (0..<12).map { song("r\($0)") }
         }
         await rig.player.start()

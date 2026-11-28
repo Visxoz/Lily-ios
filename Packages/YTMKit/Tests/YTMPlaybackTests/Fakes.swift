@@ -19,6 +19,8 @@ final class FakeMusic: MusicService {
     struct State {
         var signedIn = false
         var radios: [String: [Track]] = [:]
+        /// A song's radio for its first ask alone, as YouTube's changes between asks.
+        var firstRadios: [String: [Track]] = [:]
         /// The radio of any song without one of its own.
         var anyRadio: [Track] = []
         var failing: Set<String> = []
@@ -124,7 +126,7 @@ final class FakeMusic: MusicService {
     func radio(videoId: String) async throws -> [Track] {
         log("radio \(videoId)")
         await waitWhileHeld("radio \(videoId)")
-        return state.withLock { $0.radios[videoId] ?? $0.anyRadio }
+        return state.withLock { $0.firstRadios.removeValue(forKey: videoId) ?? $0.radios[videoId] ?? $0.anyRadio }
     }
 
     func radio(playlistId: String) async throws -> [Track] {
