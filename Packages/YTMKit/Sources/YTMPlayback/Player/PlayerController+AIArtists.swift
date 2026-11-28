@@ -40,13 +40,12 @@ extension PlayerController {
                     // First, so Smart Shuffle's top-up after the purge honours it.
                     settings.listed = loaded.listed
                     // Only once the switch has gone on: launch and daily loads leave the queue as it is.
-                    if aiArtistsPurgeOwed {
-                        aiArtistsPurgeOwed = false
-                        leaveOut(listed: loaded.listed)
-                    }
+                    if aiArtistsPurgeOwed { leaveOut(listed: loaded.listed) }
                     aiArtistsFailures = 0
                     // Never zero once held, so this ends; left nil meanwhile, so a refresh doesn't restart the fetch.
                     guard loaded.due == .zero else {
+                        // Owed until a fresh list, so artists it adds to a stale copy go too.
+                        aiArtistsPurgeOwed = false
                         aiArtistsDue = .now + loaded.due
                         return
                     }

@@ -108,7 +108,7 @@ public struct MotionClip: Sendable {
     @ObservationIgnored var aiArtistsFailures = 0
     /// When Block AI music's list is next wanted; nil while it is off or loading.
     @ObservationIgnored var aiArtistsDue: ContinuousClock.Instant?
-    /// Set as Block AI music goes on, so the first load to succeed, retries included, takes the list's songs out.
+    /// Set as Block AI music goes on, so loads take the list's songs out until a fresh one succeeds, retries included.
     @ObservationIgnored var aiArtistsPurgeOwed = false
     @ObservationIgnored private var itemSerial: UInt64 = 0
     @ObservationIgnored private var hasStarted = false

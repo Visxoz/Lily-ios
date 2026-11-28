@@ -177,6 +177,27 @@ struct BlockedArtistsTests {
         rig.player.apply(rig.settings.value)
         await rig.player.aiArtistsLoad?.value
         await rig.settle()
+        #expect(rig.settings.listed?.count == AIArtists.minNames)
+        #expect(rig.player.current?.id == "a" && rig.player.isPlaying, "not skipped")
+        #expect(rig.player.queue.items.map(\.id) == ["a", "b", "d"])
+    }
+
+    @Test func aListThatFailedAsBlockAIWentOnTakesItsSongsOutOnceItLoads() async throws {
+        let rig = await started()
+        rig.player.play([aiSong("a"), song("b"), aiSong("c"), song("d")])
+        await rig.settle()
+        await rig.soundStarts()
+        // On without a load, as after one failed with no copy kept.
+        rig.player.applied?.blockAI = true
+        rig.settings.value.blockAI = true
+        rig.player.aiArtistsPurgeOwed = true
+        try keepAIList(in: rig)
+        rig.player.aiArtistsDue = .now
+        rig.player.refreshAIArtistsIfDue()
+        await rig.player.aiArtistsLoad?.value
+        await rig.settle()
+        #expect(rig.settings.listed?.count == AIArtists.minNames)
+        #expect(!rig.player.aiArtistsPurgeOwed)
         #expect(rig.player.current?.id == "a" && rig.player.isPlaying, "not skipped")
         #expect(rig.player.queue.items.map(\.id) == ["a", "b", "d"])
     }
@@ -189,13 +210,14 @@ struct BlockedArtistsTests {
         try rig.store.save(#require(SessionSnapshot(queue, position: 0, duration: 200)), to: .session)
         rig.settings.value.blockAI = true
         await rig.player.start()
+        #expect(!rig.player.aiArtistsPurgeOwed)
         await rig.player.aiArtistsLoad?.value
         // The launch load may finish before the session is restored; this one comes after.
         rig.player.aiArtistsDue = .now
         rig.player.refreshAIArtistsIfDue()
         await rig.player.aiArtistsLoad?.value
         await rig.settle()
-        #expect(rig.settings.listed != nil)
+        #expect(rig.settings.listed?.count == AIArtists.minNames)
         #expect(rig.player.queue.items.map(\.id) == ["a", "b", "c"])
     }
 
