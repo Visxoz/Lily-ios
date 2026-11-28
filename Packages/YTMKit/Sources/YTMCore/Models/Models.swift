@@ -81,16 +81,16 @@ extension ArtistRef {
 
 extension [Track] {
     /// Without `blocked` artists' songs; the same array, uncopied, with none blocked.
-    public func leavingOut(_ blocked: [ArtistRef]) -> [Track] {
-        blocked.isEmpty ? self : filter { !$0.isBy(anyOf: blocked) }
+    public func leavingOut(_ blocked: Blocked) -> [Track] {
+        blocked.isEmpty ? self : filter { !blocked.has($0) }
     }
 
     /// Leaves out `blocked` artists' songs but the one at `sparing`, answering its new index.
-    public func removingSongs(by blocked: [ArtistRef], sparing: Int?) -> (tracks: [Track], index: Int?) {
+    public func removingSongs(by blocked: Blocked, sparing: Int?) -> (tracks: [Track], index: Int?) {
         guard !blocked.isEmpty else { return (self, sparing) }
         var kept: [Track] = []
         var index: Int?
-        for (at, track) in enumerated() where at == sparing || !track.isBy(anyOf: blocked) {
+        for (at, track) in enumerated() where at == sparing || !blocked.has(track) {
             if at == sparing { index = kept.count }
             kept.append(track)
         }

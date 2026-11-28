@@ -104,6 +104,12 @@ public struct MotionClip: Sendable {
     @ObservationIgnored var lyricsAhead: Set<String> = []
     /// Bumped as the song changes or is rated, so a stale rating isn't shown.
     @ObservationIgnored var ratingGeneration: UInt64 = 0
+    /// Block AI music's failed loads in a row, each doubling the wait for the next.
+    @ObservationIgnored var aiArtistsFailures = 0
+    /// When Block AI music's list is next wanted; nil while it is off or loading.
+    @ObservationIgnored var aiArtistsDue: ContinuousClock.Instant?
+    /// Set as Block AI music goes on, so the first load to succeed, retries included, takes the list's songs out.
+    @ObservationIgnored var aiArtistsPurgeOwed = false
     @ObservationIgnored private var itemSerial: UInt64 = 0
     @ObservationIgnored private var hasStarted = false
 
@@ -132,6 +138,8 @@ public struct MotionClip: Sendable {
     @ObservationIgnored var reopenWait: Task<Void, Never>?
     /// A timed sleep's wait.
     @ObservationIgnored var sleepWait: Task<Void, Never>?
+    /// Block AI music's list being read or fetched.
+    @ObservationIgnored var aiArtistsLoad: Task<Void, Never>?
 
     public convenience init(
         api: YTMusic = .shared, settings: SettingsStore = .shared, history: LocalHistory = .shared, audio: AudioPlayer
@@ -176,7 +184,7 @@ public struct MotionClip: Sendable {
     }
 
     isolated deinit {
-        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, continuing, lyricsLoad, ratingLoad, reopenWait, sleepWait] {
+        for task in listening + [ticking, resolving, queueing, extending, autoplay, pendingPlay, continuing, lyricsLoad, ratingLoad, reopenWait, sleepWait, aiArtistsLoad] {
             task?.cancel()
         }
         toastSink.finish()
@@ -202,6 +210,8 @@ public struct MotionClip: Sendable {
         premiumStatus = chooser.status
         apply(settings.value)
         followSettings()
+        // At once, from the copy kept however old, so the first plays leave them out; a fetch waits for the launch.
+        loadAIArtists(asked: false, after: launchLoad)
         let restored = restoreSession(await session)
         let rating = ratingGeneration
         Task { [weak self] in

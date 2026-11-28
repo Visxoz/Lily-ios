@@ -6,6 +6,20 @@ import Testing
     #expect(ArtistRef.joined([.init(id: nil, name: "A"), .init(id: nil, name: "B"), .init(id: nil, name: "C")]) == "A, B, C")
 }
 
+@Test func listedArtistsAreLeftOutByNameWhateverItsCase() {
+    let blocked = Blocked(listed: ListedArtists(["Aria Vale", "kelvin", "Aria vale"]))
+    let listed = Track(id: "a", title: "", artists: [ArtistRef(id: "UC1", name: "ARIA VALE")])
+    let other = Track(id: "b", title: "", artists: [ArtistRef(id: nil, name: "Pond")])
+    #expect(blocked.has(listed) && !blocked.has(other))
+    #expect(blocked.has(Track(id: "k", title: "", artists: [ArtistRef(id: nil, name: "\u{212A}ELVIN")])), "a capital folding to ASCII")
+    #expect(blocked.listed?.count == 2, "each name once")
+    #expect(ListedArtists(["SLØWBREAKER"]).has("sløwbreaker"), "a capital beyond ASCII")
+    let (kept, index) = [listed, other, listed].removingSongs(by: blocked, sparing: 2)
+    #expect(kept.map(\.id) == ["b", "a"] && index == 1, "bar the one chosen")
+    #expect([listed, other].leavingOut(blocked).map(\.id) == ["b"])
+    #expect(Blocked().isEmpty && !Blocked().has(listed))
+}
+
 @Test func badgesPremiumFormatsAtTheirNominalBitrate() throws {
     let url = try #require(URL(string: "https://r1.googlevideo.com/x"))
     func badge(_ itag: Int, _ codec: AudioCodec, _ bitrate: Int) -> String {

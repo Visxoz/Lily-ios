@@ -149,13 +149,21 @@ import Testing
         #expect(alias.isBy(anyOf: settings.blockedArtists), "another ID for the same name")
         #expect(byID.isBy(anyOf: settings.blockedArtists))
         #expect(!other.isBy(anyOf: settings.blockedArtists))
-        let (kept, index) = [byName, other, byName].removingSongs(by: settings.blockedArtists, sparing: 2)
+        let blocking = Blocked(artists: settings.blockedArtists)
+        let (kept, index) = [byName, other, byName].removingSongs(by: blocking, sparing: 2)
         #expect(kept.map(\.id) == ["d", "a"] && index == 1, "bar the one chosen")
-        #expect([byName, other].leavingOut(settings.blockedArtists).map(\.id) == ["d"])
+        #expect([byName, other].leavingOut(blocking).map(\.id) == ["d"])
         let file = #"{"blockedArtists": [{"id": "UC1", "name": "Tame Impala"}, {"id": 3}]}"#
         #expect(try decode(file).blockedArtists == settings.blockedArtists, "one that won't read loses only itself")
         let unblocked = !settings.toggleBlock(ArtistRef(id: "UC1", name: "Renamed"))
         #expect(unblocked && settings.blockedArtists.isEmpty)
+    }
+
+    @Test func blockAIIsOffUntilChosenAndKeptAcrossSaves() throws {
+        #expect(try !decode("{}").blockAI, "off in a file from before it")
+        var settings = Settings()
+        settings.blockAI = true
+        #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings)).blockAI)
     }
 
     @Test func defaultsToLilysOrchidOnBlack() {

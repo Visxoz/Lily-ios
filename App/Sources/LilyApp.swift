@@ -29,6 +29,7 @@ struct LilyApp: App {
                 app.keepDownloading(app.player.downloads.isActive)
             case .active:
                 app.player.downloads.resume()
+                app.player.refreshAIArtistsIfDue()
             default:
                 break
             }

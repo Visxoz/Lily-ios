@@ -17,6 +17,12 @@ import YTMCore
     /// The saved settings have been read, so changes are saved from now on.
     public private(set) var isLoaded = false
 
+    /// The AI artists list while it is wanted: set each run, never saved, and unobserved, as no view shows it.
+    @ObservationIgnored var listed: ListedArtists?
+
+    /// What every queue, radio, shuffle and smart download leaves out.
+    var blocked: Blocked { Blocked(artists: value.blockedArtists, listed: listed) }
+
     @ObservationIgnored private let store: FileStore
     @ObservationIgnored private let saving = Debounce()
     @ObservationIgnored private var loading: Task<Void, Never>?

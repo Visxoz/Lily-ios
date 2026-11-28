@@ -26,7 +26,16 @@ struct BlockedArtistsTests {
         block("a", in: rig)
         rig.player.play(songs("a"))
         #expect(rig.player.current == nil)
-        #expect(await toasts.next() == "Every song here is by an artist you've blocked")
+        #expect(await toasts.next() == "Every song here is by a blocked artist")
+    }
+
+    @Test func playLeavesOutListedArtistsButTheSongChosen() async {
+        let rig = await started()
+        rig.settings.listed = ListedArtists(["ARTIST"])
+        rig.player.play(songs("a", "b"), startAt: 0)
+        await rig.settle()
+        #expect(rig.player.queue.items.map(\.id) == ["a"])
+        #expect(rig.player.current?.id == "a")
     }
 
     @Test func aLongPlaylistAllBlockedAddsNoLaterPages() async {
@@ -142,5 +151,70 @@ struct BlockedArtistsTests {
         await rig.settle()
         #expect(!rig.player.isPlaying && rig.player.current?.id == "a", "left where it is")
         #expect(rig.player.queue.items.map(\.id) == ["a"])
+    }
+
+    /// A fresh copy kept in the rig's store, so the list loads from it and never from the network.
+    private func keepAIList(in rig: Rig) throws {
+        let file = rig.store.aiArtists
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(("artist,id\n" + (0..<AIArtists.minNames).map { "Artist \($0),\($0)\n" }.joined()).utf8).write(to: file)
+    }
+
+    /// By an artist on the kept list, which no `song(id)` is.
+    private func aiSong(_ id: String) -> Track {
+        var track = song(id)
+        track.artists = [ArtistRef(id: nil, name: "Artist 0")]
+        return track
+    }
+
+    @Test func turningBlockAIOnTakesTheListsSongsOutButTheOnePlaying() async throws {
+        let rig = await started()
+        try keepAIList(in: rig)
+        rig.player.play([aiSong("a"), song("b"), aiSong("c"), song("d")])
+        await rig.settle()
+        await rig.soundStarts()
+        rig.settings.value.blockAI = true
+        rig.player.apply(rig.settings.value)
+        await rig.player.aiArtistsLoad?.value
+        await rig.settle()
+        #expect(rig.player.current?.id == "a" && rig.player.isPlaying, "not skipped")
+        #expect(rig.player.queue.items.map(\.id) == ["a", "b", "d"])
+    }
+
+    @Test func launchAndDueLoadsLeaveTheQueueAsItIs() async throws {
+        let rig = Rig()
+        try keepAIList(in: rig)
+        var queue = Queue<Track>(seed: 1)
+        queue.set(items: [aiSong("a"), song("b"), aiSong("c")], start: 0, shuffle: false)
+        try rig.store.save(#require(SessionSnapshot(queue, position: 0, duration: 200)), to: .session)
+        rig.settings.value.blockAI = true
+        await rig.player.start()
+        await rig.player.aiArtistsLoad?.value
+        // The launch load may finish before the session is restored; this one comes after.
+        rig.player.aiArtistsDue = .now
+        rig.player.refreshAIArtistsIfDue()
+        await rig.player.aiArtistsLoad?.value
+        await rig.settle()
+        #expect(rig.settings.listed != nil)
+        #expect(rig.player.queue.items.map(\.id) == ["a", "b", "c"])
+    }
+
+    @Test func turningBlockAIOffForgetsTheList() async throws {
+        let rig = Rig()
+        try keepAIList(in: rig)
+        rig.settings.value.blockAI = true
+        await rig.player.start()
+        await rig.player.aiArtistsLoad?.value
+        #expect(rig.settings.listed?.count == AIArtists.minNames)
+        rig.settings.value.blockAI = false
+        rig.player.apply(rig.settings.value)
+        await rig.settle()
+        #expect(rig.settings.listed == nil)
+        #expect(rig.settings.blocked.isEmpty)
+    }
+
+    @Test func aFailedAIListIsAskedForAgainLaterEachTimeUpToADay() {
+        let minutes = (0..<9).map { PlayerController.aiArtistsRetry(after: $0) / .seconds(60) }
+        #expect(minutes == [15, 30, 60, 120, 240, 480, 960, 1440, 1440])
     }
 }

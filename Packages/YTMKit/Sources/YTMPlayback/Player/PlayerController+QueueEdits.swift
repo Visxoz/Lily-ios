@@ -59,10 +59,10 @@ extension PlayerController {
     }
 
     /// Takes the artists' songs out of the queue and skips the one playing; one paused stays, as skipping would play.
-    func leaveOutBlocked(_ blocked: [ArtistRef]) {
+    func leaveOutBlocked(_ blocked: Blocked) {
         // First, so the skip lands on a song kept.
-        removeEntries { $0.item.isBy(anyOf: blocked) }
-        guard let at = queue.currentIndex, queue.entries[at].item.isBy(anyOf: blocked) else { return }
+        removeEntries { blocked.has($0.item) }
+        guard let at = queue.currentIndex, blocked.has(queue.entries[at].item) else { return }
         let playing = queue.entries[at]
         // Paused too, so Play doesn't end in its radio.
         dropAutoplayRadio(of: playing.item.id)
@@ -82,7 +82,7 @@ extension PlayerController {
     }
 
     /// All but the current entry; the queue is left untouched when none match, so its observers aren't woken.
-    private func removeEntries(where drop: (Queue<Track>.Entry) -> Bool) {
+    func removeEntries(where drop: (Queue<Track>.Entry) -> Bool) {
         let (entries, current) = (queue.entries, queue.currentIndex)
         let matching = entries.indices.filter { $0 != current && drop(entries[$0]) }
         guard !matching.isEmpty else { return }

@@ -147,7 +147,7 @@ Most YouTube clients get stream URLs that YouTube's player JavaScript has to uns
 
 Apple's AudioToolbox decodes Opus, but can't read the WebM files YouTube keeps it in, so the app reads them itself and hands AudioToolbox the packets as they download.
 
-The app talks only to YouTube's hosts, plus Apple Music's and Spotify's for moving covers, Better Lyrics' hub, lrc.red, LRCLIB and KuGou (Tencent Music, in China) for lyrics (sent a song's title, artist and length while lyrics are open, and the hub its video ID too; KuGou only when the others have no word timing), and Last.fm and ListenBrainz if you connect them, each checked against an allowlist.
+The app talks only to YouTube's hosts, plus GitHub for updates (and, with **Block AI music** on, for the list of AI artists), Apple Music's and Spotify's for moving covers, Better Lyrics' hub, lrc.red, LRCLIB and KuGou (Tencent Music, in China) for lyrics (sent a song's title, artist and length while lyrics are open, and the hub its video ID too; KuGou only when the others have no word timing), and Last.fm and ListenBrainz if you connect them, each checked against an allowlist.
 
 The hub wants a pass from Cloudflare's check, which the app runs about once a day in a hidden web view. It follows the proxy set in iOS, or an HTTP or SOCKS5 proxy of your own entered in **Settings ▸ Account ▸ Proxy**, used from Lily's next start.
 
@@ -179,6 +179,8 @@ Every release is built by [GitHub Actions](.github/workflows/release.yml) from m
 Lily for iPhone is a port of [Lily for Windows](https://github.com/Visxoz/lily) and, like it, free software under the [GNU General Public License, version 3](LICENSE).
 
 Lyrics come partly from [Better Lyrics](https://github.com/better-lyrics/better-lyrics)' lyrics hub. Thanks to Better Lyrics for it.
+
+**Block AI music** in **Settings ▸ Playback** uses the list of AI artists from [spotify-ai-blocker](https://github.com/CennoxX/spotify-ai-blocker), which includes [loved.music](https://loved.music)'s AI Artists list under CC BY 4.0. Thanks to both.
 
 <br>
 

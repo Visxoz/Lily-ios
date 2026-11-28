@@ -13,10 +13,10 @@ struct SmartShuffleTests {
     @Test func asksForABatchWhenThePoolIsDry() {
         var smart = SmartShuffle()
         var queue = queue(20)
-        let seed = smart.topUp(&queue, recent: [], blocked: [])
+        let seed = smart.topUp(&queue, recent: [], blocked: Blocked())
         #expect(seed != nil)
         #expect(smart.fetching)
-        let result14 = smart.topUp(&queue, recent: [], blocked: [])
+        let result14 = smart.topUp(&queue, recent: [], blocked: Blocked())
         #expect(result14 == nil, "one batch at a time")
         #expect(queue.recommendedIndices.isEmpty)
     }
@@ -24,11 +24,11 @@ struct SmartShuffleTests {
     @Test func placesOneRecommendationAfterEveryThreeOrFourOwnSongsAhead() {
         var smart = SmartShuffle()
         var queue = queue(20)
-        _ = smart.topUp(&queue, recent: ["r0"], blocked: [])
-        let fresh = smart.receive((0..<10).map { song("r\($0)") } + [song("5")], generation: smart.generation, blocked: [])
+        _ = smart.topUp(&queue, recent: ["r0"], blocked: Blocked())
+        let fresh = smart.receive((0..<10).map { song("r\($0)") } + [song("5")], generation: smart.generation, blocked: Blocked())
         #expect(fresh)
         // Blocked after the batch arrived.
-        _ = smart.topUp(&queue, recent: ["r0"], blocked: [ArtistRef(id: "UCr1", name: "Artist r1")])
+        _ = smart.topUp(&queue, recent: ["r0"], blocked: Blocked(artists: [ArtistRef(id: "UCr1", name: "Artist r1")]))
         let marks = queue.recommendedIndices
         #expect(marks.count >= 2)
         var own = 0
@@ -54,19 +54,19 @@ struct SmartShuffleTests {
     @Test func leavesBlockedArtistsOutOfSeedsAndBatches() {
         var smart = SmartShuffle()
         var queue = queue(20)
-        let blocked = (0..<20).filter { $0 != 3 }.map { ArtistRef(id: "UC\($0)", name: "Artist \($0)") }
+        let blocked = Blocked(artists: (0..<20).filter { $0 != 3 }.map { ArtistRef(id: "UC\($0)", name: "Artist \($0)") })
         #expect(smart.topUp(&queue, recent: [], blocked: blocked) == "3")
-        let fresh = smart.receive([song("x")], generation: smart.generation, blocked: [ArtistRef(id: "UCx", name: "Artist x")])
+        let fresh = smart.receive([song("x")], generation: smart.generation, blocked: Blocked(artists: [ArtistRef(id: "UCx", name: "Artist x")]))
         #expect(!fresh, "a batch of only blocked songs brings nothing new")
     }
 
     @Test func dropsABatchAskedForAnEarlierQueue() {
         var smart = SmartShuffle()
         var queue = queue(20)
-        _ = smart.topUp(&queue, recent: [], blocked: [])
+        _ = smart.topUp(&queue, recent: [], blocked: Blocked())
         let asked = smart.generation
         smart.reset()
-        let result15 = smart.receive([song("r")], generation: asked, blocked: [])
+        let result15 = smart.receive([song("r")], generation: asked, blocked: Blocked())
         #expect(!result15)
         #expect(!smart.fetching)
     }

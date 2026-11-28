@@ -32,7 +32,7 @@ struct SmartShuffle {
 
     /// Returns the seed of a batch to ask for when the pool ran dry, and marks it as being fetched. `blocked` is
     /// checked as each is placed, so one blocked after its batch arrived is left out too.
-    mutating func topUp(_ queue: inout Queue<Track>, recent: some Sequence<String>, blocked: [ArtistRef]) -> String? {
+    mutating func topUp(_ queue: inout Queue<Track>, recent: some Sequence<String>, blocked: Blocked) -> String? {
         guard let current = queue.currentIndex, !fetching else { return nil }
         if knownRevision != queue.revision {
             known = Set(queue.items.map(\.id)).union(recent)
@@ -76,27 +76,27 @@ struct SmartShuffle {
 
     /// Returns whether the batch brought anything new to place; one for an earlier queue is dropped.
     /// `blocked` too, so a batch of only blocked songs doesn't count as new and ask again at once.
-    mutating func receive(_ tracks: [Track]?, generation: UInt64, blocked: [ArtistRef]) -> Bool {
+    mutating func receive(_ tracks: [Track]?, generation: UInt64, blocked: Blocked) -> Bool {
         guard generation == self.generation else { return false }
         fetching = false
-        pool += (tracks ?? []).filter { !known.contains($0.id) && !$0.isBy(anyOf: blocked) }
+        pool += (tracks ?? []).filter { !known.contains($0.id) && !blocked.has($0) }
         return !pool.isEmpty
     }
 
-    private mutating func fresh(_ blocked: [ArtistRef]) -> Track? {
+    private mutating func fresh(_ blocked: Blocked) -> Track? {
         while !pool.isEmpty {
             let track = pool.removeFirst()
-            if !known.contains(track.id), !track.isBy(anyOf: blocked) { return track }
+            if !known.contains(track.id), !blocked.has(track) { return track }
         }
         return nil
     }
 
     /// Never a blocked artist's song, whose radio would be mostly theirs.
-    private static func seed(_ queue: Queue<Track>, _ blocked: [ArtistRef]) -> String? {
+    private static func seed(_ queue: Queue<Track>, _ blocked: Blocked) -> String? {
         let entries = queue.entries
         // Shuffled first, so the block check usually runs once rather than over a long queue.
         return entries.indices.filter { !entries[$0].isRecommended }.shuffled()
-            .first { !entries[$0].item.isBy(anyOf: blocked) }.map { entries[$0].item.id }
+            .first { !blocked.has(entries[$0].item) }.map { entries[$0].item.id }
     }
 }
 
@@ -107,7 +107,7 @@ extension PlayerController {
         let recent = history.history.tracks.prefix(SmartShuffle.recent).lazy.map(\.id)
         // On a copy, written back only when something was placed: the queue is observed, and most calls place nothing.
         var upcoming = queue
-        let seed = smart.topUp(&upcoming, recent: recent, blocked: settings.value.blockedArtists)
+        let seed = smart.topUp(&upcoming, recent: recent, blocked: settings.blocked)
         if upcoming.revision != queue.revision { queue = upcoming }
         guard let seed else { return }
         let generation = smart.generation
@@ -119,7 +119,7 @@ extension PlayerController {
                 Logger.playback.debug("smart shuffle could not fetch recommendations: \(sentence(for: error), privacy: .public)")
             }
             // Nothing new: the next song start asks again from another seed.
-            if smart.receive(try? result.get(), generation: generation, blocked: settings.value.blockedArtists) {
+            if smart.receive(try? result.get(), generation: generation, blocked: settings.blocked) {
                 prefetchNext()
             }
         }

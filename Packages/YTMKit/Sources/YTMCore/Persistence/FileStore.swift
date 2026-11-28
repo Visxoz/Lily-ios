@@ -36,6 +36,11 @@ public final class FileStore: Sendable {
         directory.appending(path: "Downloads", directoryHint: .isDirectory)
     }
 
+    /// The AI artists list as fetched, kept as CSV rather than JSON.
+    var aiArtists: URL {
+        directory.appending(path: "ai-artists.csv", directoryHint: .notDirectory)
+    }
+
     private func url(_ file: StoreFile) -> URL {
         directory.appending(path: file.rawValue + ".json", directoryHint: .notDirectory)
     }

@@ -24,11 +24,12 @@ enum HTTP {
         "lrc.red", "lrclib.net", "mobileservice.kugou.com", "krcs.kugou.com", "lyrics.api.dacubeking.com",
     ]
 
-    static func isAllowed(_ url: URL) -> Bool {
+    /// `extra` is one more exact host, for a caller's own request alone.
+    static func isAllowed(_ url: URL, allowing extra: String? = nil) -> Bool {
         guard url.scheme?.lowercased() == "https", let host = url.host()?.lowercased(), !host.isEmpty else {
             return false
         }
-        return hosts.contains(host) || domains.contains { HostAllowlist.isHost(host, within: $0) }
+        return host == extra || hosts.contains(host) || domains.contains { HostAllowlist.isHost(host, within: $0) }
     }
 
     /// youtube.com or a subdomain: the only hosts sent or let set the account's cookies.
@@ -115,8 +116,7 @@ enum HTTP {
                     throw YTMError(status: http.statusCode)
                 }
             } catch let error as URLError {
-                if error.code == .cancelled { throw CancellationError() }
-                guard attempt < retries, error.code == .timedOut else { throw YTMError(error) }
+                guard attempt < retries, error.code == .timedOut else { throw surfaced(error) }
             }
             try await Task.sleep(for: retryDelay(after: attempt))
             attempt += 1
@@ -124,9 +124,11 @@ enum HTTP {
     }
 
     /// The body as it arrives, checked as `data` is, without retries. Only the answer's status is checked here:
-    /// reading the bytes can still fail, as on a stall.
-    static func bytes(for request: URLRequest, session: URLSession = api) async throws -> URLSession.AsyncBytes {
-        guard let url = request.url, isAllowed(url) else { throw YTMError.blocked }
+    /// reading the bytes can still fail, as on a stall. `allowing` admits one more host, not for redirects.
+    static func bytes(
+        for request: URLRequest, allowing extra: String? = nil, session: URLSession = api
+    ) async throws -> URLSession.AsyncBytes {
+        guard let url = request.url, isAllowed(url, allowing: extra) else { throw YTMError.blocked }
         do {
             let (bytes, response) = try await session.bytes(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -136,9 +138,24 @@ enum HTTP {
             }
             return bytes
         } catch let error as URLError {
-            if error.code == .cancelled { throw CancellationError() }
-            throw YTMError(error)
+            throw surfaced(error)
         }
+    }
+
+    /// `bytes` whole, or nil once past `limit`, reading no further. A failed read surfaces as a failed request does.
+    static func body<Bytes: AsyncSequence>(of bytes: Bytes, limit: Int) async throws -> Data? where Bytes.Element == UInt8 {
+        // An array appends a byte far faster than `Data` does.
+        var body: [UInt8] = []
+        body.reserveCapacity(min(limit, 64 << 10))
+        do {
+            for try await byte in bytes {
+                guard body.count < limit else { return nil }
+                body.append(byte)
+            }
+        } catch let error as URLError {
+            throw surfaced(error)
+        }
+        return Data(body)
     }
 
     /// To a temporary file the caller moves, so a large body never sits in memory; checked as `data` is, without retries.
@@ -153,9 +170,13 @@ enum HTTP {
             }
             return file
         } catch let error as URLError {
-            if error.code == .cancelled { throw CancellationError() }
-            throw YTMError(error)
+            throw surfaced(error)
         }
+    }
+
+    /// A cancelled request as the task's cancellation; any other failure worded without its URL.
+    private static func surfaced(_ error: URLError) -> any Error {
+        error.code == .cancelled ? CancellationError() : YTMError(error)
     }
 
     static func isTransient(status: Int) -> Bool {
@@ -197,7 +218,7 @@ private final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
         _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
         newRequest request: URLRequest
     ) async -> URLRequest? {
-        request.url.map(HTTP.isAllowed) == true ? request : nil
+        request.url.map { HTTP.isAllowed($0) } == true ? request : nil
     }
 }
 

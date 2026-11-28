@@ -13,9 +13,9 @@ extension PlayerController {
             return false
         }
         // A song chosen plays though its artist is blocked.
-        let (tracks, index) = tracks.removingSongs(by: settings.value.blockedArtists, sparing: index)
+        let (tracks, index) = tracks.removingSongs(by: settings.blocked, sparing: index)
         guard !tracks.isEmpty else {
-            say("Every song here is by an artist you've blocked")
+            say("Every song here is by a blocked artist")
             return false
         }
         if shuffle, settings.value.shuffle == .off {
@@ -198,7 +198,7 @@ extension PlayerController {
 
     /// Leaves out blocked artists' songs. While shuffled, among the songs still to play, so one may now be next.
     private func appendShuffledIn(_ tracks: [Track]) {
-        let tracks = tracks.leavingOut(settings.value.blockedArtists)
+        let tracks = tracks.leavingOut(settings.blocked)
         guard !tracks.isEmpty else { return }
         queue.extend(tracks)
         dropStaleNext()

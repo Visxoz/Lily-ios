@@ -4,6 +4,7 @@ import YTMCore
 
 struct PlaybackSettings: View {
     @Environment(AppModel.self) private var app
+    @State private var confirmingBlockAI = false
 
     var body: some View {
         @Bindable var settings = app.settings
@@ -49,6 +50,20 @@ struct PlaybackSettings: View {
             detail: "Keeps playing similar music when the queue ends.",
             isOn: $settings.value.autoplay
         )
+        ToggleRow(
+            label: "Block AI music",
+            detail: "Experimental. Leaves out songs by artists on a community list.",
+            // On only once the alert is confirmed, off at once.
+            isOn: Binding(get: { settings.value.blockAI }, set: { on in
+                if on { confirmingBlockAI = true } else { settings.value.blockAI = false }
+            })
+        )
+        .alert("Block AI music", isPresented: $confirmingBlockAI) {
+            Button("Cancel", role: .cancel) {}
+            Button("Turn on") { settings.value.blockAI = true }
+        } message: {
+            Text("This is experimental. Songs by artists on a community list of AI-generated music are left out of queues, radios and shuffles, matched by name. The list comes from a third party, not from Lily, and Lily can't check it: it may name real artists, and anyone sharing a listed artist's name is left out too. A song you pick to play still plays.")
+        }
         SettingRow(
             label: "Blocked artists",
             detail: "Their songs are left out of what plays unless you pick one yourself. Block an artist from a song's or artist's menu."

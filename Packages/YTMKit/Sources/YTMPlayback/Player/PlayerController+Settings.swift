@@ -93,8 +93,9 @@ extension PlayerController {
         if old.blockedArtists != new.blockedArtists {
             // Only those just blocked, so a song chosen by one blocked before stays.
             let added = new.blockedArtists.filter { !old.blockedArtists.contains(where: $0.matches) }
-            if !added.isEmpty { leaveOutBlocked(added) }
+            if !added.isEmpty { leaveOutBlocked(Blocked(artists: added)) }
         }
+        if old.blockAI != new.blockAI { blockAIChanged(to: new.blockAI) }
         if old.quality != new.quality {
             // Streams resolved ahead, or being resolved, at the old quality are dropped; the playing song carries on.
             queueing?.cancel()

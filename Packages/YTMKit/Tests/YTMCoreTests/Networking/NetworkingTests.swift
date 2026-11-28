@@ -3,8 +3,8 @@ import Testing
 @testable import YTMCore
 
 @Suite struct AllowlistTests {
-    private func allowed(_ url: String) -> Bool {
-        URL(string: url).map(HTTP.isAllowed) ?? false
+    private func allowed(_ url: String, allowing extra: String? = nil) -> Bool {
+        URL(string: url).map { HTTP.isAllowed($0, allowing: extra) } ?? false
     }
 
     @Test func allowsYouTubeHostsOverHTTPS() {
@@ -27,6 +27,16 @@ import Testing
         #expect(allowed("https://krcs.kugou.com/download?id=1"))
         #expect(allowed("https://lyrics.api.dacubeking.com/v2/lyrics"))
         #expect(allowed("https://api.github.com/repos/Visxoz/Lily-ios/releases/latest"))
+    }
+
+    @Test func allowsOneMoreExactHostOnlyWhenNamed() {
+        let host = "raw.githubusercontent.com"
+        #expect(!allowed("https://raw.githubusercontent.com/a.csv"), "only the AI artists list's own fetch")
+        #expect(allowed("https://raw.githubusercontent.com/a.csv", allowing: host))
+        #expect(allowed("https://RAW.githubusercontent.com/a.csv", allowing: host))
+        #expect(!allowed("http://raw.githubusercontent.com/a.csv", allowing: host), "plain HTTP")
+        #expect(!allowed("https://x.raw.githubusercontent.com/", allowing: host))
+        #expect(!allowed("https://raw.githubusercontent.com.evil.com/", allowing: host))
     }
 
     @Test func blocksEverythingElse() {
@@ -52,6 +62,22 @@ import Testing
         #expect(!error.message.contains("googlevideo"))
         #expect(YTMError(status: 403).status == 403)
         #expect(YTMError(status: 302).kind == .http)
+    }
+
+    @Test func aBodyIsReadOnlyUpToItsLimit() async throws {
+        func body(_ count: Int, ends: Bool = true) async throws -> Data? {
+            let (stream, continuation) = AsyncThrowingStream.makeStream(of: UInt8.self)
+            for byte in 0..<count { continuation.yield(UInt8(byte)) }
+            if ends { continuation.finish() }
+            return try await HTTP.body(of: stream, limit: 4)
+        }
+        #expect(try await body(3) == Data([0, 1, 2]))
+        #expect(try await body(4)?.count == 4, "exactly the limit")
+        // Left open, so only a read that stops past the limit returns.
+        #expect(try await body(5, ends: false) == nil)
+        let (stalled, continuation) = AsyncThrowingStream.makeStream(of: UInt8.self)
+        continuation.finish(throwing: URLError(.timedOut))
+        await #expect(throws: YTMError.self) { try await HTTP.body(of: stalled, limit: 4) }
     }
 }
 

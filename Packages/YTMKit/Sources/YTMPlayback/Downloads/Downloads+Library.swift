@@ -159,7 +159,7 @@ extension Downloads {
     /// last picks, if nothing has played yet or a radio fails.
     private func smartPicks(_ count: Int) async -> [Track]? {
         // Before seeding, so no blocked artist's radio is asked for.
-        let played = history.history.tracks.leavingOut(settings.value.blockedArtists)
+        let played = history.history.tracks.leavingOut(settings.blocked)
         guard !played.isEmpty else { return nil }
         let music = music
         let radios = await withTaskGroup(of: [Track]?.self) { group in
@@ -172,7 +172,7 @@ extension Downloads {
         }
         guard radios.allSatisfy({ $0 != nil }) else { return nil }
         // Read again, as an artist may have been blocked while the radios loaded.
-        let blocked = settings.value.blockedArtists
+        let blocked = settings.blocked
         let lists = ([Array(played.prefix(count))] + radios.compactMap(\.self)).map { $0.leavingOut(blocked) }
         return Self.interleave(lists, count: count)
     }

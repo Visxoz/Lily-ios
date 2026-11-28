@@ -125,6 +125,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var pinsAccount: Account?
     /// Artists whose songs play only when chosen, oldest first; unlike pins, every account's on this phone.
     public var blockedArtists: [ArtistRef] = []
+    /// Leaves out the artists a community list names as making AI music.
+    public var blockAI = false
     /// Library's albums by artist rather than as YouTube Music sorts them.
     public var albumsByArtist = false
     /// A tap of the Taptic Engine as Lily's own controls are used.
@@ -219,6 +221,7 @@ public struct Settings: Codable, Equatable, Sendable {
             pinsAccount = account
         }
         blockedArtists = file.readEach(.blockedArtists)
+        file.read(&blockAI, .blockAI)
         file.read(&albumsByArtist, .albumsByArtist)
         file.read(&haptics, .haptics)
     }
