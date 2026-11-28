@@ -83,7 +83,8 @@ struct PacketIndex {
 
     /// Nil past the packets listed so far.
     func packet(holding frame: Int64) -> (index: Int, start: Int64)? {
-        guard frame >= firstFrame else { return nil }
+        // A seek waiting on its packet asks on every piece, so a frame past the list returns before any walk.
+        guard frame >= firstFrame, frame < firstFrame + frames else { return nil }
         var start = firstFrame
         for (index, entry) in entries.enumerated() {
             let end = start + Int64(entry.frames)

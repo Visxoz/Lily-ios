@@ -2,7 +2,9 @@ import AVFoundation
 
 extension PlaybackEngine {
     func fill() {
-        while aheadFrames < frames(Self.aheadSeconds), let (buffer, entry) = nextBuffer() {
+        // Paused with the output stopped, `resume` remakes the schedule, so one buffer is enough to announce the start.
+        let target = paused && !graph.engine.isRunning ? 1 : frames(Self.aheadSeconds)
+        while aheadFrames < target, let (buffer, entry) = nextBuffer() {
             schedule(buffer, entry)
         }
         if scheduled.isEmpty {

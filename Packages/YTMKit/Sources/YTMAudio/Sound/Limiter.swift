@@ -1,3 +1,5 @@
+import Accelerate
+
 /// Keeps peaks within full scale: each frame's gain drops at once to what keeps its loudest channel at 1, then
 /// rises back linearly, so it lands exactly on idle and leaves samples already within full scale untouched.
 struct Limiter {
@@ -9,6 +11,8 @@ struct Limiter {
     var limiting: Float = 0
 
     mutating func process(_ left: UnsafeMutableBufferPointer<Float>, _ right: UnsafeMutableBufferPointer<Float>, rate: Double) {
+        // Idle and within full scale, the loop below changes nothing.
+        if limiting == 0, vDSP.maximumMagnitude(left) <= 1, vDSP.maximumMagnitude(right) <= 1 { return }
         let step = 1 / (Self.releaseSeconds * Float(max(rate, 1)))
         for frame in 0..<min(left.count, right.count) {
             let peak = max(abs(left[frame]), abs(right[frame]))

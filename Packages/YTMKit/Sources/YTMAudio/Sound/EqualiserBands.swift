@@ -19,8 +19,8 @@ public struct EqualiserBands {
     /// One gain per band, in fixed storage, as the render thread may not allocate.
     typealias Gains = InlineArray<10, Float>
 
-    /// How wide the peaks are: an octave.
-    static let q = 2.squareRoot()
+    /// How wide the peaks are: an octave, √2. A literal, so the render thread never runs a lazy initialiser.
+    static let q = 1.414_213_562_373_095_1
     /// How fast a gain glides to a new setting, in dB a second: the whole 12 dB in 75 ms, so a slider's steps
     /// never click.
     static let glide: Float = 160

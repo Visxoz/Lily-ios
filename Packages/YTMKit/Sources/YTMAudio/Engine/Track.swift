@@ -25,6 +25,8 @@ final class Track {
     /// Automix's analyses, kept as each decodes seconds of the file.
     private var analysedTail: (end: Int64, analysis: Automix.Analysis)?
     private var analysedIntro: Automix.Analysis?
+    /// Crossfade's sound end, found once.
+    private var foundEnd: Int64?
     private var startAt: Double
     /// The file's first bytes, until there are enough to tell its container.
     private var head = Data()
@@ -203,6 +205,8 @@ final class Track {
     /// `measure` the `measured` frames before them too. Nil until the file is complete.
     func soundEnd(limit: Int64, measuring measured: Int64 = 0, _ measure: (Crossfade.Channels, Int) -> Void = { _, _ in }) -> Int64? {
         guard let length else { return nil }
+        // Each seek or resume plans the fade again, and a complete file's end never moves.
+        if measured == 0, let foundEnd { return foundEnd }
         let cut = max(length - limit, 0)
         var end = cut
         let scanned = scan(from: max(cut - measured, 0)) { channels, count, start in
@@ -213,7 +217,9 @@ final class Track {
             }
             return true
         }
-        return scanned ? end : length
+        guard scanned else { return length }
+        if measured == 0 { foundEnd = end }
+        return end
     }
 
     /// As `soundEnd`, with Automix's analysis from `frames` before the cut to the sound end. An unreadable end

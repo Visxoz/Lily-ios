@@ -37,7 +37,8 @@ final class PacketDecoder {
     private var converterUsed = false
     private let cookie: Data?
     private let inputFormat: AVAudioFormat
-    private var input: AVAudioCompressedBuffer
+    /// 64 × 1,536 bytes outgrows any packet, whose size the index holds in 16 bits.
+    private let input: AVAudioCompressedBuffer
     private let output: AVAudioPCMBuffer
     private let channels: UnsafePointer<UnsafeMutablePointer<Float>>
     private let file: FileHandle
@@ -212,11 +213,6 @@ final class PacketDecoder {
             return nil
         }
         let first = Int64(packets[nextPacket].offset)
-        if Int64(packets[nextPacket].size) > Int64(input.byteCapacity) {
-            input = AVAudioCompressedBuffer(
-                format: inputFormat, packetCapacity: Self.inputPackets, maximumPacketSize: Int(packets[nextPacket].size)
-            )
-        }
         var count = 0
         var span = 0
         while nextPacket + count < usable, count < Int(input.packetCapacity) {
