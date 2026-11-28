@@ -182,8 +182,7 @@ extension PlayerController {
         // through a slow fetch.
         audio.stop(keepingOutput: true)
         playback.itemID = nil
-        let resume = playback.resume.flatMap { $0.id == track.id ? $0.position : nil } ?? 0
-        present(track, at: resume)
+        present(track, at: resumePosition())
         updateBuffering()
         publishPlayback()
         // A stream resolved ahead needs no await, so the song loads on this turn and the quality badge never shows

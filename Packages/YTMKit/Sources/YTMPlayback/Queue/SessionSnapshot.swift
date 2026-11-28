@@ -99,8 +99,8 @@ extension PlayerController {
         preparePremium()
         guard let restored, current?.id == restored.id else { return }
         if ratingGeneration == rating { loadRating(of: restored.id) }
-        // So the first play needn't wait on YouTube. Not warmed: the play fetches the start itself.
+        // So the first play needn't wait on YouTube, nor on googlevideo's first answer.
         guard isStopped else { return }
-        resolveAhead(restored, warming: false)
+        resolveAhead(restored)
     }
 }

@@ -98,12 +98,12 @@ struct StreamPrefetcher {
 }
 
 extension PlayerController {
-    /// Smart Shuffle goes first, as the next song may be one of its recommendations. Never waits.
+    /// Smart Shuffle first, as the next song may be its pick; the rest waits for the first sound, which calls this again.
     func prefetchNext() {
         topUpSmartShuffle()
         // Last, so it waits for the lyrics fetched ahead rather than asking too.
         defer { prefetchSung() }
-        guard let next = queue.peekNext(repeat: repeatMode) else { return }
+        guard playback.started, let next = queue.peekNext(repeat: repeatMode) else { return }
         // A downloaded video stays, as its song version may need the network.
         if next.isVideo, localStream(next.id) == nil { swapInSongVersion(next) }
         prefetchLyrics(of: next)
@@ -119,17 +119,14 @@ extension PlayerController {
         resolveAhead(next)
     }
 
-    /// The stream is kept only if `keep` says so once it lands. `warming` has the engine fetch its start too while it
-    /// is still next.
-    func resolveAhead(
-        _ track: Track, warming: Bool = true, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }
-    ) {
+    /// The stream is kept only if `keep` says so once it lands, and its start warmed while `warm` allows.
+    func resolveAhead(_ track: Track, keep: @escaping @MainActor (PlayerController) -> Bool = { _ in true }) {
         // The engine holds the queued song's stream; one that failed to open resolves afresh.
         guard localStream(track.id) == nil, heldStream(track.id) == nil,
               gapless.queued?.trackID != track.id || gapless.queuedFailed else { return }
         if let kept = prefetcher.kept(track.id) {
             // A kept stream may have lost its part file since; the engine skips a file cached or open.
-            if warming, current?.id != track.id { warm(track, kept.stream) }
+            if current?.id != track.id || isStopped { warm(track, kept.stream) }
             return
         }
         guard !prefetcher.isPending(track.id) else { return }
@@ -144,7 +141,7 @@ extension PlayerController {
             case .success(let stream):
                 guard keep(self) else { return }
                 prefetcher.store(track.id, .init(stream: stream, resolvedAt: .now, epoch: prefetcher.epoch))
-                if warming { warm(track, stream) }
+                warm(track, stream)
             case .failure(let error):
                 Logger.playback.debug("\(track.id, privacy: .public): could not resolve ahead: \(sentence(for: error), privacy: .public)")
             }
@@ -175,10 +172,10 @@ extension PlayerController {
         id == current?.id && audio.bufferedFraction >= 1 ? prefetcher.held(id) : nil
     }
 
-    /// Only while `track` is still next: the engine warms one song, and a stream landing late for another would
-    /// replace the real next song's.
+    /// Only while `track` is still next, or the stopped song Play starts: the engine warms one song, and a stream
+    /// landing late for another would replace the real one's.
     func warm(_ track: Track, _ stream: ResolvedStream) {
-        guard queue.peekNext(repeat: repeatMode)?.id == track.id,
+        guard queue.peekNext(repeat: repeatMode)?.id == track.id || (isStopped && current?.id == track.id),
               let item = try? audioItem(for: track, stream: stream) else { return }
         audio.warm(item)
     }

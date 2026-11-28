@@ -19,6 +19,7 @@ extension PlayerControllerTests {
         #expect(!second.player.isPlaying)
         #expect(second.audio.played.isEmpty, "nothing loads until played")
         await second.settle()
+        #expect(second.audio.warmed.contains { $0.id.hasPrefix("b#") }, "only its start fetched ahead")
         second.player.togglePlayPause()
         await second.settle()
         let resumed = try #require(second.audio.played.last)
