@@ -84,7 +84,7 @@ import Testing
         let store = store()
         store.save(PlayerScript(id: "0000abcd", signatureTimestamp: 20000, code: ""), to: .player)
         let (asked, ask) = AsyncStream.makeStream(of: Void.self)
-        let scripts = PlayerScripts { _ in
+        let scripts = PlayerScripts { _, _ in
             ask.yield()
             throw YTMError(.parse, "offline")
         }
@@ -95,7 +95,7 @@ import Testing
     }
 
     @Test func withoutASavedScriptLaunchWaitsForYouTubes() async throws {
-        let scripts = PlayerScripts { _ in throw YTMError(.parse, "offline") }
+        let scripts = PlayerScripts { _, _ in throw YTMError(.parse, "offline") }
         let store = store()
         await #expect(throws: YTMError.self) { try await scripts.player(store: store) }
         await #expect(throws: YTMError.playerUnprepared) { try await scripts.player(store: store) }

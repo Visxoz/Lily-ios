@@ -53,24 +53,34 @@ struct StreamResolver: Sendable {
         failed[played] = nil
     }
 
-    /// YouTube sometimes bot-checks a visitor ID, so when every client fails they are asked once more with a fresh one,
-    /// kept only if it works. With `itag`, that format only.
+    /// YouTube sometimes bot-checks a visitor ID, so when every client fails and one got an answer, they are asked once
+    /// more with a fresh one, kept only if it works. With `itag`, that format only.
     func resolve(videoId: String, maxKbps: Int?, itag: Int? = nil) async throws -> ResolvedStream {
         let visitor = try await innerTube.visitorData()
+        var answered = false
         do {
-            return try await resolveWithClients(videoId: videoId, maxKbps: maxKbps, itag: itag, visitorData: visitor)
+            return try await resolveWithClients(
+                videoId: videoId, maxKbps: maxKbps, itag: itag, visitorData: visitor, answered: &answered
+            )
         } catch is CancellationError {
             throw CancellationError()
+        } catch where !answered {
+            // No client got an answer, which a fresh visitor ID can't change.
+            throw error
         } catch {
             let fresh = try await innerTube.candidateVisitorData(replacing: visitor)
-            let stream = try await resolveWithClients(videoId: videoId, maxKbps: maxKbps, itag: itag, visitorData: fresh)
+            let stream = try await resolveWithClients(
+                videoId: videoId, maxKbps: maxKbps, itag: itag, visitorData: fresh, answered: &answered
+            )
             await innerTube.adoptVisitorData(fresh, replacing: visitor)
             return stream
         }
     }
 
-    /// Fails with the first client's reason, as the first is the usual one.
-    private func resolveWithClients(videoId: String, maxKbps: Int?, itag: Int?, visitorData: String) async throws -> ResolvedStream {
+    /// Fails with the first client's reason, as the first is the usual one; `answered` says whether any got an answer.
+    private func resolveWithClients(
+        videoId: String, maxKbps: Int?, itag: Int?, visitorData: String, answered: inout Bool
+    ) async throws -> ResolvedStream {
         var firstError: (any Error)?
         var failing: [String] = []
         for client in Self.clients(cut: Self.cutOffClients.withLock { $0 }, failed: Self.failedClients.withLock { $0 }) {
@@ -85,6 +95,8 @@ struct StreamResolver: Sendable {
                 throw CancellationError()
             } catch {
                 firstError = firstError ?? error
+                // Only a failed connection is `.network`; any status or reply is an answer.
+                if (error as? YTMError)?.kind != .network { answered = true }
                 failing.append(client.name)
             }
         }

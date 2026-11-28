@@ -26,14 +26,14 @@ struct PlayerScript: Codable, Sendable {
     static let checkN = "abcdefghijklmnop"
     static let checkSignature = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"
 
-    /// From the store unless YouTube has a newer one, else fetched, trimmed, checked and saved.
+    /// `known` or the saved one, unless YouTube has a newer one, else fetched, trimmed, checked and saved.
     @concurrent
-    static func load(store: FileStore) async throws -> PlayerScript {
+    static func load(store: FileStore, known: PlayerScript? = nil) async throws -> PlayerScript {
         let iframe = try await fetch(iframeAPI)
         guard let id = playerId(inIframeAPI: String(decoding: iframe, as: UTF8.self)) else {
             throw YTMError(.parse, "The version of YouTube's player wasn't found.")
         }
-        if let cached = store.load(PlayerScript.self, from: .player), cached.id == id { return cached }
+        if let cached = known ?? store.load(PlayerScript.self, from: .player), cached.id == id { return cached }
         if unreadable.withLock({ $0 == id }) { throw YTMError(.parse, "This version of YouTube's player can't be read.") }
 
         let clock = ContinuousClock()
@@ -106,9 +106,13 @@ actor PlayerScripts {
     private var loading: Task<PlayerScript, any Error>?
     private var failed: ContinuousClock.Instant?
     /// A stand-in for `PlayerScript.load` in tests.
-    private let fetch: @Sendable (FileStore) async throws -> PlayerScript
+    private let fetch: @Sendable (FileStore, PlayerScript?) async throws -> PlayerScript
 
-    init(fetch: @escaping @Sendable (FileStore) async throws -> PlayerScript = { try await PlayerScript.load(store: $0) }) {
+    init(
+        fetch: @escaping @Sendable (FileStore, PlayerScript?) async throws -> PlayerScript = {
+            try await PlayerScript.load(store: $0, known: $1)
+        }
+    ) {
         self.fetch = fetch
     }
 
@@ -137,10 +141,12 @@ actor PlayerScripts {
     /// The task can't run before `loading` is set, as the actor is busy until this returns.
     @discardableResult
     private func refresh(store: FileStore) -> Task<PlayerScript, any Error> {
+        let known = current?.script
         let task = Task {
             defer { loading = nil }
             do {
-                let script = try await fetch(store)
+                // The script held, so a check decodes nothing from disk.
+                let script = try await fetch(store, known)
                 if let old = current?.script.id, old != script.id {
                     Logger.premium.info("player \(script.id, privacy: .public) replaces \(old, privacy: .public)")
                 } else if current != nil {

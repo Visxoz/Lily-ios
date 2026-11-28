@@ -71,12 +71,15 @@ private final class Limits {
     /// Which limit stopped the script, read once it has returned.
     private(set) var reason: String?
 
+    /// Looked up once. RTLD_DEFAULT, which Swift doesn't import: every loaded image.
+    private static let found = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "JSContextGroupSetExecutionTimeLimit")
+        .map { unsafeBitCast($0, to: SetLimit.self) }
+
     init() throws {
-        // RTLD_DEFAULT, which Swift doesn't import: every loaded image.
-        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "JSContextGroupSetExecutionTimeLimit") else {
+        guard let found = Self.found else {
             throw YTMError(.unplayable, "The Premium stream couldn't be unlocked: JavaScriptCore can't limit the player.")
         }
-        setLimit = unsafeBitCast(symbol, to: SetLimit.self)
+        setLimit = found
     }
 
     /// The watchdog calls back once per limit set, so each check that lets the script carry on sets the next.
