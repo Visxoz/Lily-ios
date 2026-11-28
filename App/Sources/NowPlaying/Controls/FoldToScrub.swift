@@ -20,7 +20,7 @@ struct FoldToScrub: ViewModifier {
         if #available(iOS 27.1, *) {
             content
                 .onHingeChange(isEnabled: isEnabled) { _, new in reading(new.hinge) }
-                .sensoryFeedback(.selection, trigger: seeks)
+                .haptic(.selection, trigger: seeks)
                 .onChange(of: isEnabled) {
                     settling?.cancel()
                     scrub = FoldScrub()

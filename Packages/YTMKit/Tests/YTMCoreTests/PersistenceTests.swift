@@ -32,6 +32,8 @@ import Testing
         #expect(!settings.albumsByArtist, "YouTube's order until chosen")
         #expect(try decode(#"{"albumsByArtist": true}"#).albumsByArtist)
         #expect(settings.pauseOnUnplug, "on until turned off")
+        #expect(settings.haptics, "on until turned off")
+        #expect(try !decode(#"{"haptics": false}"#).haptics)
         #expect(settings.animatedArt == .wifi)
         #expect(try decode(#"{"animatedArt": "on"}"#).animatedArt == .on)
         #expect(!settings.crossfeed && !settings.widen && !settings.mono && settings.balance == 0)

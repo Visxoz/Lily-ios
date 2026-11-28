@@ -22,6 +22,6 @@ struct PlayPauseButton: View {
             }
         }
         .frame(width: size, height: size)
-        .sensoryFeedback(.play, trigger: taps)
+        .haptic(.play, trigger: taps)
     }
 }

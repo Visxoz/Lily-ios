@@ -23,7 +23,7 @@ struct CompactTransport<Title: View>: View {
             PlayPauseButton(size: playSize)
             skip(.next, "Next") { app.player.next() }
         }
-        .sensoryFeedback(.skip, trigger: skips)
+        .haptic(.skip, trigger: skips)
     }
 
     private func skip(_ icon: Icon, _ label: String, action: @escaping () -> Void) -> some View {

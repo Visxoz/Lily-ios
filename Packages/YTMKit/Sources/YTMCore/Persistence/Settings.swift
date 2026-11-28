@@ -127,6 +127,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var blockedArtists: [ArtistRef] = []
     /// Library's albums by artist rather than as YouTube Music sorts them.
     public var albumsByArtist = false
+    /// A tap of the Taptic Engine as Lily's own controls are used.
+    public var haptics = true
 
     public init() {}
 
@@ -218,6 +220,7 @@ public struct Settings: Codable, Equatable, Sendable {
         }
         blockedArtists = file.readEach(.blockedArtists)
         file.read(&albumsByArtist, .albumsByArtist)
+        file.read(&haptics, .haptics)
     }
 
     /// Older versions had six bands, which are carried over to the ten by interpolating in log-frequency between

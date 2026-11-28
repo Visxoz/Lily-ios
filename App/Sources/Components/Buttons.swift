@@ -18,6 +18,25 @@ extension SensoryFeedback {
     static let skip = SensoryFeedback.impact(weight: .light)
 }
 
+extension View {
+    /// `sensoryFeedback`, silent while haptics are off in Settings.
+    func haptic(_ feedback: SensoryFeedback?, trigger: some Equatable) -> some View {
+        modifier(Haptic(feedback: feedback, trigger: trigger))
+    }
+}
+
+private struct Haptic<Trigger: Equatable>: ViewModifier {
+    let feedback: SensoryFeedback?
+    let trigger: Trigger
+
+    @Environment(AppModel.self) private var app
+
+    /// Read as the feedback plays, not in `body`, so a settings change doesn't redraw this.
+    func body(content: Content) -> some View {
+        content.sensoryFeedback(trigger: trigger) { _, _ in app.settings.value.haptics ? feedback : nil }
+    }
+}
+
 /// A button that plays `feedback` with each tap, or none when nil.
 struct FeedbackButton<Label: View>: View {
     let feedback: SensoryFeedback?
@@ -33,7 +52,7 @@ struct FeedbackButton<Label: View>: View {
         } label: {
             label
         }
-        .sensoryFeedback(trigger: taps) { _, _ in feedback }
+        .haptic(feedback, trigger: taps)
     }
 }
 

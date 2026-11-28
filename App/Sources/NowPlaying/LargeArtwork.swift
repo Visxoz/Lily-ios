@@ -37,7 +37,7 @@ struct LargeArtwork: View {
         // Hit-tested as a whole, as the still takes no touches while hidden under the tall clip.
         .contentShape(Rectangle())
         .gesture(SidewaysPan(moved: { shift = $0 }, ended: ended))
-        .sensoryFeedback(.skip, trigger: skips)
+        .haptic(.skip, trigger: skips)
     }
 
     private func ended(_ x: CGFloat, velocity: CGFloat) {

@@ -30,6 +30,11 @@ struct AppearanceSettings: View {
             detail: "Orders your saved albums by artist, then title, rather than as YouTube Music lists them; Library's row too once it holds them all.",
             isOn: $settings.value.albumsByArtist
         )
+        ToggleRow(
+            label: "Haptics",
+            detail: "A tap as you play, skip and use the player's controls.",
+            isOn: $settings.value.haptics
+        )
     }
 }
 
